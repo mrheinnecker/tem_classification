@@ -1,0 +1,1 @@
+organellemaskmaker - From the final segmentation mask and the classification table, creates for each cell a mask per present organelle.

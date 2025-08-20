@@ -1,0 +1,1 @@
+getimages - creates and fills a folder containing the images of all organelles present in a cell. Can output images with or without background. Expanding crop bounds for extra context is also possible.

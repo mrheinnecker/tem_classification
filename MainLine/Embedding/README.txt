@@ -1,0 +1,3 @@
+dinov2 - applies dino or another model to get the embeddings of images from a cell and stores them in a .pkl table for future use. dinov2 tends to trigger 'cuda out of memory errors' so it is recommended to execute 'grep -l "rror" dino_*' in the terminal afterwards to catch errors and try again: it lists logs that contain errors. I have not found a method to request a minimum in GPU memory which would prevent the error from happening.
+
+addsizes - functions used in dinov2.py. Adds size and average pixel color to the embeddings' table.
