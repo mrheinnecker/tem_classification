@@ -1,0 +1,29 @@
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# Uncomment the following line if you don't like systemctl's auto-paging feature:
+# export SYSTEMD_PAGER=
+alias microsamsegmenting='sbatch /g/schwab/GregoireMichelDeletie/Codes/MainLine/Segmenting/microsamsegmenting.sh'
+alias maskmerge='sbatch /g/schwab/GregoireMichelDeletie/Codes/MainLine/Segmenting/maskmerge.sh'
+alias getimages='sbatch /g/schwab/GregoireMichelDeletie/Codes/MainLine/Extraction/getimages.sh'
+alias dinov2='sbatch /g/schwab/GregoireMichelDeletie/Codes/MainLine/Embedding/dinov2.sh'
+
+alias celgmentation='sbatch /g/schwab/GregoireMichelDeletie/Codes/celgmentation.sh'
+
+# User specific aliases and functions
+
+
+# Custom manual initialization of conda
+function initialize_conda {
+    source <(/g/easybuild/x86_64/Rocky/8/znver2/software/Mamba/4.14.0-0/bin/conda shell.bash hook)
+}
+
+
+
+
+
+
