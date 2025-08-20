@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=gpu
 #SBATCH --job-name=microsam
-#SBATCH --array=102-103     # nb of parallel tasks (both bounds included)
+#SBATCH --array=40-42    # nb of parallel tasks (both bounds included)
 #SBATCH --output=test_%a.txt
 #SBATCH --cpus-per-task=1
 #SBATCH -N 1
@@ -14,13 +14,17 @@ module purge
 # Load the Anaconda module that matches your needs
 module load Mamba/4.14.0-0
 # Activate conda in the current environment
-source ~/.bashrc
-initialize_conda
+
+source <(/g/easybuild/x86_64/Rocky/8/znver2/software/Mamba/4.14.0-0/bin/conda shell.bash hook)
+
 
 # Activate the conda environment required for your calculations
 conda deactivate
-conda activate micro-sam-env
+conda activate /g/schwab/marco/conda_microsam
 
 
 # Run your script
-python /g/schwab/GregoireMichelDeletie/Codes/MainLine/Segmenting/microsamsegmenting.py $SLURM_ARRAY_TASK_ID
+python /g/schwab/marco/repos/tem_classification/MainLine/Segmenting/microsamsegmenting.py $SLURM_ARRAY_TASK_ID
+
+
+
