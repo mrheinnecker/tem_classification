@@ -13,6 +13,8 @@ def get_labeled():
     solutions={
     }
     for y in os.listdir(r"/g/schwab/GregoireMichelDeletie/slurm_outputs/labeled_data"):
+        if not os.path.isdir(os.path.join(r"/g/schwab/GregoireMichelDeletie/slurm_outputs/labeled_data",y)):
+            continue
         solutions[y]=[]
         for x in os.listdir(os.path.join(r"/g/schwab/GregoireMichelDeletie/slurm_outputs/labeled_data",y)):
             if x.endswith(".png"):
