@@ -66,21 +66,22 @@
 process JUSTBLEND {
   
     cpus   = 1
-    memory = "5GB"
+    memory = "2GB"
     time   = "1h"    
   
     publishDir "${params.logdir}", mode:'copy'
-  
+    containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
     path raw_mrc
     
     output:
-    path "*_blend.mrc", emit: justblend_mrc
+    path "*_blend.mrc", emit: blend_mrc
     
     script:
     """
-
-    module load IMOD
+    export IMOD_DIR=/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1
+    export AUTODOC_DIR=\$IMOD_DIR/autodoc
+    export PATH=\$IMOD_DIR/bin:\$PATH
 
     justblend $raw_mrc
     
@@ -90,29 +91,56 @@ process JUSTBLEND {
 process CORRECTIONBLEND {
   
     cpus   = 1
-    memory = "5GB"
+    memory = "2GB"
     time   = "1h"    
   
     publishDir "${params.logdir}", mode:'copy'
-  
+    containerOptions '--bind /home --bind /scratch'  
     input:
     path raw_mrc
     path raw_pl
     
     output:
-    path "*_blend.mrc", emit: justblend_mrc
+    path "*correctionblend.mrc", emit: blend_mrc
     
     script:
     """
     echo "${raw_mrc}"
 
-    module load IMOD
+    export IMOD_DIR=/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1
+    export AUTODOC_DIR=\$IMOD_DIR/autodoc
+    export PATH=\$IMOD_DIR/bin:\$PATH
 
-    blendmont -imi "${raw_mrc}" -pli "${raw_pl}" -imo "test_blend.mrc" -int 1 -roo test1 -sloppy
+    blendmont -imi "${raw_mrc}" -pli "${raw_pl}" -imo "${raw_mrc.baseName}_correctionblend.mrc" -int 1 -roo test1 -sloppy
 
     """  
 }
 
+
+
+process EXPORTOVPNG {
+  
+    cpus   = 1
+    memory = "5GB"
+    time   = "1h"    
+  
+    publishDir "${params.logdir}", mode:'copy'
+    containerOptions '--bind /g --bind /home --bind /scratch'
+
+    input:
+    path blend_mrc
+    
+    output:
+    path "*.png", emit: png_ov
+    
+    script:
+    """
+      python3 /g/schwab/marco/repos/tem_classification/scripts_marco/process_images.py \
+        -i "${blend_mrc}" \
+        -o "${blend_mrc.baseName}_ov.png"
+
+    """  
+}
 
 
 
@@ -140,7 +168,13 @@ workflow {
     raw_pl_ch
   )
 
+  blend_png_ch=CORRECTIONBLEND.out.blend_mrc.concat(JUSTBLEND.out.blend_mrc)
 
+  blend_png_ch.view()
+
+  EXPORTOVPNG(
+    blend_png_ch
+  )
 }
 
 

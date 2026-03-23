@@ -20,12 +20,15 @@ justblend $img_test
 
 blendmont -imi "${img_test}.mrc" -pli "${img_test}.pl" -imo /g/schwab/marco/testblend.mrc -int 1 -roo /scratch/rheinnec/test1 -sloppy
 
+container_mrcfile="/scratch/rheinnec/container_devel/py_mrcfile.sif"
+container_imod="/scratch/rheinnec/container_devel/EMBL_IMOD_5.1.0-foss-2023a-CUDA-12.1.1.sif"
+
 
 raw_mrc="/scratch/rheinnec/tem_screen/245756_A5_Cut1_116114425_TAL_10to40_20230617_AM_01_epo_01_P1/245756_A5_Cut1_1161114425_c008.mrc"
 raw_pl="/scratch/rheinnec/tem_screen/245756_A5_Cut1_116114425_TAL_10to40_20230617_AM_01_epo_01_P1/245756_A5_Cut1_1161114425_c008.pl"
 
 workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
-rundir="/scratch/rheinnec/wfTEM_test2"
+rundir="/scratch/rheinnec/wfTEM_test3"
 mkdir -p $rundir
 
 module load Nextflow/24.10.4
@@ -34,7 +37,10 @@ nextflow run "${workflow_dir}/wfTEM.nf" \
       --logdir $rundir \
       --raw_mrc $raw_mrc \
       --raw_pl $raw_pl \
-      -profile "cluster" 
+      --container_mrcfile $container_mrcfile \
+      --container_imod $container_imod \
+      -profile "cluster" \
+      -resume      
 
 
 
