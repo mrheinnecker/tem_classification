@@ -102,19 +102,19 @@ rect = Rectangle(
     (x0, y0),
     scalebar_length_px,
     scalebar_height_px,
-    facecolor="white",
-    edgecolor="white"
+    facecolor="black",
+    edgecolor="black"
 )
 ax.add_patch(rect)
 
 # add label BELOW the bar
 ax.text(
     x0 + scalebar_length_px / 2,
-    y0 + scalebar_height_px + label_offset_px,
+    y0 + scalebar_height_px / 2,
     f"{scalebar_length_nm/1000} µm",
     color="white",
     ha="center",
-    va="top",
+    va="center",
     fontsize=14
 )
 plt.tight_layout(pad=0)

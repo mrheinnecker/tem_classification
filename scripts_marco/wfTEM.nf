@@ -62,6 +62,51 @@
   
 // }
 
+process CHECKNEWIMAGES {
+  
+    cpus   = 1
+    memory = "1GB"
+    time   = "1h"    
+  
+    publishDir "${params.logdir}", mode:'copy'
+    containerOptions '--bind /g --bind /scratch'  
+
+    input:
+    path rawdir
+    path pngdir
+
+    output:
+    path "images_to_process.csv", emit: to_process
+    
+    script:
+    """
+    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/imaging_ov.R -r "${params.rawdir}" -p $pngdir
+    
+    """  
+}
+
+
+
+process RENAME {
+  
+    cpus   = 1
+    memory = "2GB"
+    time   = "1h"    
+  
+    publishDir "${params.logdir}/${filename}", mode:'copy'
+    containerOptions '--bind /g --bind /home --bind /scratch'  
+    input:
+    tuple val(filename), path(raw_mrc)
+    
+    output:
+    tuple val(filename), path("*.mrc"), emit: renamed_mrc
+    
+    script:
+    """
+    cp $raw_mrc "./${filename}.mrc"
+    
+    """  
+}
 
 process JUSTBLEND {
   
@@ -69,21 +114,21 @@ process JUSTBLEND {
     memory = "2GB"
     time   = "1h"    
   
-    publishDir "${params.logdir}", mode:'copy'
+    publishDir "${params.logdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
-    path raw_mrc
+    tuple val(filename), path(raw_mrc)
     
     output:
-    path "*_blend.mrc", emit: blend_mrc
+    tuple val(filename), path("*_blend.mrc"), path("*.pl"),  path(raw_mrc), emit: justblend_tup
     
     script:
     """
     export IMOD_DIR=/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1
     export AUTODOC_DIR=\$IMOD_DIR/autodoc
     export PATH=\$IMOD_DIR/bin:\$PATH
-
     justblend $raw_mrc
+    
     
     """  
 }
@@ -91,17 +136,18 @@ process JUSTBLEND {
 process CORRECTIONBLEND {
   
     cpus   = 1
-    memory = "2GB"
+    memory = "5GB"
     time   = "1h"    
   
-    publishDir "${params.logdir}", mode:'copy'
+    publishDir "${params.logdir}/${filename}", mode:'copy'
     containerOptions '--bind /home --bind /scratch'  
+    errorStrategy = 'ignore' 
+
     input:
-    path raw_mrc
-    path raw_pl
+    tuple val(filename), path(blend_mrc), path(blend_pl), path(raw_mrc)
     
     output:
-    path "*correctionblend.mrc", emit: blend_mrc
+    tuple val(filename), path("*correctionblend.mrc"), emit: correctionblend_tup
     
     script:
     """
@@ -111,7 +157,7 @@ process CORRECTIONBLEND {
     export AUTODOC_DIR=\$IMOD_DIR/autodoc
     export PATH=\$IMOD_DIR/bin:\$PATH
 
-    blendmont -imi "${raw_mrc}" -pli "${raw_pl}" -imo "${raw_mrc.baseName}_correctionblend.mrc" -int 1 -roo test1 -sloppy
+    blendmont -imi "${raw_mrc}" -pli "${blend_pl}" -imo "${raw_mrc.baseName}_correctionblend.mrc" -int 1 -roo test1 -sloppy
 
     """  
 }
@@ -121,23 +167,25 @@ process CORRECTIONBLEND {
 process EXPORTOVPNG {
   
     cpus   = 1
-    memory = "5GB"
-    time   = "1h"    
+    memory = "25GB"
+    time   = "0.25h"    
   
-    publishDir "${params.logdir}", mode:'copy'
+    publishDir "${params.pngdir}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
 
     input:
+    //tuple val(filename), path(blend_mrc)
     path blend_mrc
-    
+
     output:
     path "*.png", emit: png_ov
     
     script:
     """
+
       python3 /g/schwab/marco/repos/tem_classification/scripts_marco/process_images.py \
         -i "${blend_mrc}" \
-        -o "${blend_mrc.baseName}_ov.png"
+        -o "${blend_mrc.baseName}.png"
 
     """  
 }
@@ -148,33 +196,50 @@ workflow {
   
 
 
-  Channel
-    .fromPath(params.raw_mrc)
-    .collect()
-    .set { raw_mrc_ch }
+
 
   Channel
-    .fromPath(params.raw_pl)
+    .fromPath(params.rawdir)
     .collect()
-    .set { raw_pl_ch }
+    .set { rawdir_ch }
 
+  Channel
+    .fromPath(params.pngdir)
+    .collect()
+    .set { pngdir_ch }
+
+  CHECKNEWIMAGES(rawdir_ch, pngdir_ch)
+
+  CHECKNEWIMAGES.out.to_process.view()
+
+  Channel
+        CHECKNEWIMAGES.out.to_process
+        .splitCsv(header:true)
+        .map { row -> tuple row.filename, row.file}  
+        .set { batch_ch }
+
+  RENAME(batch_ch)
 
   JUSTBLEND(
-    raw_mrc_ch
+    RENAME.out.renamed_mrc
   )
+
 
   CORRECTIONBLEND(
-    raw_mrc_ch,
-    raw_pl_ch
+    JUSTBLEND.out.justblend_tup
   )
 
-  blend_png_ch=CORRECTIONBLEND.out.blend_mrc.concat(JUSTBLEND.out.blend_mrc)
 
-  blend_png_ch.view()
+  ch_a_second = JUSTBLEND.out.justblend_tup.map { t -> t[1] }
+  ch_b_second = CORRECTIONBLEND.out.correctionblend_tup.map { t -> t[1] }
+
+  combined_ch = ch_a_second.mix(ch_b_second)
+
 
   EXPORTOVPNG(
-    blend_png_ch
+    combined_ch
   )
+
 }
 
 
