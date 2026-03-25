@@ -13,7 +13,7 @@ opt <- getopt(spec)
 
 
 # opt <- tibble(
-#   rawdir="/scratch/rheinnec/tem_screen/raw/",
+#   rawdir="/g/schwab/tem_screen/",
 #   pngdir="/g/schwab/marco/wfTEM_pngs/"
 # )
 
@@ -23,6 +23,7 @@ png_dir <- opt$pngdir
 all_files <- 
   tibble(file=list.files(raw_dir, pattern="c0\\d+.mrc$", recursive = T, full.names=T) %>%
   .[which(!str_detect(.,"canc_"))]) %>%
+ # .[63,] %>%
   #rowwise() %>%
   mutate(
     site=str_extract(file, "ATH|BAR|KRI|TAL"),
@@ -31,11 +32,17 @@ all_files <-
     shortname=str_extract(basename(dirname(file)), "^.*Cut\\d+") %>% paste(cell_id, sep="_"),
     
     filename=str_split(basename(dirname(file)), "Cut\\d*_") %>% map_chr(.,2) %>% paste(shortname,., sep="_"),
-    justblend_file=file.path(png_dir, filename, paste0(filename, "_blend.png")),
-    correctionblend_file=file.path(png_dir, filename, paste0(filename, "_correctionblend.png")),
+    justblend_file=file.path(png_dir, paste0(filename, "_blend.png")),
+    correctionblend_file=file.path(png_dir, paste0(filename, "_correctionblend.png")),
+    
     #grid=
   ) %>%
-  select(filename, file, shortname, justblend_file, correctionblend_file) #%>%
+  rowwise() %>%
+  mutate(
+    filesize=file.info(file)$size,
+    req_mem=min(max(16, round(20*filesize/10^9)), 128)
+  ) %>%
+  select(filename, file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
 to_run <- all_files %>%
   filter(!(file.exists(correctionblend_file)&file.exists(justblend_file)))

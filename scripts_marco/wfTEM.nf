@@ -167,7 +167,7 @@ process CORRECTIONBLEND {
 process EXPORTOVPNG {
   
     cpus   = 1
-    memory = "25GB"
+    memory = "128GB"
     time   = "0.25h"    
   
     publishDir "${params.pngdir}", mode:'copy'

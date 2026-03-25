@@ -6,7 +6,7 @@ container_imod="/scratch/rheinnec/container_devel/EMBL_IMOD_5.1.0-foss-2023a-CUD
 container_tidyverse="/g/schwab/marco/container_legacy/probeDesign_rtool.sif"
 
 workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
-rawdir="/scratch/rheinnec/tem_screen/raw/"
+rawdir="/g/schwab/tem_screen/"
 timestamp=$(date +%Y-%m-%d_%H-%M)
 
 logdir="/scratch/rheinnec/runs/wfTEM_${timestamp}"
