@@ -1,0 +1,4 @@
+Bootstrap: docker
+From: sydneyinformaticshub/imod:11.4-centos7
+
+## sudo singularity build /scratch/rheinnec/container_devel/test.sif /g/schwab/marco/repos/tem_classification/container/imod.def
