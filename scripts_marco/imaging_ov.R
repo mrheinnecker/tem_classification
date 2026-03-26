@@ -5,7 +5,8 @@ library(getopt)
 spec <- matrix(c(
   # long option                  short  arg  type
   "rawdir",                   "r",   1,   "character",
-  "pngdir",        "p",   1,   "character"
+  "pngdir",        "p",   1,   "character",
+  "dryrun", "d",   1,   "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -17,6 +18,8 @@ opt <- getopt(spec)
 #   pngdir="/g/schwab/marco/wfTEM_pngs/"
 # )
 
+print(opt$dryrun)
+
 raw_dir <- opt$rawdir
 png_dir <- opt$pngdir
 
@@ -26,6 +29,7 @@ all_files <-
  # .[63,] %>%
   #rowwise() %>%
   mutate(
+    mdoc_file=str_replace(file, ".mrc$", ".mrc.mdoc"),
     site=str_extract(file, "ATH|BAR|KRI|TAL"),
     cell_id=str_extract(file, "c0\\d+.mrc$") %>% str_remove(".mrc"),
     
@@ -42,10 +46,15 @@ all_files <-
     filesize=file.info(file)$size,
     req_mem=min(max(16, round(20*filesize/10^9)), 128)
   ) %>%
-  select(filename, file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
+  select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
-to_run <- all_files %>%
-  filter(!(file.exists(correctionblend_file)&file.exists(justblend_file)))
+if(as.logical(opt$dryrun)){
+  to_run <- all_files[1:5,]
+} else {
+  to_run <- all_files %>%
+    filter(!(file.exists(correctionblend_file)&file.exists(justblend_file)))  
+}
+
 
 
 write_csv(to_run, file="images_to_process.csv")

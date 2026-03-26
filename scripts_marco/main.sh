@@ -6,11 +6,12 @@ container_imod="/scratch/rheinnec/container_devel/EMBL_IMOD_5.1.0-foss-2023a-CUD
 container_tidyverse="/g/schwab/marco/container_legacy/probeDesign_rtool.sif"
 
 workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
-rawdir="/g/schwab/tem_screen/"
+rawdir="/g/schwab/tem_screen/raw/"
 timestamp=$(date +%Y-%m-%d_%H-%M)
 
 logdir="/scratch/rheinnec/runs/wfTEM_${timestamp}"
-pngdir="/g/schwab/marco/wfTEM_pngs"
+pngdir="/g/schwab/marco/wfTEM_pngs3"
+outdir="/g/schwab/tem_screen/processed"
 mkdir -p $logdir
 mkdir -p $pngdir
 
@@ -22,9 +23,11 @@ nextflow run "${workflow_dir}/wfTEM.nf" \
       --logdir $logdir \
       --pngdir $pngdir \
       --rawdir $rawdir \
+      --outdir $outdir \
       --container_mrcfile $container_mrcfile \
       --container_imod $container_imod \
       --container_tidyverse $container_tidyverse \
+      --dryrun "TRUE" \
       -profile "cluster" \
       -resume      
 
@@ -65,10 +68,10 @@ justblend $img_test
 
 
 
-raw_mrc="/g/schwab/marco/container_legacy/work/a9/131dc462a40bc35a6643a60ee1ca4d/245756_G1_Cut1_117659905_BAR_20to200_20240321_AM_01_epo_03_P1_c010_blend.mrc"
-raw_pl="/g/schwab/marco/container_legacy/work/a9/131dc462a40bc35a6643a60ee1ca4d/245756_G1_Cut1_117659905_BAR_20to200_20240321_AM_01_epo_03_P1_c010_blend.pl"
+raw_mrc="/scratch/rheinnec/runs/wfTEM_2026-03-25_11-17/245756_A5_Cut1_c008_116114425_TAL_10to40_20230617_AM_01_epo_01_P1/245756_A5_Cut1_c008_116114425_TAL_10to40_20230617_AM_01_epo_01_P1.mrc"
+raw_pl="/scratch/rheinnec/runs/wfTEM_2026-03-25_11-17/245756_A5_Cut1_c008_116114425_TAL_10to40_20230617_AM_01_epo_01_P1/245756_A5_Cut1_c008_116114425_TAL_10to40_20230617_AM_01_epo_01_P1.pl"
 
-blendmont -imi "${raw_mrc}" -pli "${raw_pl}" -imo /g/schwab/marco/testblend2.mrc -int 1 -roo /scratch/rheinnec/test1 -sloppy
+blendmont -imi "${raw_mrc}" -pli "${raw_pl}" -imo /g/schwab/marco/testblend3.mrc -int 1 -roo /scratch/rheinnec/test2 -sloppy
 
 blendmont -imi 245756_G1_Cut1_117659905_c001_blend.mrc -pli 245756_G1_Cut1_117659905_c001.pl -imo "245756_G1_Cut1_117659905_c001_correctionblend.mrc" -int 1 -roo test1 -sloppy
 

@@ -1,4 +1,4 @@
-
+params.dryrun="FALSE"
 
 // process EXTRACTFEATURES {
   
@@ -74,13 +74,14 @@ process CHECKNEWIMAGES {
     input:
     path rawdir
     path pngdir
+    val dryrun
 
     output:
     path "images_to_process.csv", emit: to_process
     
     script:
     """
-    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/imaging_ov.R -r "${params.rawdir}" -p $pngdir
+    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/imaging_ov.R -r "${params.rawdir}" -p $pngdir -d $dryrun
     
     """  
 }
@@ -93,17 +94,18 @@ process RENAME {
     memory = "2GB"
     time   = "1h"    
   
-    publishDir "${params.logdir}/${filename}", mode:'copy'
+    publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
-    tuple val(filename), path(raw_mrc)
+    tuple val(filename), path(raw_mrc), path(mdoc_file), val(shortname), val(req_mem)
     
     output:
-    tuple val(filename), path("*.mrc"), emit: renamed_mrc
+    tuple val(filename), path("*.mrc"), path("*.mdoc"), emit: renamed_mrc
     
     script:
     """
     cp $raw_mrc "./${filename}.mrc"
+    cp $mdoc_file "./${filename}.mdoc"
     
     """  
 }
@@ -114,10 +116,10 @@ process JUSTBLEND {
     memory = "2GB"
     time   = "1h"    
   
-    publishDir "${params.logdir}/${filename}", mode:'copy'
+    publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
-    tuple val(filename), path(raw_mrc)
+    tuple val(filename), path(raw_mrc), path(raw_mdoc)
     
     output:
     tuple val(filename), path("*_blend.mrc"), path("*.pl"),  path(raw_mrc), emit: justblend_tup
@@ -139,7 +141,7 @@ process CORRECTIONBLEND {
     memory = "5GB"
     time   = "1h"    
   
-    publishDir "${params.logdir}/${filename}", mode:'copy'
+    publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /home --bind /scratch'  
     errorStrategy = 'ignore' 
 
@@ -157,7 +159,7 @@ process CORRECTIONBLEND {
     export AUTODOC_DIR=\$IMOD_DIR/autodoc
     export PATH=\$IMOD_DIR/bin:\$PATH
 
-    blendmont -imi "${raw_mrc}" -pli "${blend_pl}" -imo "${raw_mrc.baseName}_correctionblend.mrc" -int 1 -roo test1 -sloppy
+    blendmont -imi "${raw_mrc}" -pli "${blend_pl}" -imo "${raw_mrc.baseName}_correctionblend.mrc" -int 2 -roo test1 -sloppy -sum
 
     """  
 }
@@ -195,7 +197,9 @@ process EXPORTOVPNG {
 workflow {
   
 
-
+  Channel
+    .from(params.dryrun)
+    .set { dryrun_ch }
 
 
   Channel
@@ -208,14 +212,14 @@ workflow {
     .collect()
     .set { pngdir_ch }
 
-  CHECKNEWIMAGES(rawdir_ch, pngdir_ch)
+  CHECKNEWIMAGES(rawdir_ch, pngdir_ch, dryrun_ch)
 
   CHECKNEWIMAGES.out.to_process.view()
 
   Channel
         CHECKNEWIMAGES.out.to_process
         .splitCsv(header:true)
-        .map { row -> tuple row.filename, row.file}  
+        .map { row -> tuple row.filename, row.file, row.mdoc_file, row.shortname, row.req_mem}  
         .set { batch_ch }
 
   RENAME(batch_ch)
