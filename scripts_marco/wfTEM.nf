@@ -92,7 +92,7 @@ process RENAME {
   
     cpus   = 1
     memory = "2GB"
-    time   = "1h"    
+    time   = "0.25h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
@@ -170,7 +170,7 @@ process EXPORTOVPNG {
   
     cpus   = 1
     memory = "128GB"
-    time   = "0.25h"    
+    time   = "0.2h"    
   
     publishDir "${params.pngdir}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
@@ -213,8 +213,6 @@ workflow {
     .set { pngdir_ch }
 
   CHECKNEWIMAGES(rawdir_ch, pngdir_ch, dryrun_ch)
-
-  CHECKNEWIMAGES.out.to_process.view()
 
   Channel
         CHECKNEWIMAGES.out.to_process
