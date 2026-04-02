@@ -33,6 +33,10 @@ png_path = args.output
 # ---------------------------
 scalebar_length_nm = 5000   # e.g. 100, 200, 500, 1000, 5000
 
+# quick preview mode
+preview = True
+preview_factor = 4   # 4 means keep every 4th pixel in x and y
+
 # ---------------------------
 # read only what is needed
 # ---------------------------
@@ -72,7 +76,7 @@ del img
 pixel_size_angstrom = float(voxel_size.x)
 pixel_size_nm = pixel_size_angstrom / 10.0
 
-print("Image shape:", img_uint8.shape)
+print("Original image shape:", img_uint8.shape)
 print("Pixel size:", pixel_size_angstrom, "Å =", pixel_size_nm, "nm")
 
 # convert desired scalebar length to pixels
@@ -88,11 +92,28 @@ margin_x = int(img_w * 0.05)
 margin_y = int(img_h * 0.05)
 
 # dynamic scalebar thickness: 1.5% of image height
-# with a sensible minimum/maximum
 scalebar_height_px = max(8, min(int(img_h * 0.015), 200))
 
 # dynamic font size based on scalebar height
 fontsize = max(8, int(scalebar_height_px * 0.45))
+
+# ---------------------------
+# quick preview downscaling
+# ---------------------------
+if preview and preview_factor > 1:
+    img_uint8 = img_uint8[::preview_factor, ::preview_factor]
+
+    scalebar_length_px = max(1, int(round(scalebar_length_px / preview_factor)))
+    scalebar_height_px = max(1, int(round(scalebar_height_px / preview_factor)))
+    margin_x = int(round(margin_x / preview_factor))
+    margin_y = int(round(margin_y / preview_factor))
+    fontsize = max(6, int(round(fontsize / preview_factor)))
+
+    print("Preview image shape:", img_uint8.shape)
+    print(f"Preview mode active: downscaled by factor {preview_factor}")
+
+# update image size after optional downscaling
+img_h, img_w = img_uint8.shape
 
 # bottom-right position
 x0 = img_w - margin_x - scalebar_length_px
@@ -105,8 +126,7 @@ y0 = max(0, y0)
 # ---------------------------
 # plot
 # ---------------------------
-# match figure size roughly to image aspect ratio, avoid oversized canvas
-dpi = 100
+dpi = 50
 fig_w = img_w / dpi
 fig_h = img_h / dpi
 

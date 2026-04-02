@@ -1,7 +1,7 @@
 #!bin/bash
 
 workflow_dir="$1"
-
+#workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
 
 container_mrcfile="/g/schwab/marco/container_legacy/py_mrcfile.sif"
 container_imod="/g/schwab/marco/container_legacy/EMBL_IMOD_5.1.0-foss-2023a-CUDA-12.1.1.sif"
@@ -28,7 +28,7 @@ nextflow run "${workflow_dir}/wfTEM.nf" \
       --container_mrcfile $container_mrcfile \
       --container_imod $container_imod \
       --container_tidyverse $container_tidyverse \
-      --dryrun "TRUE" \
+      --dryrun "FALSE" \
       -profile "cluster"     
 
 
