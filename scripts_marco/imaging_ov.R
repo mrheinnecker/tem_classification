@@ -1,6 +1,12 @@
 library(tidyverse)
 library(getopt)
 
+library(googlesheets4)
+#email = "marco.rheinnecker@embl.de"
+gs4_auth(path="/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json")
+trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+
+
 
 spec <- matrix(c(
   # long option                  short  arg  type
@@ -14,30 +20,30 @@ opt <- getopt(spec)
 
 
 # opt <- tibble(
-#   rawdir="/g/schwab/tem_screen/",
-#   pngdir="/g/schwab/marco/wfTEM_pngs/"
+#   rawdir="/g/schwab/tem_screen/raw",
+#   pngdir="/g/schwab/tem_screen/pngs"
 # )
 
-print(opt$dryrun)
+#print(opt$dryrun)
 
 raw_dir <- opt$rawdir
 png_dir <- opt$pngdir
 
-all_files <- 
-  tibble(file=list.files(raw_dir, pattern="c0\\d+.mrc$", recursive = T, full.names=T) %>%
+all_files_raw <- 
+  tibble(file=list.files(raw_dir, pattern="c\\d+.mrc$", recursive = T, full.names=T) %>%
   .[which(!str_detect(.,"canc_"))]) %>%
  # .[63,] %>%
   #rowwise() %>%
   mutate(
     mdoc_file=str_replace(file, ".mrc$", ".mrc.mdoc"),
-    site=str_extract(file, "ATH|BAR|KRI|TAL"),
+    site=str_extract(file, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
     cell_id=str_extract(file, "c0\\d+.mrc$") %>% str_remove(".mrc"),
     
     shortname=str_extract(basename(dirname(file)), "^.*Cut\\d+") %>% paste(cell_id, sep="_"),
     
     filename=str_split(basename(dirname(file)), "Cut\\d*_") %>% map_chr(.,2) %>% paste(shortname,., sep="_"),
-    justblend_file=file.path(png_dir, paste0(filename, "_blend.png")),
-    correctionblend_file=file.path(png_dir, paste0(filename, "_correctionblend.png")),
+    justblend_file=file.path(png_dir, site, paste0(filename, "_blend.png")),
+    correctionblend_file=file.path(png_dir, site, paste0(filename, "_correctionblend.png")),
     
     #grid=
   ) %>%
@@ -45,19 +51,41 @@ all_files <-
   mutate(
     filesize=file.info(file)$size,
     req_mem=min(max(16, round(20*filesize/10^9)), 128)
-  ) %>%
+  ) 
+
+all_files <- all_files_raw %>%
   select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
 if(as.logical(opt$dryrun)){
   to_run <- all_files[1:5,]
 } else {
   to_run <- all_files %>%
-    filter(!(file.exists(correctionblend_file)&file.exists(justblend_file)))  
+    filter(!(file.exists(correctionblend_file)))  
 }
+
+
+
+df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet="image_log", col_types="c") 
+write_tsv(df_trec_tem_current_state, file="manually_filled_log.tsv")
+
+
+new <- all_files_raw %>%
+  select(shortname, site) %>%
+  left_join(df_trec_tem_current_state, by=c("shortname", "site"))
+
+#, "site"
+
+write_sheet(new, ss = trec_tem_googledoc, sheet="image_log")
+
 
 
 
 write_csv(to_run, file="images_to_process.csv")
 
 write_tsv(all_files, file="all_datasets.tsv")
+
+
+
+
+
 

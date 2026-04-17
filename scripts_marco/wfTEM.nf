@@ -78,6 +78,7 @@ process CHECKNEWIMAGES {
 
     output:
     path "images_to_process.csv", emit: to_process
+    path "manually_filled_log.tsv"
     
     script:
     """
@@ -172,7 +173,13 @@ process EXPORTOVPNG {
     memory = "128GB"
     time   = "0.2h"    
   
-    publishDir "${params.pngdir}", mode:'copy'
+    //publishDir "${params.pngdir}", mode:'copy'
+    publishDir { 
+    def m = (blend_mrc.baseName =~ /_(NAP|BAR|KRI|POR|TAL|ATH|BIL)_/)
+    def sample = m ? m[0][1] : "UNKNOWN"
+    "${params.pngdir}/${sample}"
+    }, mode: 'copy'
+    
     containerOptions '--bind /g --bind /home --bind /scratch'
 
     input:
@@ -239,7 +246,7 @@ workflow {
 
 
   EXPORTOVPNG(
-    combined_ch
+    ch_b_second
   )
 
 }

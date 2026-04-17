@@ -9,15 +9,16 @@ ssh login1.cluster.embl.de
 
 
 ## OPTION 1:
-# allocate clusternode for some hours (can be shorter if few images only) ... can take some minutes
-srun -p htc --time=0-01:00:00 --ntasks-per-node 64 --mem 32G --pty bash
+# allocate clusternode for some hours (can be shorter if few images only) 
+# ... can take some minutes until resources are allocated
+srun -p htc --time=0-03:00:00 --ntasks-per-node 64 --mem 32G --pty bash
 
-# execute blending workflow
-local_repo_clone="/g/schwab/marco/repos/tem_classification/scripts_marco"
-bash "${local_repo_clone}/main.sh" $local_repo_clone 
+# execute blending workflow (adjust path to your local repo clone!!!!!!!)
+workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
+bash "${workflow_dir}/main.sh" $workflow_dir 
 
 
 ## OPTION 2:
-local_repo_clone="/g/schwab/marco/repos/tem_classification"
-sbatch -J "wfTEM" -t 2:00:00 --mem 2000 -e "/scratch/tem_screen/log.txt" -o "/scratch/tem_screen/log.out" --wrap="bash "${local_repo_clone}/scripts_marco/main.sh" $local_repo_clone"
+workflow_dir="/g/schwab/marco/repos/tem_classification/scripts_marco"
+sbatch -J "wfTEM" -t 3:00:00 --mem 2000 -e "/scratch/tem_screen/log.txt" -o "/scratch/tem_screen/log.out" --wrap="bash "${workflow_dir}/main.sh" $workflow_dir"
 
