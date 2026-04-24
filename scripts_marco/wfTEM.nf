@@ -106,7 +106,7 @@ process RENAME {
     script:
     """
     cp $raw_mrc "./${filename}.mrc"
-    cp $mdoc_file "./${filename}.mdoc"
+    cp $mdoc_file "./${filename}.mrc.mdoc"
     
     """  
 }
@@ -116,6 +116,9 @@ process JUSTBLEND {
     cpus   = 1
     memory = "2GB"
     time   = "1h"    
+  
+    errorStrategy 'retry'
+    maxRetries 1
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
