@@ -1,9 +1,12 @@
 library(tidyverse)
 library(getopt)
-
 library(googlesheets4)
+library(googledrive)
 #email = "marco.rheinnecker@embl.de"
-gs4_auth(path="/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json")
+
+json_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
+gs4_auth(path=json_key)
+drive_auth(path = json_key)
 trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
 
 
@@ -33,6 +36,10 @@ all_files_raw <-
   tibble(file=list.files(raw_dir, pattern="c\\d+.mrc$", recursive = T, full.names=T) %>%
   .[which(!str_detect(.,"canc_"))]) %>%
  # .[63,] %>%
+  # filter(
+  #   ## duplicated with id c015 from same block
+  #   !2474646_76273
+  # ) %>%
   #rowwise() %>%
   mutate(
     mdoc_file=str_replace(file, ".mrc$", ".mrc.mdoc"),
@@ -64,6 +71,20 @@ if(as.logical(opt$dryrun)){
 }
 
 
+## make statistics figure
+
+source("/g/schwab/marco/repos/tem_classification/scripts_marco/count_stats.R")
+
+comb_plot <- make_main_statistic_of_sample_number(raw_dir)
+
+plot_name <- "TEM_screen_image_count.pdf"
+
+pdf(file=plot_name, width=4.5, height=4.5)
+comb_plot+ggtitle("TESTEST")
+dev.off()
+
+
+
 
 df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet="image_log", col_types="c") 
 write_tsv(df_trec_tem_current_state, file="manually_filled_log.tsv")
@@ -76,6 +97,15 @@ new <- all_files_raw %>%
 #, "site"
 
 write_sheet(new, ss = trec_tem_googledoc, sheet="image_log")
+
+options(gargle_oauth_cache = "/g/schwab/marco/repos/tem_classification/scripts_marco/gargle_cache")
+drive_auth(email = "marco.rheinnecker@embl.de")
+folder <- drive_get(as_id("https://drive.google.com/drive/folders/11T1ozEQ66wFDgfWjJnCW3jpfHTHwpJsW"))
+drive_upload(
+  media = plot_name,
+  path  = folder,
+  name  = plot_name
+)
 
 
 
