@@ -1,4 +1,7 @@
-Bootstrap: docker
-From: sydneyinformaticshub/imod:11.4-centos7
+## NOT A DEF FILE!!!!!!!!
 
-## sudo singularity build /scratch/rheinnec/container_devel/test.sif /g/schwab/marco/repos/tem_classification/container/imod.def
+# IMOD cntainer can be buold by following command (load imod module beforehand)
+
+## build singularity image from module in EMBL HPC (load required modules beforehand)
+bash /g/easybuild/scripts/generate_container_from_loaded_modules.sh -a rheinnec
+
