@@ -79,6 +79,7 @@ process CHECKNEWIMAGES {
     output:
     path "images_to_process.csv", emit: to_process
     path "manually_filled_log.tsv"
+    path "TEM_screen_image_count.pdf"
     
     script:
     """
