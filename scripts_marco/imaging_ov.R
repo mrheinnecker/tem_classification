@@ -2,6 +2,7 @@ library(tidyverse)
 library(getopt)
 library(googlesheets4)
 library(googledrive)
+library(cowplot)
 #email = "marco.rheinnecker@embl.de"
 
 json_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
@@ -80,9 +81,41 @@ comb_plot <- make_main_statistic_of_sample_number(raw_dir)
 plot_name <- "TEM_screen_image_count.pdf"
 
 pdf(file=plot_name, width=4.5, height=4.5)
-comb_plot+ggtitle("TESTEST")
+comb_plot
 dev.off()
 
+
+# 
+# 
+# cache_dir <- "/g/schwab/marco/repos/tem_classification/scripts_marco/gargle_cache"
+# 
+# 
+# 
+# options(gargle_oauth_cache = cache_dir,
+#         gargle_oauth_email = "marco.rheinnecker@embl.de")
+# 
+# print(gargle::gargle_oauth_cache())
+# print(list.files(cache_dir, recursive = TRUE))
+# 
+# 
+# 
+# googledrive::drive_auth(
+#   email = "marco.rheinnecker@embl.de",
+#   cache = cache_dir,
+#   scopes = "https://www.googleapis.com/auth/drive"
+# )
+# 
+# folder <- drive_get(as_id("https://drive.google.com/drive/folders/11T1ozEQ66wFDgfWjJnCW3jpfHTHwpJsW"))
+# 
+# 
+# 
+# drive_upload(
+#   media = plot_name,
+#   path  = folder,
+#   name  = plot_name,
+#   overwrite=TRUE
+# )
+# 
 
 
 
@@ -97,18 +130,6 @@ new <- all_files_raw %>%
 #, "site"
 
 write_sheet(new, ss = trec_tem_googledoc, sheet="image_log")
-
-options(gargle_oauth_cache = "/g/schwab/marco/repos/tem_classification/scripts_marco/gargle_cache")
-drive_auth(email = "marco.rheinnecker@embl.de")
-folder <- drive_get(as_id("https://drive.google.com/drive/folders/11T1ozEQ66wFDgfWjJnCW3jpfHTHwpJsW"))
-drive_upload(
-  media = plot_name,
-  path  = folder,
-  name  = plot_name
-)
-
-
-
 
 write_csv(to_run, file="images_to_process.csv")
 
