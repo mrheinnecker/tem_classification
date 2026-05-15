@@ -205,6 +205,42 @@ process EXPORTOVPNG {
 
 
 
+process EUBICONVERSION {
+  
+    cpus   = 1
+    memory = "5GB"
+    time   = "1h"    
+  
+    publishDir "${params.outdir}/${filename}", mode:'copy'
+    containerOptions '--bind /home --bind /scratch'  
+    errorStrategy = 'ignore' 
+
+    input:
+    tuple val(filename), path(correctionblend_mrc), path(mdoc_file), path(raw_mdoc)
+    
+    output:
+    tuple val(filename), path(mdoc_file), path("conversion_done.txt"), path("*omezarr"), emit: omezarr_tup
+    
+    script:
+    """
+    eubi to_zarr \
+      /scratch/rheinnec/245756_S2_Cut2_c019_116114649_KRI_10to40_20230802_PM_01_epo_02_P1/245756_S2_Cut2_c019_116114649_KRI_10to40_20230802_PM_01_epo_02_P1_correctionblend.mrc \
+      /scratch/rheinnec/245756_S2_Cut2_c019_116114649_KRI_10to40_20230802_PM_01_epo_02_P1/245756_S2_Cut2_c019_116114649_KRI_10to40_20230802_PM_01_epo_02_P1_correctionblend_omezarr5 \
+      --x_unit nm \
+      --y_unit nm \
+      --x_scale 1.766 \
+      --y_scale 1.766
+
+    touch conversion_done.txt
+
+
+    """  
+}
+
+
+
+
+
 workflow {
   
 
