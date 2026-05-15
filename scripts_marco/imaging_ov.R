@@ -77,12 +77,30 @@ if(as.logical(opt$dryrun)){
 source("/g/schwab/marco/repos/tem_classification/scripts_marco/count_stats.R")
 
 comb_plot <- make_main_statistic_of_sample_number(raw_dir)
+outdir <- getwd()
+plot_name <- "TEM_screen_image_count"
 
-plot_name <- "TEM_screen_image_count.pdf"
-
-pdf(file=plot_name, width=4.5, height=4.5)
+pdf(file=file.path(outdir, paste0(plot_name, ".pdf")), width=4.5, height=4.5)
 comb_plot
 dev.off()
+
+
+
+
+png(
+  filename = file.path(outdir, paste0(plot_name, ".png")),
+  width = 4.5,
+  height = 4.5,
+  units = "in",
+  res = 300   # good default for publication-quality
+)
+
+comb_plot
+dev.off()
+
+
+
+
 
 
 # 
