@@ -1,0 +1,68 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.10-bookworm-slim
+
+%labels
+    Author marco
+    Tool EuBI-Bridge
+    Source https://github.com/Euro-BioImaging/EuBI-Bridge
+
+%environment
+    export MAMBA_ROOT_PREFIX=/opt/conda
+    export PATH=/opt/conda/envs/eubi/bin:/opt/conda/bin:$PATH
+    export JAVA_HOME=/opt/conda/envs/eubi
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%post
+    export MAMBA_ROOT_PREFIX=/opt/conda
+    export PATH=/opt/conda/bin:$PATH
+
+    apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        build-essential \
+        ca-certificates \
+        libgl1 \
+        libegl1 \
+        libxkbcommon-x11-0 \
+        libdbus-1-3 \
+        libxcb-cursor0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-shape0 \
+        libxcb-xinerama0 \
+        libxcb-xfixes0 \
+        libxrender1 \
+        libxi6 \
+        libxext6 \
+        libsm6 \
+        libice6 \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+
+    micromamba create -y -n eubi -c conda-forge \
+        python=3.12 \
+        openjdk=11 \
+        maven \
+        pyqt6 \
+        pip \
+        cmake \
+        zlib \
+        boost
+
+    micromamba run -n eubi python -m pip install --upgrade pip setuptools wheel
+
+    # Stable PyPI release
+    micromamba run -n eubi pip install --no-cache-dir eubi-bridge==0.1.0
+
+    # Initialize default config
+    micromamba run -n eubi eubi reset_config || true
+
+%runscript
+    exec eubi "$@"
+
+%test
+    eubi --help
+    python -c "import eubi_bridge; print('EuBI-Bridge import OK')"
