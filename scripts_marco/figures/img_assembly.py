@@ -4,39 +4,60 @@ import pandas as pd
 import mrcfile
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
 
+parser = argparse.ArgumentParser()
 
-df_in = pd.read_csv("/scratch/rheinnec/viktoria_figure/df_in_full_new.tsv", sep="\t")
+parser.add_argument(
+    "--df",
+    type=str,
+    required=True,
+    help="Input TSV file"
+)
 
-out_file = "/scratch/rheinnec/viktoria_figure/figure_2x2_cropped_scalebar_real_imgs_new.png"
+parser.add_argument(
+    "--out",
+    type=str,
+    required=True,
+    help="Output figure file"
+)
 
+parser.add_argument(
+    "--ncols",
+    type=int,
+    default=4,
+    help="Number of columns in figure layout"
+)
 
+args = parser.parse_args()
 
+df_in = pd.read_csv(args.df, sep="\t")
+
+out_file = args.out
+
+ncols = args.ncols
+
+# df_in = pd.read_csv("/scratch/rheinnec/viktoria_figure/df_in_full_new.tsv", sep="\t")
+# 
+# out_file = "/scratch/rheinnec/viktoria_figure/figure_2x2_cropped_scalebar_real_imgs_new.png"
+# 
+# ncols = 3
 
 def choose_scale_bar_nm(
     img,
     pixel_size_nm,
-    start_nm=500,
-    min_frac=0.15,
-    max_frac=0.35
+    options_nm=(500, 1000, 2000, 5000, 10000),
+    target_frac=0.25
 ):
     img_h, img_w = img.shape
 
-    scale_bar_nm = start_nm
+    best_nm = min(
+        options_nm,
+        key=lambda nm: abs((nm / pixel_size_nm) / img_w - target_frac)
+    )
 
-    while True:
-        scale_bar_px = scale_bar_nm / pixel_size_nm
-        frac = scale_bar_px / img_w
+    return best_nm
 
-        if frac < min_frac:
-            scale_bar_nm *= 2
-        elif frac > max_frac:
-            scale_bar_nm /= 2
-            break
-        else:
-            break
-
-    return scale_bar_nm
 
 
 
@@ -46,12 +67,23 @@ def add_scale_bar(
     img,
     pixel_size_nm,
     scale_bar_nm=500,
+    auto_scale=True,
+    min_frac=0.15,
+    max_frac=0.35,
     bar_height_frac=0.012,
     margin_frac=0.04,
     color="black",
     fontsize=14
 ):
     img_h, img_w = img.shape
+
+    if auto_scale:
+        scale_bar_nm = choose_scale_bar_nm(
+            img=img,
+            pixel_size_nm=pixel_size_nm,
+            options_nm=(500, 1000, 5000, 10000),
+            target_frac=0.25
+        )
 
     scale_bar_px = scale_bar_nm / pixel_size_nm
 
@@ -71,10 +103,14 @@ def add_scale_bar(
         color=color
     )
 
+    label = f"{int(scale_bar_nm)} nm"
+    if scale_bar_nm >= 1000:
+        label = f"{scale_bar_nm / 1000:g} µm"
+
     ax.text(
         (x_start + x_end) / 2,
         y_end - img_h * 0.015,
-        f"{scale_bar_nm} nm",
+        label,
         color=color,
         fontsize=fontsize,
         ha="center",
@@ -111,7 +147,7 @@ def crop_square(img, start_x, start_y, width, y_origin="bottom"):
     return img[start_y:end_y, start_x:end_x]
 
 n_panels = len(df_in)
-ncols = 4
+
 nrows = math.ceil(n_panels / ncols)
 
 fig, axes = plt.subplots(
@@ -154,7 +190,10 @@ for ax, (_, row) in zip(axes, df_in.iterrows()):
         img=img_crop,
         pixel_size_nm=1.76,
         scale_bar_nm=500,
-        bar_height_frac=0.012,
+        auto_scale=True,
+        min_frac=0.15,
+        max_frac=0.35,
+        bar_height_frac=0.01,
         margin_frac=0.04
     )
     ax.set_axis_off()

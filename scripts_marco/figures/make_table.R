@@ -73,3 +73,61 @@ write_tsv(df_final[c(1,2,4,5),], file="/scratch/rheinnec/viktoria_figure/df_in.t
 
 
 write_tsv(df_final, file="/scratch/rheinnec/viktoria_figure/df_in_full.tsv")
+
+
+
+
+
+library(tidyverse)
+library(getopt)
+library(googlesheets4)
+library(googledrive)
+library(cowplot)
+#email = "marco.rheinnecker@embl.de"
+
+json_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
+gs4_auth(path=json_key)
+drive_auth(path = json_key)
+trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/1VnX2JjlOJf7tkjw4DN6FIpiulz-qko1pQk6onMM5RwY/edit?gid=1366996799#gid=1366996799"
+
+
+
+df <- read_sheet(trec_tem_googledoc, sheet="df_in_full", col_types="c") 
+
+
+fig1 <- df  %>%
+  filter(is.na(figure), !is.na(label))%>%
+  mutate(label=factor(label, levels=c(LETTERS, paste0(LETTERS, LETTERS)))) %>%
+  arrange(label)
+
+
+
+#LETTERS
+
+
+fig2 <- df %>% filter(figure==1) %>%
+  mutate(label=factor(label, levels=c(LETTERS, paste0(LETTERS, LETTERS)))) %>%
+  arrange(label)
+
+
+
+write_tsv(fig1, file="/scratch/rheinnec/viktoria_figure/df_in_full_new_big.tsv")
+
+
+write_tsv(fig2, file="/scratch/rheinnec/viktoria_figure/df_in_full_new.tsv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
