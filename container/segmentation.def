@@ -1,0 +1,47 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+%labels
+    Author marco
+    Description OME-Zarr TEM segmentation and cropping container
+
+%environment
+    export LC_ALL=C
+    export LANG=C
+    export PYTHONUNBUFFERED=1
+
+%post
+
+    apt-get update && apt-get install -y \
+        build-essential \
+        gcc \
+        g++ \
+        git \
+        wget \
+        curl \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        && apt-get clean
+
+    pip install --no-cache-dir --upgrade pip
+
+    pip install --no-cache-dir \
+        numpy \
+        scipy \
+        scikit-image \
+        zarr \
+        ome-zarr \
+        dask \
+        dask-image \
+        tifffile \
+        imagecodecs \
+        opencv-python-headless \
+        pandas \
+        matplotlib
+
+    mkdir -p /opt/scripts
+
+%runscript
+    exec python "$@"
