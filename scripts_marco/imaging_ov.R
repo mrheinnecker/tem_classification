@@ -24,8 +24,11 @@ opt <- getopt(spec)
 
 
 # opt <- tibble(
-#   rawdir="/g/schwab/tem_screen/raw",
-#   pngdir="/g/schwab/tem_screen/pngs"
+#   # rawdir="/g/schwab/tem_screen/raw",
+#   # pngdir="/g/schwab/tem_screen/pngs",
+#   rawdir="/scratch/rheinnec/tem_screen/raw",
+#   pngdir="/scratch/rheinnec/tem_screen/pngs",
+#   dryrun="TRUE"
 # )
 
 #print(opt$dryrun)
@@ -135,10 +138,26 @@ dev.off()
 # )
 # 
 
+if(as.logical(opt$dryrun)){
+  sheet_name <- "image_log_test"
+} else {
+  sheet_name <- "image_log"
+}
 
 
-df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet="image_log", col_types="c") 
-write_tsv(df_trec_tem_current_state, file="manually_filled_log.tsv")
+df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet=sheet_name, col_types="c") 
+
+
+if((nrow(df_trec_tem_current_state)>nrow(all_files_raw))&!as.logical(opt$dryrun)){
+  
+  stop("existing image_log sheet has more entries than present raw files. Proceeding could mean annotations are lost!! - is this suppossed to be a dryrun? Set --dryrun \"TRUE\"")
+  
+}
+
+
+timestamp <- Sys.time() %>% as.character() %>% str_replace_all(" |:|\\.", "_")
+
+write_tsv(df_trec_tem_current_state, file=paste0("manually_filled_log_",timestamp,".tsv"))
 
 
 new <- all_files_raw %>%
@@ -147,7 +166,7 @@ new <- all_files_raw %>%
 
 #, "site"
 
-write_sheet(new, ss = trec_tem_googledoc, sheet="image_log")
+write_sheet(new, ss = trec_tem_googledoc, sheet=sheet_name)
 
 write_csv(to_run, file="images_to_process.csv")
 
