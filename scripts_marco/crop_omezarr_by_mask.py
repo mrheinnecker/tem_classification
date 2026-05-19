@@ -2,6 +2,7 @@
 
 import argparse
 import shutil
+import mrcfile
 from pathlib import Path
 
 import numpy as np
@@ -163,28 +164,35 @@ def save_qc_png(img, mask, bbox, out_png):
 
     plt.figure(figsize=(10, 10))
     plt.imshow(norm, cmap="gray")
-    # original segmentation (purple)
+
+    
+    # dilated segmentation (red)
     plt.contour(
         mask,
         levels=[0.5],
         linewidths=1,
         colors="magenta",
     )
-    
-    # dilated segmentation (red)
-    dilation_size = int(max(mask.shape) * 0.05)
-    
-    dilated_mask = ndi.binary_dilation(
-        mask,
-        iterations=dilation_size
-    )
-    
-    plt.contour(
-        dilated_mask,
-        levels=[0.5],
-        linewidths=1,
-        colors="red",
-    )
+
+    # additional dilation overlays
+    dilation_fractions = [0.05, 0.1]
+    dilation_colors = ["red", "cyan"]
+
+    for frac, col in zip(dilation_fractions, dilation_colors):
+
+        dilation_size = int(max(mask.shape) * frac)
+
+        dilated_mask = ndi.binary_dilation(
+            mask,
+            iterations=dilation_size
+        )
+
+        plt.contour(
+            dilated_mask,
+            levels=[0.5],
+            linewidths=1,
+            colors=col,
+        )
     plt.plot(
         [xmin, xmax, xmax, xmin, xmin],
         [ymin, ymin, ymax, ymax, ymin],
@@ -320,7 +328,13 @@ def make_mask_background_negative(
     mask = keep_largest_object(mask)
 
     return mask.astype(bool), smooth, thr
-  
+
+def load_mrc(path):
+    with mrcfile.open(path, permissive=True) as mrc:
+        img = np.asarray(mrc.data).copy()
+        voxel_size = mrc.voxel_size
+    return img, voxel_size
+
 def main():
     parser = argparse.ArgumentParser(
         description="Simple foreground segmentation and cropping for 2D TEM OME-Zarr images."
@@ -366,13 +380,11 @@ def main():
 
     args = parser.parse_args()
 
-    root = zarr.open(str(args.input), mode="r")
-    array_path, arr = find_image_array(root)
+    img, voxel_size = load_mrc(args.input)
 
-    print(f"Found image array: {array_path}")
-    print(f"Original shape: {arr.shape}")
+    print(f"Original shape: {img.shape}")
 
-    img2d = squeeze_to_2d(arr)
+    img2d = squeeze_to_2d(img)
 
     if args.segmentation_mode == "foreground":
         mask, smooth, thr = make_mask(
@@ -406,16 +418,6 @@ def main():
     print(f"Threshold: {thr:.4f}")
     print(f"Bounding box: ymin={ymin}, ymax={ymax}, xmin={xmin}, xmax={xmax}")
     print(f"Cropped size: y={ymax-ymin}, x={xmax-xmin}")
-
-    cropped_shape = copy_and_crop_omezarr(
-        input_path=args.input,
-        output_path=args.output,
-        array_path=array_path,
-        bbox=bbox,
-    )
-
-    print(f"Output shape: {cropped_shape}")
-    print(f"Written: {args.output}")
 
     if args.save_mask:
         mask_out = Path(args.output).with_suffix("").as_posix() + "_mask.npy"
