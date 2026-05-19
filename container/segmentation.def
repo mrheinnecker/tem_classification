@@ -39,7 +39,8 @@ From: python:3.11-slim
         imagecodecs \
         opencv-python-headless \
         pandas \
-        matplotlib
+        matplotlib \
+        mrcfile
 
     mkdir -p /opt/scripts
 
