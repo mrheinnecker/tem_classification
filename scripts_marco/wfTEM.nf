@@ -234,7 +234,7 @@ process EUBICONVERSION {
       --dimension_order xyzct \
       --squeeze True \
       --save_omexml True \
-      --zar_format 3 \
+      --zar_format 2 \
       --auto_chunk True
       
     ##       --metadata_reader bioio this flag causes the error  
@@ -246,7 +246,95 @@ process EUBICONVERSION {
 }
 
 
+process S3UPLOAD {
 
+
+    cpus 1
+    memory "1 GB"
+    time "10m"
+
+    input:
+    tuple val(filename), path(omezarr)
+
+    output:
+    path "done.txt"
+
+    /*
+     * Optional:
+     * use this if your cluster needs bind mounts explicitly
+     */
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    script:
+    """
+
+    echo "Uploading file...."
+    mc cp "$omezarr/" s3embl/temscreen -r
+
+    echo "Done."
+    
+    touch done.txt
+    
+    """
+}
+
+
+process COLLECTS3FILES {
+
+
+    cpus 1
+    memory "1 GB"
+    time "10m"
+
+    input:
+    tuple path(done)
+
+    output:
+    path "all_s3_entries.txt", emit: all_s3
+
+    /*
+     * Optional:
+     * use this if your cluster needs bind mounts explicitly
+     */
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    script:
+    """
+
+    mc ls s3embl/temscreen > "all_s3_entries.txt"
+
+    
+    """
+}
+
+
+process MAKECOLLECTIONTABLE {
+
+
+    cpus 1
+    memory "1 GB"
+    time "10m"
+
+    input:
+    path all_s3
+
+    output:
+    path "done.tsv"
+
+    /*
+     * Optional:
+     * use this if your cluster needs bind mounts explicitly
+     */
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    script:
+    """
+
+    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/make_collection_table.R -d $all_s3
+
+    
+    """
+}
 
 
 workflow {
@@ -300,6 +388,21 @@ workflow {
   EUBICONVERSION(
     CORRECTIONBLEND.out.correctionblend_tup
   )
+
+  s3upload_out_ch=S3UPLOAD(
+    EUBICONVERSION.out.omezarr_tup
+  )
+
+  fully_done_ch=s3upload_out_ch.collect()
+
+  COLLECTS3FILES(
+    fully_done_ch
+  )
+
+  MAKECOLLECTIONTABLE(
+    COLLECTS3FILES.out.all_s3
+  )
+
 
 }
 
