@@ -17,8 +17,8 @@ case "$mode" in
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
     profile="interactive"
     sheet_mode="${SHEET_MODE:-local}"
-    workflow_stage="${WORKFLOW_STAGE:-process}"
-    dryrun="${DRYRUN:-TRUE}"
+    workflow_stage="all"
+    dryrun="TRUE"
     module load Nextflow/24.10.4
     ;;
   cluster)
