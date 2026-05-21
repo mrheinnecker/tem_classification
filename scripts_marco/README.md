@@ -44,6 +44,16 @@ WORKFLOW_STAGE=all DRYRUN=FALSE ./main.sh local
 
 Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, and runs the full workflow.
 
+## Interactive cluster debugging
+
+After allocating an interactive cluster node, run:
+
+```bash
+./main.sh interactive
+```
+
+Interactive mode uses the cluster paths and containers, but runs Nextflow tasks with the local executor inside the allocated node instead of submitting each task as a Slurm batch job. By default it uses `SHEET_MODE=local`, `WORKFLOW_STAGE=process`, and `DRYRUN=TRUE`, so it avoids Google/S3 while debugging.
+
 ## Useful overrides
 
 All paths can be changed without editing code:
@@ -52,4 +62,5 @@ All paths can be changed without editing code:
 TEM_SCREEN_DIR=/some/other/tem_screen ./main.sh local
 RAWDIR=/path/to/raw PNGDIR=/path/to/pngs OUTDIR=/path/to/processed ./main.sh local
 SHEET_MODE=local WORKFLOW_STAGE=discover DRYRUN=TRUE ./main.sh cluster
+DRYRUN=FALSE WORKFLOW_STAGE=process ./main.sh interactive
 ```

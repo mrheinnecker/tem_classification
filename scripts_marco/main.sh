@@ -13,6 +13,14 @@ case "$mode" in
     workflow_stage="${WORKFLOW_STAGE:-discover}"
     dryrun="${DRYRUN:-TRUE}"
     ;;
+  interactive)
+    main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    profile="interactive"
+    sheet_mode="${SHEET_MODE:-local}"
+    workflow_stage="${WORKFLOW_STAGE:-process}"
+    dryrun="${DRYRUN:-TRUE}"
+    module load Nextflow/24.10.4
+    ;;
   cluster)
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
     profile="cluster"
@@ -22,7 +30,7 @@ case "$mode" in
     module load Nextflow/24.10.4
     ;;
   *)
-    echo "Usage: $0 [local|cluster]"
+    echo "Usage: $0 [local|interactive|cluster]"
     exit 1
     ;;
 esac
