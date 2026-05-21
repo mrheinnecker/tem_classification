@@ -347,7 +347,7 @@ process S3UPLOAD {
     image_target_name="\$(basename "\$image_zarr")"
 
     if [ ! -e "\$image_zarr/.zattrs" ] && [ ! -e "\$image_zarr/.zgroup" ]; then
-      inner_zarr="\$(find "\$image_zarr" -mindepth 1 -maxdepth 1 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' -o -name '*omezarr' \\) | head -n 1)"
+      inner_zarr="\$(find "\$image_zarr" -mindepth 1 -maxdepth 3 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' \\) | head -n 1)"
       if [ -n "\$inner_zarr" ]; then
         image_zarr="\$inner_zarr"
         image_target_name="\$(basename "\$inner_zarr")"
@@ -387,7 +387,7 @@ process COLLECTS3FILES {
     script:
     """
 
-    mc ls "${params.s3_bucket}" > "all_s3_entries.txt"
+    mc ls --recursive "${params.s3_bucket}" > "all_s3_entries.txt"
 
     
     """

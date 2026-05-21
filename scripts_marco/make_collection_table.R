@@ -41,18 +41,20 @@ col_table <- read_lines(opt$all_s3) %>%
   as_tibble() %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
-    s3_raw=str_remove(s3_raw, "/$")
+    s3_raw=str_remove(s3_raw, "/$"),
+    zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
   ) %>%
   filter(
-    !is.na(s3_raw),
-    !s3_raw %in% c("", ".", ".zattrs", ".zgroup"),
-    str_detect(s3_raw, "(_coarse_mask\\.ome\\.zarr|\\.zarr)$"),
-    !str_detect(s3_raw, "/")
+    !is.na(zarr_root),
+    !str_detect(zarr_root, "^0/")
   ) %>%
+  distinct(zarr_root) %>%
   mutate(
+    s3_raw=zarr_root,
     object_name=basename(s3_raw),
     source_name=case_when(
       str_detect(object_name, "_coarse_mask\\.ome\\.zarr$") ~ str_remove(object_name, "_coarse_mask\\.ome\\.zarr$"),
+      str_detect(object_name, "\\.ome\\.zarr$") ~ str_remove(object_name, "\\.ome\\.zarr$"),
       str_detect(object_name, "_omezarr$") ~ str_remove(object_name, "_omezarr$"),
       str_detect(object_name, "\\.zarr$") ~ str_remove(object_name, "\\.zarr$"),
       TRUE ~ object_name
