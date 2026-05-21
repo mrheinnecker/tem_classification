@@ -28,7 +28,13 @@ If IMOD, EUBI, and the segmentation Python container/tools are available locally
 WORKFLOW_STAGE=process DRYRUN=FALSE ./main.sh local
 ```
 
-This produces the corrected image, the overview PNG with scale bar, a coarse-mask QC PNG, and a `*_coarse_mask.ome.zarr` label image for MoBIE overlay testing.
+This produces the corrected image, gradient QC/metrics, the overview PNG with scale bar, a coarse-mask QC PNG, and a `*_coarse_mask.ome.zarr` label image for MoBIE overlay testing.
+
+Gradient correction runs in `auto` mode by default. It estimates a broad low-frequency plane, writes `*_gradient_metrics.tsv` and `*_gradient_qc.png`, and only subtracts the plane when `gradient_score >= 0.18`. To report without changing pixels:
+
+```bash
+nextflow run /path/to/wfTEM.nf -profile interactive --gradient_mode detect_only
+```
 
 ## Local full run
 
@@ -65,4 +71,7 @@ TEM_SCREEN_DIR=/some/other/tem_screen ./main.sh local
 RAWDIR=/path/to/raw PNGDIR=/path/to/pngs OUTDIR=/path/to/processed ./main.sh local
 SHEET_MODE=local WORKFLOW_STAGE=discover DRYRUN=TRUE ./main.sh cluster
 DRYRUN=FALSE WORKFLOW_STAGE=process ./main.sh interactive
+RESUME=FALSE ./main.sh interactive
 ```
+
+`RESUME=TRUE` is the default and adds Nextflow's `-resume` flag. Use `RESUME=FALSE` when you want a clean debug run and do not want Nextflow to reuse cached process outputs.

@@ -11,6 +11,10 @@ params.s3_bucket = params.s3_bucket ?: "s3embl/temscreen"
 params.zarr_format = params.zarr_format ?: 2
 params.pixel_scale_x = params.pixel_scale_x ?: 1.766
 params.pixel_scale_y = params.pixel_scale_y ?: 1.766
+params.gradient_mode = params.gradient_mode ?: "auto"
+params.gradient_threshold = params.gradient_threshold ?: 0.18
+params.gradient_downsample = params.gradient_downsample ?: 16
+params.gradient_background_sigma = params.gradient_background_sigma ?: 20
 
 // process EXTRACTFEATURES {
   
@@ -240,6 +244,39 @@ process EXPORTOVPNG {
 }
 
 
+process CORRECTGRADIENT {
+  
+    cpus   = 1
+    memory = "32GB"
+    time   = "1h"    
+  
+    publishDir "${params.outdir}/${filename}", mode:'copy'
+    containerOptions '--bind /g --bind /home --bind /scratch'
+    errorStrategy = 'ignore' 
+
+    input:
+    tuple val(filename), path(correctionblend_mrc)
+    
+    output:
+    tuple val(filename), path("*_gradientcorrected.mrc"), emit: corrected_mrc_tup
+    path "*_gradient_qc.png", emit: gradient_qc
+    path "*_gradient_metrics.tsv", emit: gradient_metrics
+    
+    script:
+    """
+      python3 "${params.script_dir}/correct_gradient.py" \
+        --input "${correctionblend_mrc}" \
+        --output "${correctionblend_mrc.baseName}_gradientcorrected.mrc" \
+        --qc-png "${correctionblend_mrc.baseName}_gradient_qc.png" \
+        --metrics "${correctionblend_mrc.baseName}_gradient_metrics.tsv" \
+        --mode "${params.gradient_mode}" \
+        --threshold "${params.gradient_threshold}" \
+        --downsample "${params.gradient_downsample}" \
+        --background-sigma "${params.gradient_background_sigma}"
+    """  
+}
+
+
 
 process EUBICONVERSION {
   
@@ -411,19 +448,22 @@ workflow {
       JUSTBLEND.out.justblend_tup
     )
 
+    CORRECTGRADIENT(
+      CORRECTIONBLEND.out.correctionblend_tup
+    )
 
     ch_a_second = JUSTBLEND.out.justblend_tup.map { t -> t[1] }
-    ch_b_second = CORRECTIONBLEND.out.correctionblend_tup.map { t -> t[1] }
+    ch_b_second = CORRECTGRADIENT.out.corrected_mrc_tup.map { t -> t[1] }
 
     combined_ch = ch_a_second.mix(ch_b_second)
 
 
     EXPORTOVPNG(
-      CORRECTIONBLEND.out.correctionblend_tup
+      CORRECTGRADIENT.out.corrected_mrc_tup
     )
 
     EUBICONVERSION(
-      CORRECTIONBLEND.out.correctionblend_tup
+      CORRECTGRADIENT.out.corrected_mrc_tup
     )
 
     if (params.workflow_stage == "all") {
