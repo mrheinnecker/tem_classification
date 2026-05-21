@@ -247,7 +247,7 @@ process EXPORTOVPNG {
 process CORRECTGRADIENT {
   
     cpus   = 1
-    memory = "32GB"
+    memory = "64GB"
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -281,8 +281,8 @@ process CORRECTGRADIENT {
 process EUBICONVERSION {
   
     cpus   = 1
-    memory = "32GB"
-    time   = "2h"    
+    memory = "64GB"
+    time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
