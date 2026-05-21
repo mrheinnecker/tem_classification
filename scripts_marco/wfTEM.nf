@@ -342,8 +342,8 @@ process S3UPLOAD {
     """
 
     echo "Uploading file...."
-    mc cp "$omezarr/" "${params.s3_bucket}" -r
-    mc cp "$mask_zarr/" "${params.s3_bucket}" -r
+    mc cp "$omezarr/" "${params.s3_bucket}/${omezarr.name}/" -r
+    mc cp "$mask_zarr/" "${params.s3_bucket}/${mask_zarr.name}/" -r
 
     echo "Done."
     

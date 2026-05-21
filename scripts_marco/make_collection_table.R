@@ -28,15 +28,33 @@ if (is.null(local_collection_table) || is.na(local_collection_table)) {
   local_collection_table <- "collection_table.tsv"
 }
 
+parse_mc_ls_path <- function(line) {
+  parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
+  ifelse(
+    is.na(parsed),
+    str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2],
+    parsed
+  )
+}
+
 col_table <- read_lines(opt$all_s3) %>%
   as_tibble() %>%
   mutate(
-    s3_raw=str_split(value, "0B ") %>% map_chr(.,2),
-    s3_raw=str_remove(s3_raw, "/$"),
+    s3_raw=parse_mc_ls_path(value),
+    s3_raw=str_remove(s3_raw, "/$")
+  ) %>%
+  filter(
+    !is.na(s3_raw),
+    !s3_raw %in% c("", ".", ".zattrs", ".zgroup"),
+    str_detect(s3_raw, "(_omezarr|_coarse_mask\\.ome\\.zarr|\\.zarr)$"),
+    !str_detect(s3_raw, "/")
+  ) %>%
+  mutate(
     object_name=basename(s3_raw),
     source_name=case_when(
       str_detect(object_name, "_coarse_mask\\.ome\\.zarr$") ~ str_remove(object_name, "_coarse_mask\\.ome\\.zarr$"),
       str_detect(object_name, "_omezarr$") ~ str_remove(object_name, "_omezarr$"),
+      str_detect(object_name, "\\.zarr$") ~ str_remove(object_name, "\\.zarr$"),
       TRUE ~ object_name
     ),
     is_mask=str_detect(object_name, "_coarse_mask\\.ome\\.zarr$"),
@@ -54,11 +72,16 @@ col_table <- read_lines(opt$all_s3) %>%
     sampling_time=str_extract(source_name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     group=site
   ) %>%
+  distinct(uri, .keep_all=TRUE) %>%
   arrange(source_name, is_mask) %>%
   select(
     uri, name, type, view, display, blend, color, format, group,
     site, cell_id, size_frac, sampling_time, source_name
   )
+
+if (nrow(col_table) == 0) {
+  stop("No top-level OME-Zarr datasets found in S3 listing.")
+}
 
 
 if (sheet_mode == "google") {
