@@ -1,27 +1,46 @@
 library(tidyverse)
 library(getopt)
-library(googlesheets4)
-library(googledrive)
 library(cowplot)
-#email = "marco.rheinnecker@embl.de"
-
-json_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
-gs4_auth(path=json_key)
-drive_auth(path = json_key)
-trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
-
-
 
 spec <- matrix(c(
   # long option                  short  arg  type
   "rawdir",                   "r",   1,   "character",
   "pngdir",        "p",   1,   "character",
-  "dryrun", "d",   1,   "character"
+  "dryrun", "d",   1,   "character",
+  "script_dir", "s", 1, "character",
+  "sheet_mode", "m", 1, "character",
+  "sheet_url", "u", 1, "character",
+  "google_key", "k", 1, "character",
+  "local_log", "l", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
 opt <- getopt(spec)
 
+arg_file <- commandArgs(FALSE) %>%
+  .[str_detect(., "^--file=")] %>%
+  str_remove("^--file=") %>%
+  .[1]
+
+script_dir <- opt$script_dir
+if (is.null(script_dir) || is.na(script_dir)) {
+  script_dir <- dirname(normalizePath(arg_file))
+}
+
+sheet_mode <- opt$sheet_mode
+if (is.null(sheet_mode) || is.na(sheet_mode)) {
+  sheet_mode <- "local"
+}
+
+trec_tem_googledoc <- opt$sheet_url
+if (is.null(trec_tem_googledoc) || is.na(trec_tem_googledoc)) {
+  trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+}
+
+local_log <- opt$local_log
+if (is.null(local_log) || is.na(local_log)) {
+  local_log <- file.path(dirname(opt$pngdir), "image_log_local.tsv")
+}
 
 # opt <- tibble(
 #   # rawdir="/g/schwab/tem_screen/raw",
@@ -46,9 +65,9 @@ all_files_raw <-
   # ) %>%
   #rowwise() %>%
   mutate(
-    mdoc_file=str_replace(file, ".mrc$", ".mrc.mdoc"),
+    mdoc_file=str_replace(file, "\\.mrc$", ".mrc.mdoc"),
     site=str_extract(file, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
-    cell_id=str_extract(file, "c0\\d+.mrc$") %>% str_remove(".mrc"),
+    cell_id=str_extract(file, "c0\\d+\\.mrc$") %>% str_remove("\\.mrc"),
     
     shortname=str_extract(basename(dirname(file)), "^.*Cut\\d+") %>% paste(cell_id, sep="_"),
     
@@ -68,7 +87,7 @@ all_files <- all_files_raw %>%
   select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
 if(as.logical(opt$dryrun)){
-  to_run <- all_files[1:5,]
+  to_run <- head(all_files, 5)
 } else {
   to_run <- all_files %>%
     filter(!(file.exists(correctionblend_file)))  
@@ -77,7 +96,7 @@ if(as.logical(opt$dryrun)){
 
 ## make statistics figure
 
-source("/g/schwab/marco/repos/tem_classification/scripts_marco/count_stats.R")
+source(file.path(script_dir, "count_stats.R"))
 
 comb_plot <- make_main_statistic_of_sample_number(raw_dir)
 outdir <- getwd()
@@ -145,7 +164,25 @@ if(as.logical(opt$dryrun)){
 }
 
 
-df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet=sheet_name, col_types="c") 
+if (sheet_mode == "google") {
+  library(googlesheets4)
+  library(googledrive)
+
+  json_key <- opt$google_key
+  if (is.null(json_key) || is.na(json_key)) {
+    json_key <- file.path(script_dir, "trec-tem-screen-e98a2e03f58b.json")
+  }
+
+  gs4_auth(path=json_key)
+  drive_auth(path = json_key)
+  df_trec_tem_current_state <- read_sheet(trec_tem_googledoc, sheet=sheet_name, col_types="c")
+} else {
+  if (file.exists(local_log)) {
+    df_trec_tem_current_state <- read_tsv(local_log, col_types=cols(.default = col_character()))
+  } else {
+    df_trec_tem_current_state <- tibble(shortname=character(), site=character())
+  }
+}
 
 
 if((nrow(df_trec_tem_current_state)>nrow(all_files_raw))&!as.logical(opt$dryrun)){
@@ -166,7 +203,11 @@ new <- all_files_raw %>%
 
 #, "site"
 
-write_sheet(new, ss = trec_tem_googledoc, sheet=sheet_name)
+if (sheet_mode == "google") {
+  write_sheet(new, ss = trec_tem_googledoc, sheet=sheet_name)
+} else {
+  write_tsv(new, file=local_log)
+}
 
 write_csv(to_run, file="images_to_process.csv")
 

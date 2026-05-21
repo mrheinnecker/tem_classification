@@ -1,32 +1,32 @@
 library(tidyverse)
 library(getopt)
-library(googlesheets4)
-library(googledrive)
-#library(cowplot)
-#email = "marco.rheinnecker@embl.de"
-
-json_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
-gs4_auth(path=json_key)
-drive_auth(path = json_key)
-#trec_tem_googledoc <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
-collection_table="https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
-
 
 spec <- matrix(c(
   # long option                  short  arg  type
-  "all_s3", "d",   1,   "character"
+  "all_s3", "d",   1,   "character",
+  "sheet_mode", "m", 1, "character",
+  "google_key", "k", 1, "character",
+  "collection_table_url", "u", 1, "character",
+  "local_collection_table", "l", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
 opt <- getopt(spec)
 
+sheet_mode <- opt$sheet_mode
+if (is.null(sheet_mode) || is.na(sheet_mode)) {
+  sheet_mode <- "local"
+}
 
+collection_table <- opt$collection_table_url
+if (is.null(collection_table) || is.na(collection_table)) {
+  collection_table <- "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
+}
 
-opt <- tibble(
-  # rawdir="/g/schwab/tem_screen/raw",
-  # pngdir="/g/schwab/tem_screen/pngs",
-  all_s3="/scratch/rheinnec/tem_screen/work/a4/39875e44d4c1c4603c6380a3aca160/all_s3_entries.txt" 
-)
+local_collection_table <- opt$local_collection_table
+if (is.null(local_collection_table) || is.na(local_collection_table)) {
+  local_collection_table <- "collection_table.tsv"
+}
 
 col_table <- read_lines(opt$all_s3) %>%
   as_tibble() %>%
@@ -38,9 +38,22 @@ col_table <- read_lines(opt$all_s3) %>%
   select(uri, name)
 
 
+if (sheet_mode == "google") {
+  library(googlesheets4)
+  library(googledrive)
 
-write_sheet(col_table, ss = collection_table, sheet="collection_table")
+  json_key <- opt$google_key
+  if (is.null(json_key) || is.na(json_key)) {
+    stop("--google_key is required when --sheet_mode google")
+  }
 
-write_tsv(tibble(done="done jonge"), file="done.tsv")
+  gs4_auth(path=json_key)
+  drive_auth(path = json_key)
+  write_sheet(col_table, ss = collection_table, sheet="collection_table")
+} else {
+  write_tsv(col_table, file=local_collection_table)
+}
+
+write_tsv(tibble(done="done"), file="done.tsv")
 
 

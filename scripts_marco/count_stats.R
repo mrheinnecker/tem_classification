@@ -19,7 +19,7 @@ make_main_statistic_of_sample_number <- function(raw_dir){
     
     mutate(
       site=str_extract(file, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
-      cell_id=str_extract(file, "c0\\d+.mrc$") %>% str_remove(".mrc"),
+      cell_id=str_extract(file, "c0\\d+\\.mrc$") %>% str_remove("\\.mrc"),
       sampling_time=str_extract(file, "_AM_|_PM_|_MID_|_TARA_") %>% str_remove_all("_"),
       size_frac=str_extract(file, "_\\d+to\\d+_") %>% str_remove_all("_"),
       shortname=str_extract(basename(dirname(file)), "^.*Cut\\d+") %>% paste(cell_id, sep="_")

@@ -1,4 +1,16 @@
-params.dryrun="FALSE"
+params.dryrun = params.dryrun ?: "FALSE"
+params.script_dir = params.script_dir ?: baseDir.toString()
+params.sheet_mode = params.sheet_mode ?: "local"
+params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+params.collection_table_url = params.collection_table_url ?: "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
+params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
+params.local_log = params.local_log ?: "${params.outdir}/image_log_local.tsv"
+params.workflow_stage = params.workflow_stage ?: "all"
+params.imod_dir = params.imod_dir ?: "/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1"
+params.s3_bucket = params.s3_bucket ?: "s3embl/temscreen"
+params.zarr_format = params.zarr_format ?: 2
+params.pixel_scale_x = params.pixel_scale_x ?: 1.766
+params.pixel_scale_y = params.pixel_scale_y ?: 1.766
 
 // process EXTRACTFEATURES {
   
@@ -72,18 +84,33 @@ process CHECKNEWIMAGES {
     containerOptions '--bind /g --bind /scratch'  
 
     input:
-    path rawdir
-    path pngdir
+    val rawdir
+    val pngdir
     val dryrun
+    val script_dir
+    val sheet_mode
+    val sheet_url
+    val google_key
+    val local_log
 
     output:
     path "images_to_process.csv", emit: to_process
     path "manually_filled_log*"
     path "TEM_screen_image_count.pdf"
+    path "TEM_screen_image_count.png"
+    path "all_datasets.tsv"
     
     script:
     """
-    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/imaging_ov.R -r "${params.rawdir}" -p $pngdir -d $dryrun
+    Rscript "${script_dir}/imaging_ov.R" \
+      --rawdir "${rawdir}" \
+      --pngdir "${pngdir}" \
+      --dryrun "${dryrun}" \
+      --script_dir "${script_dir}" \
+      --sheet_mode "${sheet_mode}" \
+      --sheet_url "${sheet_url}" \
+      --google_key "${google_key}" \
+      --local_log "${local_log}"
     
     """  
 }
@@ -131,7 +158,7 @@ process JUSTBLEND {
     
     script:
     """
-    export IMOD_DIR=/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1
+    export IMOD_DIR="${params.imod_dir}"
     export AUTODOC_DIR=\$IMOD_DIR/autodoc
     export PATH=\$IMOD_DIR/bin:\$PATH
     justblend $raw_mrc
@@ -160,7 +187,7 @@ process CORRECTIONBLEND {
     """
     echo "${raw_mrc}"
 
-    export IMOD_DIR=/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1
+    export IMOD_DIR="${params.imod_dir}"
     export AUTODOC_DIR=\$IMOD_DIR/autodoc
     export PATH=\$IMOD_DIR/bin:\$PATH
 
@@ -196,7 +223,7 @@ process EXPORTOVPNG {
     script:
     """
 
-      python3 /g/schwab/marco/repos/tem_classification/scripts_marco/process_images.py \
+      python3 "${params.script_dir}/process_images.py" \
         -i "${blend_mrc}" \
         -o "${blend_mrc.baseName}.png"
 
@@ -229,12 +256,12 @@ process EUBICONVERSION {
       "${filename}_omezarr" \
       --x_unit nm \
       --y_unit nm \
-      --x_scale 1.766 \
-      --y_scale 1.766 \
+      --x_scale "${params.pixel_scale_x}" \
+      --y_scale "${params.pixel_scale_y}" \
       --dimension_order xyzct \
       --squeeze True \
       --save_omexml True \
-      --zar_format 2 \
+      --zar_format "${params.zarr_format}" \
       --auto_chunk True
       
     ##       --metadata_reader bioio this flag causes the error  
@@ -269,7 +296,7 @@ process S3UPLOAD {
     """
 
     echo "Uploading file...."
-    mc cp "$omezarr/" s3embl/temscreen -r
+    mc cp "$omezarr/" "${params.s3_bucket}" -r
 
     echo "Done."
     
@@ -301,7 +328,7 @@ process COLLECTS3FILES {
     script:
     """
 
-    mc ls s3embl/temscreen > "all_s3_entries.txt"
+    mc ls "${params.s3_bucket}" > "all_s3_entries.txt"
 
     
     """
@@ -330,7 +357,12 @@ process MAKECOLLECTIONTABLE {
     script:
     """
 
-    Rscript /g/schwab/marco/repos/tem_classification/scripts_marco/make_collection_table.R -d $all_s3
+    Rscript "${params.script_dir}/make_collection_table.R" \
+      --all_s3 "$all_s3" \
+      --sheet_mode "${params.sheet_mode}" \
+      --google_key "${params.google_key}" \
+      --collection_table_url "${params.collection_table_url}" \
+      --local_collection_table "collection_table.tsv"
 
     
     """
@@ -340,68 +372,66 @@ process MAKECOLLECTIONTABLE {
 workflow {
   
 
-  Channel
-    .from(params.dryrun)
-    .set { dryrun_ch }
+  CHECKNEWIMAGES(
+    params.rawdir,
+    params.pngdir,
+    params.dryrun,
+    params.script_dir,
+    params.sheet_mode,
+    params.sheet_url,
+    params.google_key,
+    params.local_log
+  )
 
+  if (params.workflow_stage != "discover") {
 
-  Channel
-    .fromPath(params.rawdir)
-    .collect()
-    .set { rawdir_ch }
-
-  Channel
-    .fromPath(params.pngdir)
-    .collect()
-    .set { pngdir_ch }
-
-  CHECKNEWIMAGES(rawdir_ch, pngdir_ch, dryrun_ch)
-
-  Channel
-        CHECKNEWIMAGES.out.to_process
+    CHECKNEWIMAGES.out.to_process
         .splitCsv(header:true)
         .map { row -> tuple row.filename, row.file, row.mdoc_file, row.shortname, row.req_mem}  
         .set { batch_ch }
 
-  RENAME(batch_ch)
+    RENAME(batch_ch)
 
-  JUSTBLEND(
-    RENAME.out.renamed_mrc
-  )
-
-
-  CORRECTIONBLEND(
-    JUSTBLEND.out.justblend_tup
-  )
+    JUSTBLEND(
+      RENAME.out.renamed_mrc
+    )
 
 
-  ch_a_second = JUSTBLEND.out.justblend_tup.map { t -> t[1] }
-  ch_b_second = CORRECTIONBLEND.out.correctionblend_tup.map { t -> t[1] }
+    CORRECTIONBLEND(
+      JUSTBLEND.out.justblend_tup
+    )
 
-  combined_ch = ch_a_second.mix(ch_b_second)
+
+    ch_a_second = JUSTBLEND.out.justblend_tup.map { t -> t[1] }
+    ch_b_second = CORRECTIONBLEND.out.correctionblend_tup.map { t -> t[1] }
+
+    combined_ch = ch_a_second.mix(ch_b_second)
 
 
-  EXPORTOVPNG(
-    ch_b_second
-  )
+    EXPORTOVPNG(
+      ch_b_second
+    )
 
-  EUBICONVERSION(
-    CORRECTIONBLEND.out.correctionblend_tup
-  )
+    EUBICONVERSION(
+      CORRECTIONBLEND.out.correctionblend_tup
+    )
 
-  s3upload_out_ch=S3UPLOAD(
-    EUBICONVERSION.out.omezarr_tup
-  )
+    if (params.workflow_stage == "all") {
+      s3upload_out_ch=S3UPLOAD(
+        EUBICONVERSION.out.omezarr_tup
+      )
 
-  fully_done_ch=s3upload_out_ch.collect()
+      fully_done_ch=s3upload_out_ch.collect()
 
-  COLLECTS3FILES(
-    fully_done_ch
-  )
+      COLLECTS3FILES(
+        fully_done_ch
+      )
 
-  MAKECOLLECTIONTABLE(
-    COLLECTS3FILES.out.all_s3
-  )
+      MAKECOLLECTIONTABLE(
+        COLLECTS3FILES.out.all_s3
+      )
+    }
+  }
 
 
 }
