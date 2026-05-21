@@ -36,8 +36,10 @@ nextflow run "${workflow_dir}/wfTEM.nf" \
       --container_imod $container_imod \
       --container_tidyverse $container_tidyverse \
       --container_eubi $container_eubi \
+      --container_mc "/g/schwab/marco/container_devel/EMBL_mc_2024-05-03T11-21-07Z.sif" \
       --dryrun "TRUE" \
-      -profile "cluster"     
+      -profile "cluster" \
+      -resume
 
 
 
@@ -81,13 +83,22 @@ singularity shell -B /scratch -B /g -B /home "/scratch/rheinnec/container_devel/
     --threshold-scale 1
 
 
-
+nextflow run
 
 
 ## copy something to s3 bucket
 
-mc cp /g/schwab/marco/cropped_omezarr.png s3embl/temscreen
+mc cp /g/schwab/marco/table.pdf s3embl/temscreen
 
+
+
+singularity shell -B /scratch -B /g -B /home "/g/schwab/marco/container_devel/EMBL_mc_2024-05-03T11-21-07Z.sif"
+
+
+cd /scratch/rheinnec/tem_screen
+
+nextflow run /g/schwab/marco/repos/tem_classification/test_mc.nf \
+  --container_mc "/g/schwab/marco/container_devel/EMBL_mc_2024-05-03T11-21-07Z.sif"
 
 
 
