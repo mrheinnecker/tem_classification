@@ -228,7 +228,27 @@ def save_overview_png(img_uint8, voxel_size, png_path, scalebar_length_nm, previ
     plt.close(fig)
 
 
-def save_qc_png(img_uint8, mask, bbox, voxel_size, out_png, scalebar_length_nm, preview_factor):
+def dilate_mask(mask, dilation_fraction):
+    if dilation_fraction <= 0:
+        return mask
+
+    iterations = int(max(mask.shape) * dilation_fraction)
+    if iterations <= 0:
+        return mask
+
+    return ndi.binary_dilation(mask, iterations=iterations)
+
+
+def save_qc_png(
+    img_uint8,
+    mask,
+    final_mask,
+    bbox,
+    voxel_size,
+    out_png,
+    scalebar_length_nm,
+    preview_factor,
+):
     ymin, ymax, xmin, xmax = bbox
     pixel_size_nm = float(voxel_size.x) / 10.0
     preview = img_uint8[::preview_factor, ::preview_factor] if preview_factor > 1 else img_uint8
@@ -239,10 +259,8 @@ def save_qc_png(img_uint8, mask, bbox, voxel_size, out_png, scalebar_length_nm, 
     ax.imshow(preview, cmap="gray", vmin=0, vmax=255)
     ax.contour(mask_preview, levels=[0.5], linewidths=1, colors="magenta")
 
-    for frac, col in zip([0.05, 0.1], ["red", "cyan"]):
-        dilation_size = int(max(mask_preview.shape) * frac)
-        dilated_mask = ndi.binary_dilation(mask_preview, iterations=dilation_size)
-        ax.contour(dilated_mask, levels=[0.5], linewidths=1, colors=col)
+    final_preview = final_mask[::preview_factor, ::preview_factor] if preview_factor > 1 else final_mask
+    ax.contour(final_preview, levels=[0.5], linewidths=1, colors="cyan")
 
     box_x = [xmin, xmax, xmax, xmin, xmin]
     box_y = [ymin, ymin, ymax, ymax, ymin]
@@ -264,12 +282,15 @@ def open_zarr_group(path):
         return zarr.open_group(str(path), mode="w", zarr_version=2)
 
 
-def save_mask_omezarr(mask, output_path, voxel_size):
+def save_mask_omezarr(mask, output_path, voxel_size, flip_vertical=False):
     output_path = Path(output_path)
     if output_path.exists():
         shutil.rmtree(output_path)
 
     root = open_zarr_group(output_path)
+    if flip_vertical:
+        mask = np.flipud(mask)
+
     chunks = tuple(min(dim, 2048) for dim in mask.shape)
     mask_data = mask.astype(np.uint8)
     try:
@@ -342,6 +363,12 @@ def parse_args():
     parser.add_argument("--threshold-scale", type=float, default=1.0)
     parser.add_argument("--sigma", type=float, default=5)
     parser.add_argument("--padding", type=int, default=500)
+    parser.add_argument("--mask-dilation-fraction", type=float, default=0.2)
+    parser.add_argument(
+        "--flip-mask-vertical",
+        action="store_true",
+        help="Flip exported mask vertically to match consumers that display MRC-derived OME-Zarr with inverted y.",
+    )
     parser.add_argument("--min-object-size", type=int, default=50000)
     parser.add_argument("--min-hole-size", type=int, default=50000)
     parser.add_argument("--closing-radius", type=int, default=15)
@@ -391,7 +418,8 @@ def main():
                 threshold_scale=args.threshold_scale,
             )
 
-        bbox = bbox_from_mask(mask, padding=args.padding)
+        final_mask = dilate_mask(mask, args.mask_dilation_fraction)
+        bbox = bbox_from_mask(final_mask, padding=args.padding)
         print(f"Threshold: {thr:.4f}")
         print(f"Bounding box: ymin={bbox[0]}, ymax={bbox[1]}, xmin={bbox[2]}, xmax={bbox[3]}")
 
@@ -399,6 +427,7 @@ def main():
             save_qc_png(
                 img_uint8,
                 mask,
+                final_mask,
                 bbox,
                 voxel_size,
                 args.qc_output,
@@ -408,7 +437,12 @@ def main():
             print("Saved QC PNG:", args.qc_output)
 
         if args.mask_output:
-            save_mask_omezarr(mask, args.mask_output, voxel_size)
+            save_mask_omezarr(
+                final_mask,
+                args.mask_output,
+                voxel_size,
+                flip_vertical=args.flip_mask_vertical,
+            )
             print("Saved mask OME-Zarr:", args.mask_output)
 
 

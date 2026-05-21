@@ -237,6 +237,8 @@ process EXPORTOVPNG {
         --threshold "otsu" \
         --sigma 5 \
         --padding 1000 \
+        --mask-dilation-fraction 0.2 \
+        --flip-mask-vertical \
         --min-object-size 50000 \
         --threshold-scale 1
 
