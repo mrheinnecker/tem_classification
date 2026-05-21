@@ -57,6 +57,8 @@ col_table <- read_lines(opt$all_s3) %>%
       str_detect(object_name, "\\.zarr$") ~ str_remove(object_name, "\\.zarr$"),
       TRUE ~ object_name
     ),
+    source_name=str_remove(source_name, "_correctionblend$"),
+    source_name=str_remove(source_name, "_gradientcorrected$"),
     is_mask=str_detect(object_name, "_coarse_mask\\.ome\\.zarr$"),
     uri=file.path("https://s3.embl.de/temscreen", s3_raw),
     name=if_else(is_mask, paste0(source_name, " coarse mask"), source_name),
@@ -76,7 +78,7 @@ col_table <- read_lines(opt$all_s3) %>%
   arrange(source_name, is_mask) %>%
   select(
     uri, name, type, view, display, blend, color, format, group,
-    site, cell_id, size_frac, sampling_time, source_name
+    site, cell_id, size_frac, sampling_time, source_name, object_name
   )
 
 if (nrow(col_table) == 0) {
