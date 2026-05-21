@@ -22,11 +22,13 @@ By default local mode uses `DRYRUN=TRUE` and `WORKFLOW_STAGE=discover`, so it li
 
 ## Local processing run
 
-If IMOD and EUBI are available locally but you do not want S3 upload, use:
+If IMOD, EUBI, and the segmentation Python container/tools are available locally but you do not want S3 upload, use:
 
 ```bash
 WORKFLOW_STAGE=process DRYRUN=FALSE ./main.sh local
 ```
+
+This produces the corrected image, the overview PNG with scale bar, a coarse-mask QC PNG, and a `*_coarse_mask.ome.zarr` label image for MoBIE overlay testing.
 
 ## Local full run
 
@@ -42,7 +44,7 @@ WORKFLOW_STAGE=all DRYRUN=FALSE ./main.sh local
 ./main.sh cluster
 ```
 
-Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, and runs the full workflow.
+Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, uploads both image OME-Zarrs and coarse-mask OME-Zarrs, and runs the full workflow.
 
 ## Interactive cluster debugging
 

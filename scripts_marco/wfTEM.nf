@@ -202,30 +202,39 @@ process EXPORTOVPNG {
   
     cpus   = 1
     memory = "128GB"
-    time   = "0.2h"    
+    time   = "1h"    
   
     //publishDir "${params.pngdir}", mode:'copy'
     publishDir { 
-    def m = (blend_mrc.baseName =~ /_(NAP|BAR|KRI|POR|TAL|ATH|BIL)_/)
+    def m = (correctionblend_mrc.baseName =~ /_(NAP|BAR|KRI|POR|TAL|ATH|BIL)_/)
     def sample = m ? m[0][1] : "UNKNOWN"
     "${params.pngdir}/${sample}"
-    }, mode: 'copy'
+    }, mode: 'copy', pattern: "*.png"
+    publishDir "${params.outdir}/${filename}", mode:'copy', pattern: "*_coarse_mask.ome.zarr"
     
     containerOptions '--bind /g --bind /home --bind /scratch'
 
     input:
-    //tuple val(filename), path(blend_mrc)
-    path blend_mrc
+    tuple val(filename), path(correctionblend_mrc)
 
     output:
     path "*.png", emit: png_ov
+    tuple val(filename), path("*_coarse_mask.ome.zarr"), emit: coarse_mask_tup
     
     script:
     """
 
       python3 "${params.script_dir}/process_images.py" \
-        -i "${blend_mrc}" \
-        -o "${blend_mrc.baseName}.png"
+        -i "${correctionblend_mrc}" \
+        -o "${correctionblend_mrc.baseName}.png" \
+        --qc-output "${correctionblend_mrc.baseName}_coarse_mask_qc.png" \
+        --mask-output "${filename}_coarse_mask.ome.zarr" \
+        --foreground "darker" \
+        --threshold "otsu" \
+        --sigma 5 \
+        --padding 1000 \
+        --min-object-size 50000 \
+        --threshold-scale 1
 
     """  
 }
@@ -281,7 +290,7 @@ process S3UPLOAD {
     time "10m"
 
     input:
-    tuple val(filename), path(omezarr)
+    tuple val(filename), path(omezarr), path(mask_zarr)
 
     output:
     path "done.txt"
@@ -297,6 +306,7 @@ process S3UPLOAD {
 
     echo "Uploading file...."
     mc cp "$omezarr/" "${params.s3_bucket}" -r
+    mc cp "$mask_zarr/" "${params.s3_bucket}" -r
 
     echo "Done."
     
@@ -409,7 +419,7 @@ workflow {
 
 
     EXPORTOVPNG(
-      ch_b_second
+      CORRECTIONBLEND.out.correctionblend_tup
     )
 
     EUBICONVERSION(
@@ -417,8 +427,10 @@ workflow {
     )
 
     if (params.workflow_stage == "all") {
+      upload_ch = EUBICONVERSION.out.omezarr_tup.join(EXPORTOVPNG.out.coarse_mask_tup)
+
       s3upload_out_ch=S3UPLOAD(
-        EUBICONVERSION.out.omezarr_tup
+        upload_ch
       )
 
       fully_done_ch=s3upload_out_ch.collect()
