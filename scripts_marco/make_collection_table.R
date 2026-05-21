@@ -78,8 +78,17 @@ col_table <- read_lines(opt$all_s3) %>%
   ) %>%
   distinct(uri, .keep_all=TRUE) %>%
   arrange(source_name, is_mask) %>%
+  mutate(
+    grid_index=match(source_name, unique(source_name)) - 1,
+    grid_cols=ceiling(sqrt(n_distinct(source_name))),
+    grid_x=grid_index %% grid_cols,
+    grid_y=floor(grid_index / grid_cols),
+    grid="all_images",
+    grid_position=paste0(grid_x, ",", grid_y)
+  ) %>%
+  arrange(source_name, is_mask) %>%
   select(
-    uri, name, type, view, display, blend, color, format, group,
+    uri, name, type, view, display, blend, color, format, group, grid, grid_position,
     site, cell_id, size_frac, sampling_time, source_name, object_name
   )
 
