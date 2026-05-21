@@ -46,7 +46,7 @@ col_table <- read_lines(opt$all_s3) %>%
   filter(
     !is.na(s3_raw),
     !s3_raw %in% c("", ".", ".zattrs", ".zgroup"),
-    str_detect(s3_raw, "(_omezarr|_coarse_mask\\.ome\\.zarr|\\.zarr)$"),
+    str_detect(s3_raw, "(_coarse_mask\\.ome\\.zarr|\\.zarr)$"),
     !str_detect(s3_raw, "/")
   ) %>%
   mutate(

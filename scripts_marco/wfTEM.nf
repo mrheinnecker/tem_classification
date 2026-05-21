@@ -342,7 +342,19 @@ process S3UPLOAD {
     """
 
     echo "Uploading file...."
-    mc cp "$omezarr/" "${params.s3_bucket}/${omezarr.name}/" -r
+
+    image_zarr="$omezarr"
+    image_target_name="$(basename "$image_zarr")"
+
+    if [ ! -e "$image_zarr/.zattrs" ] && [ ! -e "$image_zarr/.zgroup" ]; then
+      inner_zarr="$(find "$image_zarr" -mindepth 1 -maxdepth 1 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' -o -name '*omezarr' \\) | head -n 1)"
+      if [ -n "$inner_zarr" ]; then
+        image_zarr="$inner_zarr"
+        image_target_name="$(basename "$inner_zarr")"
+      fi
+    fi
+
+    mc cp "$image_zarr/" "${params.s3_bucket}/${image_target_name}/" -r
     mc cp "$mask_zarr/" "${params.s3_bucket}/${mask_zarr.name}/" -r
 
     echo "Done."
