@@ -28,13 +28,15 @@ If IMOD, EUBI, and the segmentation Python container/tools are available locally
 WORKFLOW_STAGE=process DRYRUN=FALSE ./main.sh local
 ```
 
-This produces the corrected image, gradient QC/metrics, the overview PNG with scale bar, a coarse-mask QC PNG, and a `*_coarse_mask.ome.zarr` label image for MoBIE overlay testing.
+This produces the corrected image, gradient QC/metrics, and the overview PNG with scale bar.
 
 Gradient correction runs in `auto` mode by default. It estimates a broad low-frequency plane, writes `*_gradient_metrics.tsv` and `*_gradient_qc.png`, and only subtracts the plane when `gradient_score >= 0.18`. To report without changing pixels:
 
 ```bash
 nextflow run /path/to/wfTEM.nf -profile interactive --gradient_mode detect_only
 ```
+
+Memory for the larger image-processing steps is derived from the `req_mem` estimate written by `imaging_ov.R`, with process-specific floors and caps. `EXPORTOVPNG` also reads only a downsampled preview into memory.
 
 ## Local full run
 

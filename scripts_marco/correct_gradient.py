@@ -73,7 +73,10 @@ def correct_image(data, plane_small, downsample):
     plane = plane[: target_shape[0], : target_shape[1]]
     plane = plane - np.median(plane)
 
-    corrected = data.astype(np.float32, copy=True)
+    if data.dtype == np.float32:
+        corrected = data
+    else:
+        corrected = data.astype(np.float32, copy=False)
     if corrected.ndim == 2:
         corrected -= plane
     elif corrected.ndim == 3:
@@ -110,7 +113,7 @@ def save_qc_png(img, corrected_img, plane_small, out_png, score, corrected, thre
 
 def write_mrc(output_path, data, voxel_size):
     with mrcfile.new(output_path, overwrite=True) as out:
-        out.set_data(data.astype(np.float32, copy=False))
+        out.set_data(data)
         out.voxel_size = voxel_size
 
 

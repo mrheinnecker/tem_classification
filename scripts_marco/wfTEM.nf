@@ -124,7 +124,7 @@ process CHECKNEWIMAGES {
 process RENAME {
   
     cpus   = 1
-    memory = "2GB"
+    memory { "${Math.min(Math.max((req_mem as Integer), 4), 32)}GB" }
     time   = "0.25h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -133,7 +133,7 @@ process RENAME {
     tuple val(filename), path(raw_mrc), path(mdoc_file), val(shortname), val(req_mem)
     
     output:
-    tuple val(filename), path("*.mrc"), path("*.mdoc"), emit: renamed_mrc
+    tuple val(filename), path("*.mrc"), path("*.mdoc"), val(req_mem), emit: renamed_mrc
     
     script:
     """
@@ -155,10 +155,10 @@ process JUSTBLEND {
     publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
-    tuple val(filename), path(raw_mrc), path(raw_mdoc)
+    tuple val(filename), path(raw_mrc), path(raw_mdoc), val(req_mem)
     
     output:
-    tuple val(filename), path("*_blend.mrc"), path("*.pl"),  path(raw_mrc), emit: justblend_tup
+    tuple val(filename), path("*_blend.mrc"), path("*.pl"),  path(raw_mrc), val(req_mem), emit: justblend_tup
     
     script:
     """
@@ -182,10 +182,10 @@ process CORRECTIONBLEND {
     errorStrategy = 'ignore' 
 
     input:
-    tuple val(filename), path(blend_mrc), path(blend_pl), path(raw_mrc)
+    tuple val(filename), path(blend_mrc), path(blend_pl), path(raw_mrc), val(req_mem)
     
     output:
-    tuple val(filename), path("*correctionblend.mrc"), emit: correctionblend_tup
+    tuple val(filename), path("*correctionblend.mrc"), val(req_mem), emit: correctionblend_tup
     
     script:
     """
@@ -205,7 +205,7 @@ process CORRECTIONBLEND {
 process EXPORTOVPNG {
   
     cpus   = 1
-    memory = "128GB"
+    memory { "${Math.min(Math.max((req_mem as Integer), 16), 96)}GB" }
     time   = "1h"    
   
     //publishDir "${params.pngdir}", mode:'copy'
@@ -214,16 +214,13 @@ process EXPORTOVPNG {
     def sample = m ? m[0][1] : "UNKNOWN"
     "${params.pngdir}/${sample}"
     }, mode: 'copy', pattern: "*.png"
-    publishDir "${params.outdir}/${filename}", mode:'copy', pattern: "*_coarse_mask.ome.zarr"
-    
     containerOptions '--bind /g --bind /home --bind /scratch'
 
     input:
-    tuple val(filename), path(correctionblend_mrc)
+    tuple val(filename), path(correctionblend_mrc), val(req_mem)
 
     output:
     path "*.png", emit: png_ov
-    tuple val(filename), path("*_coarse_mask.ome.zarr"), emit: coarse_mask_tup
     
     script:
     """
@@ -232,13 +229,11 @@ process EXPORTOVPNG {
         -i "${correctionblend_mrc}" \
         -o "${correctionblend_mrc.baseName}.png" \
         --qc-output "${correctionblend_mrc.baseName}_coarse_mask_qc.png" \
-        --mask-output "${filename}_coarse_mask.ome.zarr" \
         --foreground "darker" \
         --threshold "otsu" \
         --sigma 5 \
         --padding 1000 \
         --mask-dilation-fraction 0.2 \
-        --flip-mask-vertical \
         --min-object-size 50000 \
         --threshold-scale 1
 
@@ -249,7 +244,7 @@ process EXPORTOVPNG {
 process CORRECTGRADIENT {
   
     cpus   = 1
-    memory = "128GB"
+    memory { "${Math.min(Math.max((req_mem as Integer) * 2, 16), 128)}GB" }
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -257,10 +252,10 @@ process CORRECTGRADIENT {
     errorStrategy = 'ignore' 
 
     input:
-    tuple val(filename), path(correctionblend_mrc)
+    tuple val(filename), path(correctionblend_mrc), val(req_mem)
     
     output:
-    tuple val(filename), path("*_gradientcorrected.mrc"), emit: corrected_mrc_tup
+    tuple val(filename), path("*_gradientcorrected.mrc"), val(req_mem), emit: corrected_mrc_tup
     path "*_gradient_qc.png", emit: gradient_qc
     path "*_gradient_metrics.tsv", emit: gradient_metrics
     
@@ -283,7 +278,7 @@ process CORRECTGRADIENT {
 process EUBICONVERSION {
   
     cpus   = 1
-    memory = "64GB"
+    memory { "${Math.min(Math.max((req_mem as Integer) * 2, 32), 128)}GB" }
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -291,7 +286,7 @@ process EUBICONVERSION {
     errorStrategy = 'ignore' 
 
     input:
-    tuple val(filename), path(correctionblend_mrc)
+    tuple val(filename), path(correctionblend_mrc), val(req_mem)
     
     output:
     tuple val(filename), path("*omezarr"), emit: omezarr_tup
