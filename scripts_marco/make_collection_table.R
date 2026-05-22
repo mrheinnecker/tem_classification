@@ -64,11 +64,13 @@ col_table <- read_lines(opt$all_s3) %>%
     is_mask=str_detect(object_name, "_coarse_mask\\.ome\\.zarr$"),
     uri=file.path("https://s3.embl.de/temscreen", s3_raw),
     name=if_else(is_mask, paste0(source_name, " coarse mask"), source_name),
-    type=if_else(is_mask, "labels", "intensities"),
+    type="intensities",
     view=source_name,
     display=if_else(is_mask, "coarse cell mask", "TEM image"),
     blend=if_else(is_mask, "alpha", "sum"),
     color=if_else(is_mask, "magenta", "white"),
+    contrast_limits=if_else(is_mask, "(0,1)", ""),
+    mask_kind=if_else(is_mask, "coarse_binary_mask", ""),
     format="OmeZarr",
     site=str_extract(source_name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
     cell_id=str_extract(source_name, "c0\\d+"),
@@ -84,11 +86,12 @@ col_table <- read_lines(opt$all_s3) %>%
     grid_x=grid_index %% grid_cols,
     grid_y=floor(grid_index / grid_cols),
     grid="all_images",
-    grid_position=paste0(grid_x, ",", grid_y)
+    grid_position=paste0("(", grid_x, ",", grid_y, ")")
   ) %>%
   arrange(source_name, is_mask) %>%
   select(
-    uri, name, type, view, display, blend, color, format, group, grid, grid_position,
+    uri, name, type, view, display, blend, color, contrast_limits, format,
+    group, grid, grid_position, mask_kind,
     site, cell_id, size_frac, sampling_time, source_name, object_name
   )
 
