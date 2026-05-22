@@ -249,7 +249,7 @@ process EXPORTOVPNG {
 process CORRECTGRADIENT {
   
     cpus   = 1
-    memory = "64GB"
+    memory = "128GB"
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -329,7 +329,7 @@ process S3UPLOAD {
     time "10m"
 
     input:
-    tuple val(filename), path(omezarr), path(mask_zarr)
+    tuple val(filename), path(omezarr)
 
     output:
     path "done.txt"
@@ -356,8 +356,7 @@ process S3UPLOAD {
       fi
     fi
 
-    mc cp "\$image_zarr/" "${params.s3_bucket}/\$image_target_name/" -r
-    mc cp "$mask_zarr/" "${params.s3_bucket}/${mask_zarr.name}/" -r
+    mc cp "\$image_zarr/" "${params.s3_bucket}/" -r
 
     echo "Done."
     
@@ -389,7 +388,7 @@ process COLLECTS3FILES {
     script:
     """
 
-    mc ls --recursive "${params.s3_bucket}" > "all_s3_entries.txt"
+    mc ls "${params.s3_bucket}" > "all_s3_entries.txt"
 
     
     """
@@ -481,7 +480,7 @@ workflow {
     )
 
     if (params.workflow_stage == "all") {
-      upload_ch = EUBICONVERSION.out.omezarr_tup.join(EXPORTOVPNG.out.coarse_mask_tup)
+      upload_ch = EUBICONVERSION.out.omezarr_tup
 
       s3upload_out_ch=S3UPLOAD(
         upload_ch

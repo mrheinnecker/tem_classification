@@ -13,6 +13,8 @@ ncol = 4,
 byrow = TRUE)
 opt <- getopt(spec)
 
+#opt$all_s3 <- "/g/schwab/marco/repos/tem_classification/all_s3_entries.txt"
+
 sheet_mode <- opt$sheet_mode
 if (is.null(sheet_mode) || is.na(sheet_mode)) {
   sheet_mode <- "local"
@@ -37,63 +39,76 @@ parse_mc_ls_path <- function(line) {
   )
 }
 
-col_table <- read_lines(opt$all_s3) %>%
+col_table <- 
+  read_lines(opt$all_s3) %>%
+  
+  
+  
   as_tibble() %>%
+  filter(!str_detect(value, "coarse_mask")) %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
-    s3_raw=str_remove(s3_raw, "/$"),
-    zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
-  ) %>%
-  filter(
-    !is.na(zarr_root),
-    !str_detect(zarr_root, "^0/")
-  ) %>%
-  distinct(zarr_root) %>%
-  mutate(
-    s3_raw=zarr_root,
-    object_name=basename(s3_raw),
-    source_name=case_when(
-      str_detect(object_name, "_coarse_mask\\.ome\\.zarr$") ~ str_remove(object_name, "_coarse_mask\\.ome\\.zarr$"),
-      str_detect(object_name, "\\.ome\\.zarr$") ~ str_remove(object_name, "\\.ome\\.zarr$"),
-      str_detect(object_name, "_omezarr$") ~ str_remove(object_name, "_omezarr$"),
-      str_detect(object_name, "\\.zarr$") ~ str_remove(object_name, "\\.zarr$"),
-      TRUE ~ object_name
-    ),
-    source_name=str_remove(source_name, "_correctionblend$"),
-    source_name=str_remove(source_name, "_gradientcorrected$"),
-    is_mask=str_detect(object_name, "_coarse_mask\\.ome\\.zarr$"),
-    uri=file.path("https://s3.embl.de/temscreen", s3_raw),
-    name=if_else(is_mask, paste0(source_name, " coarse mask"), source_name),
-    type="intensities",
-    view=source_name,
-    display=if_else(is_mask, "coarse cell mask", "TEM image"),
-    blend=if_else(is_mask, "alpha", "sum"),
-    color=if_else(is_mask, "magenta", "white"),
-    contrast_limits=if_else(is_mask, "(0,1)", ""),
-    mask_kind=if_else(is_mask, "coarse_binary_mask", ""),
-    format="OmeZarr",
+    source_name=str_remove(s3_raw, "/$"),
     site=str_extract(source_name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
     cell_id=str_extract(source_name, "c0\\d+"),
     size_frac=str_extract(source_name, "\\d+to\\d+"),
     sampling_time=str_extract(source_name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
-    group=site
+    uri=file.path("https://s3.embl.de/temscreen", s3_raw),
+    name=paste0(str_split(source_name, cell_id) %>% map_chr(.,1), cell_id),
+    view="all"
+    #zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
   ) %>%
-  distinct(uri, .keep_all=TRUE) %>%
-  arrange(source_name, is_mask) %>%
-  mutate(
-    grid_index=match(source_name, unique(source_name)) - 1,
-    grid_cols=ceiling(sqrt(n_distinct(source_name))),
-    grid_x=grid_index %% grid_cols,
-    grid_y=floor(grid_index / grid_cols),
-    grid="all_images",
-    grid_position=paste0("(", grid_x, ",", grid_y, ")")
-  ) %>%
-  arrange(source_name, is_mask) %>%
   select(
-    uri, name, type, view, display, blend, color, contrast_limits, format,
-    group, grid, grid_position, mask_kind,
-    site, cell_id, size_frac, sampling_time, source_name, object_name
+    uri, name, view,
+    site, cell_id, size_frac, sampling_time, source_name, 
   )
+  #%>%
+  # filter(
+  #   !is.na(zarr_root),
+  #   !str_detect(zarr_root, "^0/")
+  # ) %>%
+  # distinct(zarr_root) %>%
+  # mutate(
+  #   s3_raw=zarr_root,
+  #   object_name=basename(s3_raw),
+  #   source_name=case_when(
+  #     str_detect(object_name, "_coarse_mask\\.ome\\.zarr$") ~ str_remove(object_name, "_coarse_mask\\.ome\\.zarr$"),
+  #     str_detect(object_name, "\\.ome\\.zarr$") ~ str_remove(object_name, "\\.ome\\.zarr$"),
+  #     str_detect(object_name, "_omezarr$") ~ str_remove(object_name, "_omezarr$"),
+  #     str_detect(object_name, "\\.zarr$") ~ str_remove(object_name, "\\.zarr$"),
+  #     TRUE ~ object_name
+  #   ),
+  #   source_name=str_remove(source_name, "_correctionblend$"),
+  #   source_name=str_remove(source_name, "_gradientcorrected$"),
+  #   is_mask=str_detect(object_name, "_coarse_mask\\.ome\\.zarr$"),
+  #   uri=file.path("https://s3.embl.de/temscreen", s3_raw),
+  #   name=if_else(is_mask, paste0(source_name, " coarse mask"), source_name),
+  #   type="intensities",
+  #   view=source_name,
+  #   display=if_else(is_mask, "coarse cell mask", "TEM image"),
+  #   blend=if_else(is_mask, "alpha", "sum"),
+  #   color=if_else(is_mask, "magenta", "white"),
+  #   contrast_limits=if_else(is_mask, "(0,1)", ""),
+  #   mask_kind=if_else(is_mask, "coarse_binary_mask", ""),
+  #   format="OmeZarr",
+  #   site=str_extract(source_name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
+  #   cell_id=str_extract(source_name, "c0\\d+"),
+  #   size_frac=str_extract(source_name, "\\d+to\\d+"),
+  #   sampling_time=str_extract(source_name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
+  #   group=site
+  # ) %>%
+  # distinct(uri, .keep_all=TRUE) %>%
+  # arrange(source_name, is_mask) %>%
+  # mutate(
+  #   grid_index=match(source_name, unique(source_name)) - 1,
+  #   grid_cols=ceiling(sqrt(n_distinct(source_name))),
+  #   grid_x=grid_index %% grid_cols,
+  #   grid_y=floor(grid_index / grid_cols),
+  #   grid="all_images",
+  #   grid_position=paste0("(", grid_x, ",", grid_y, ")")
+  # ) %>%
+  # arrange(source_name, is_mask) %>%
+
 
 if (nrow(col_table) == 0) {
   stop("No top-level OME-Zarr datasets found in S3 listing.")

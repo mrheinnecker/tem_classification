@@ -87,7 +87,7 @@ all_files <- all_files_raw %>%
   select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
 if(as.logical(opt$dryrun)){
-  to_run <- head(all_files, 5)
+  to_run <- head(all_files, 50)
 } else {
   to_run <- all_files %>%
     filter(!(file.exists(correctionblend_file)))  
