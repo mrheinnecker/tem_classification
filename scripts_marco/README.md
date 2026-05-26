@@ -54,6 +54,18 @@ WORKFLOW_STAGE=all DRYRUN=FALSE ./main.sh local
 
 Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, uploads both image OME-Zarrs and coarse-mask OME-Zarrs, and runs the full workflow.
 
+To submit the whole Nextflow driver as one Slurm job:
+
+```bash
+sbatch ./submit_cluster.sh
+```
+
+You can still override the usual runtime flags:
+
+```bash
+RESUME=FALSE DRYRUN=TRUE WORKFLOW_STAGE=discover sbatch ./submit_cluster.sh
+```
+
 ## Interactive cluster debugging
 
 After allocating an interactive cluster node, run:
