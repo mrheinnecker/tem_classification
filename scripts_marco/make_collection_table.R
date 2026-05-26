@@ -10,7 +10,8 @@ spec <- matrix(c(
   "local_collection_table", "l", 1, "character",
   "image_log_url", "i", 1, "character",
   "image_log_sheet", "s", 1, "character",
-  "local_image_log", "a", 1, "character"
+  "local_image_log", "a", 1, "character",
+  "image_stats_dir", "x", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -46,6 +47,11 @@ if (is.null(image_log_sheet) || is.na(image_log_sheet)) {
 local_image_log <- opt$local_image_log
 if (is.null(local_image_log) || is.na(local_image_log)) {
   local_image_log <- "image_log_local.tsv"
+}
+
+image_stats_dir <- opt$image_stats_dir
+if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
+  image_stats_dir <- "."
 }
 
 parse_mc_ls_path <- function(line) {
@@ -130,6 +136,27 @@ col_table <-
 
 if (nrow(col_table) == 0) {
   stop("No top-level OME-Zarr datasets found in S3 listing.")
+}
+
+image_stats_files <- list.files(
+  image_stats_dir,
+  pattern="_image_stats\\.tsv$",
+  full.names=TRUE
+)
+
+if (length(image_stats_files) > 0) {
+  image_stats <- image_stats_files %>%
+    map_dfr(~read_tsv(.x, col_types=cols(.default = col_character()))) %>%
+    distinct(name, .keep_all=TRUE)
+
+  col_table <- col_table %>%
+    left_join(
+      image_stats %>%
+        select(name, min_gray, max_gray, contrast_limits),
+      by="name"
+    )
+} else {
+  warning("No *_image_stats.tsv files found; collection table was written without contrast limits.")
 }
 
 read_image_log <- function() {

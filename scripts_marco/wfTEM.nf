@@ -274,6 +274,31 @@ process CORRECTGRADIENT {
 }
 
 
+process EXTRACTIMAGESTATS {
+  
+    cpus   = 1
+    memory = "2GB"
+    time   = "10m"    
+  
+    publishDir "${params.logdir}/image_stats", mode:'copy'
+    containerOptions '--bind /g --bind /home --bind /scratch'
+
+    input:
+    tuple val(filename), path(correctionblend_mrc), val(req_mem)
+    
+    output:
+    path "*_image_stats.tsv", emit: image_stats
+    
+    script:
+    """
+      python3 "${params.script_dir}/extract_image_stats.py" \
+        --input "${correctionblend_mrc}" \
+        --name "${filename}" \
+        --output "${filename}_image_stats.tsv"
+    """  
+}
+
+
 
 process EUBICONVERSION {
   
@@ -399,6 +424,7 @@ process MAKECOLLECTIONTABLE {
 
     input:
     path all_s3
+    path image_stats
 
     output:
     path "done.tsv"
@@ -414,6 +440,7 @@ process MAKECOLLECTIONTABLE {
 
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "$all_s3" \
+      --image_stats_dir "." \
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
@@ -463,6 +490,10 @@ workflow {
       CORRECTIONBLEND.out.correctionblend_tup
     )
 
+    EXTRACTIMAGESTATS(
+      CORRECTGRADIENT.out.corrected_mrc_tup
+    )
+
     ch_a_second = JUSTBLEND.out.justblend_tup.map { t -> t[1] }
     ch_b_second = CORRECTGRADIENT.out.corrected_mrc_tup.map { t -> t[1] }
 
@@ -490,8 +521,11 @@ workflow {
         fully_done_ch
       )
 
+      image_stats_ch = EXTRACTIMAGESTATS.out.image_stats.collect()
+
       MAKECOLLECTIONTABLE(
-        COLLECTS3FILES.out.all_s3
+        COLLECTS3FILES.out.all_s3,
+        image_stats_ch
       )
     }
   }
