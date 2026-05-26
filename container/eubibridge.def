@@ -55,7 +55,7 @@ From: mambaorg/micromamba:1.5.10-bookworm-slim
     micromamba run -n eubi python -m pip install --upgrade pip setuptools wheel
 
     # Stable PyPI release
-    micromamba run -n eubi pip install --no-cache-dir eubi-bridge==0.1.0
+    micromamba run -n eubi pip install --no-cache-dir eubi-bridge==0.1.2b1
 
     # Initialize default config
     micromamba run -n eubi eubi reset_config || true
