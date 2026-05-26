@@ -87,7 +87,7 @@ all_files <- all_files_raw %>%
   select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
 
 if(as.logical(opt$dryrun)){
-  to_run <- head(all_files, 5)
+  to_run <- head(all_files, 10)
 } else {
   to_run <- all_files %>%
     filter(!(file.exists(correctionblend_file)))  
@@ -162,6 +162,8 @@ if(as.logical(opt$dryrun)){
 } else {
   sheet_name <- "image_log"
 }
+
+sheet_name <- "image_log_test"
 
 
 if (sheet_mode == "google") {

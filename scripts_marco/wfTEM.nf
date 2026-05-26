@@ -225,6 +225,8 @@ process EXPORTOVPNG {
     script:
     """
 
+      echo "exporting overview png"
+
       python3 "${params.script_dir}/process_images.py" \
         -i "${correctionblend_mrc}" \
         -o "${correctionblend_mrc.baseName}.png" \
@@ -330,7 +332,9 @@ process EUBICONVERSION {
       --squeeze True \
       --save_omexml True \
       --zar_format "${params.zarr_format}" \
-      --auto_chunk True
+      --auto_chunk True \
+      --jvm_memory 8GB \
+      --max_workers 1
       
     ##       --metadata_reader bioio this flag causes the error  
 

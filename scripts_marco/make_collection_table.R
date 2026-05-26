@@ -79,12 +79,13 @@ col_table <-
     sampling_time=str_extract(source_name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     uri=file.path("https://s3.embl.de/temscreen", s3_raw),
     name=paste0(str_split(source_name, cell_id) %>% map_chr(.,1), cell_id),
-    view=site
+    view=site,
+    grid=site,
     #zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
   ) %>%
   select(
-    uri, name, view,
-    site, cell_id, size_frac, sampling_time, source_name
+    uri, name, view, grid,
+    site, cell_id, size_frac, sampling_time, source_name, 
   )
   #%>%
   # filter(

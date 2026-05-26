@@ -7,12 +7,13 @@ timestamp="$(date +%Y-%m-%d_%H-%M)"
 resume="${RESUME:-TRUE}"
 
 case "$mode" in
-  local)
-    main_dir="${TEM_SCREEN_DIR:-C:/projects/tem_screen}"
-    profile="local"
-    default_sheet_mode="local"
-    default_workflow_stage="discover"
-    default_dryrun="TRUE"
+  cluster)
+    main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    profile="cluster"
+    default_sheet_mode="google"
+    default_workflow_stage="all"
+    default_dryrun="FALSE"
+    module load Nextflow/24.10.4
     ;;
   interactive)
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
@@ -22,7 +23,7 @@ case "$mode" in
     default_dryrun="TRUE"
     module load Nextflow/24.10.4
     ;;
-  cluster)
+  devel)
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
     profile="cluster"
     default_sheet_mode="google"
