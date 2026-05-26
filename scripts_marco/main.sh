@@ -27,7 +27,7 @@ case "$mode" in
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
-    default_dryrun="TRUE"
+    default_dryrun="FALSE"
     module load Nextflow/24.10.4
     ;;
   *)
