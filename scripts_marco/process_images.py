@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+from pathlib import Path
+import re
 
 import matplotlib.pyplot as plt
 import mrcfile
@@ -173,13 +175,37 @@ def add_scalebar(ax, img_shape, pixel_size_nm, scalebar_length_nm):
     )
 
 
-def save_overview_png(img_uint8, voxel_size, png_path, scalebar_length_nm, preview_factor):
+def short_name_from_path(path):
+    stem = Path(path).name
+    match = re.search(r"^(.*?c0\d+)", stem)
+    if match:
+        return match.group(1)
+    return Path(path).stem
+
+
+def add_image_label(ax, label):
+    if not label:
+        return
+
+    ax.text(
+        0,
+        0,
+        label,
+        color="white",
+        ha="left",
+        va="top",
+        fontsize=8,
+    )
+
+
+def save_overview_png(img_uint8, voxel_size, png_path, scalebar_length_nm, preview_factor, image_label):
     pixel_size_nm = float(voxel_size.x) / 10.0 * preview_factor
 
     dpi = 50
     fig, ax = plt.subplots(figsize=(img_uint8.shape[1] / dpi, img_uint8.shape[0] / dpi), dpi=dpi)
     ax.imshow(img_uint8, cmap="gray", vmin=0, vmax=255, interpolation="nearest")
     ax.axis("off")
+    add_image_label(ax, image_label)
     add_scalebar(ax, img_uint8.shape, pixel_size_nm, scalebar_length_nm)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.savefig(png_path, dpi=dpi, pad_inches=0)
@@ -223,6 +249,7 @@ def save_qc_png(
     out_png,
     scalebar_length_nm,
     preview_factor,
+    image_label,
 ):
     ymin, ymax, xmin, xmax = bbox
     pixel_size_nm = float(voxel_size.x) / 10.0
@@ -233,6 +260,7 @@ def save_qc_png(
 
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.imshow(preview, cmap="gray", vmin=0, vmax=255)
+    add_image_label(ax, image_label)
     ax.contour(mask_preview, levels=[0.5], linewidths=1, colors="magenta")
     ax.contour(final_preview, levels=[0.5], linewidths=1, colors="cyan")
 
@@ -256,6 +284,7 @@ def parse_args():
     parser.add_argument("-i", "--input", required=True, help="Path to input MRC file")
     parser.add_argument("-o", "--output", required=True, help="Path to output overview PNG")
     parser.add_argument("--qc-output", default=None, help="Optional QC PNG with mask contours")
+    parser.add_argument("--image-label", default=None, help="Label written at pixel coordinate 0,0")
     parser.add_argument("--scalebar-length-nm", type=float, default=5000)
     parser.add_argument("--preview-factor", type=int, default=4)
     parser.add_argument(
@@ -279,6 +308,7 @@ def parse_args():
 def main():
     args = parse_args()
     preview_factor = max(1, args.preview_factor)
+    image_label = args.image_label if args.image_label is not None else short_name_from_path(args.input)
 
     with mrcfile.open(args.input, permissive=True) as mrc:
         img = get_mrc_2d_view(mrc)
@@ -296,6 +326,7 @@ def main():
             args.output,
             args.scalebar_length_nm,
             preview_factor,
+            image_label,
         )
         if args.qc_output:
             full_img = np.asarray(img, dtype=np.float32).copy()
@@ -337,6 +368,7 @@ def main():
             args.qc_output,
             args.scalebar_length_nm,
             preview_factor,
+            image_label,
         )
         print(f"Threshold: {thr:.4f}")
         print("Saved QC PNG:", args.qc_output)
