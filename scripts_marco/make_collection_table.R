@@ -7,7 +7,10 @@ spec <- matrix(c(
   "sheet_mode", "m", 1, "character",
   "google_key", "k", 1, "character",
   "collection_table_url", "u", 1, "character",
-  "local_collection_table", "l", 1, "character"
+  "local_collection_table", "l", 1, "character",
+  "image_log_url", "i", 1, "character",
+  "image_log_sheet", "s", 1, "character",
+  "local_image_log", "a", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -28,6 +31,21 @@ if (is.null(collection_table) || is.na(collection_table)) {
 local_collection_table <- opt$local_collection_table
 if (is.null(local_collection_table) || is.na(local_collection_table)) {
   local_collection_table <- "collection_table.tsv"
+}
+
+image_log_url <- opt$image_log_url
+if (is.null(image_log_url) || is.na(image_log_url)) {
+  image_log_url <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+}
+
+image_log_sheet <- opt$image_log_sheet
+if (is.null(image_log_sheet) || is.na(image_log_sheet)) {
+  image_log_sheet <- "image_log"
+}
+
+local_image_log <- opt$local_image_log
+if (is.null(local_image_log) || is.na(local_image_log)) {
+  local_image_log <- "image_log_local.tsv"
 }
 
 parse_mc_ls_path <- function(line) {
@@ -60,7 +78,7 @@ col_table <-
   ) %>%
   select(
     uri, name, view,
-    site, cell_id, size_frac, sampling_time, source_name, 
+    site, cell_id, size_frac, sampling_time, source_name
   )
   #%>%
   # filter(
@@ -112,6 +130,35 @@ col_table <-
 
 if (nrow(col_table) == 0) {
   stop("No top-level OME-Zarr datasets found in S3 listing.")
+}
+
+read_image_log <- function() {
+  if (sheet_mode == "google") {
+    library(googlesheets4)
+    json_key <- opt$google_key
+    if (is.null(json_key) || is.na(json_key)) {
+      stop("--google_key is required when --sheet_mode google")
+    }
+    gs4_auth(path=json_key)
+    read_sheet(image_log_url, sheet=image_log_sheet, col_types="c")
+  } else if (file.exists(local_image_log)) {
+    read_tsv(local_image_log, col_types=cols(.default = col_character()))
+  } else {
+    tibble(shortname=character(), site=character())
+  }
+}
+
+image_log <- read_image_log()
+
+if (nrow(image_log) > 0 && all(c("shortname", "site") %in% names(image_log))) {
+  col_table <- col_table %>%
+    left_join(
+      image_log %>%
+        distinct(shortname, site, .keep_all=TRUE),
+      by=c("name"="shortname", "site"="site")
+    )
+} else {
+  warning("Image log has no rows or is missing shortname/site columns; collection table was written without annotations.")
 }
 
 

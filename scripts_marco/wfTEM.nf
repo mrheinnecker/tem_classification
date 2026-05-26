@@ -417,7 +417,10 @@ process MAKECOLLECTIONTABLE {
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
-      --local_collection_table "collection_table.tsv"
+      --local_collection_table "collection_table.tsv" \
+      --image_log_url "${params.sheet_url}" \
+      --image_log_sheet "${params.dryrun.toString().toBoolean() ? 'image_log_test' : 'image_log'}" \
+      --local_image_log "${params.local_log}"
 
     
     """
