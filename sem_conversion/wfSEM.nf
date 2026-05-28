@@ -4,7 +4,7 @@ params.rawdir = params.rawdir ?: "/g/schwab/Chandni/SEM/IMATREC SEM"
 params.outdir = params.outdir ?: "sem_processed"
 params.logdir = params.logdir ?: "sem_logs"
 params.sheet_mode = params.sheet_mode ?: "local"
-params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/1jcpyMkSR4npSxST3D5cFzkAIi9UPmwbPvzAdr2ws55U/edit?gid=2132397683#gid=2132397683"
 params.collection_table_url = params.collection_table_url ?: "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
 params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
 params.local_log = params.local_log ?: "${params.outdir}/sem_image_log_local.tsv"
@@ -90,7 +90,7 @@ PY
 process EUBISEMCONVERSION {
 
     cpus 1
-    memory { "${Math.min(Math.max((req_mem as Integer) * 2, 16), 96)}GB" }
+    memory "4G"
     time "1h"
 
     publishDir "${params.outdir}/${filename}", mode:"copy"
@@ -202,7 +202,6 @@ process MAKESEMCOLLECTIONTABLE {
     script:
     """
     
-    echo "letsgo"
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "${all_s3}" \
       --metadata_dir "." \

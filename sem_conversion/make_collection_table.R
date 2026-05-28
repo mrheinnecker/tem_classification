@@ -17,11 +17,11 @@ opt <- getopt(spec)
 #opt$all_s3 <- "/scratch/rheinnec/sem_screen/work/c0/fde5b0abcfc45b9f759d24fc0f1b20/all_s3_entries.txt"
 
 
-print(opt$google_key)
+print(opt$image_log_url)
 
 sheet_mode <- opt$sheet_mode
 if (is.null(sheet_mode) || is.na(sheet_mode)) {
-  sheet_mode <- "local"
+  sheet_mode <- "google"
 }
 
 local_collection_table <- opt$local_collection_table
@@ -99,7 +99,8 @@ read_image_log <- function() {
       stop("--google_key is required when --sheet_mode google")
     }
     gs4_auth(path=json_key)
-    read_sheet(opt$image_log_url, sheet="sem_image_log", col_types="c")
+    read_sheet(opt$image_log_url, 
+               sheet="SEM taxonomy", col_types="c")
   } else if (file.exists(local_image_log)) {
     read_tsv(local_image_log, col_types=cols(.default=col_character()))
   } else {
@@ -112,11 +113,11 @@ col_table <-
   as_tibble() %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
-    name=source_name_from_s3(s3_raw),
+    name=source_name_from_s3(s3_raw) %>% str_remove(".zarr$"),
     uri=file.path("https://s3.embl.de/semscreen", s3_raw),
    
     
-    site=str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
+    site=str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR|ROS"),
     sem_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     size_frac=str_extract(name, "\\d+to\\d+"),
@@ -137,12 +138,13 @@ if (nrow(metadata_table) > 0) {
     left_join(metadata_table, by="name")
 }
 
-image_log <- read_image_log()
-if (nrow(image_log) > 0 && "shortname" %in% names(image_log)) {
+image_log <- read_image_log() %>% 
+  select(name=`File name`, Microscope, Date, Time,  `Size fraction`, `TARA overlap`, `Taxonomic ID`, `Major group`)
+if (nrow(image_log) > 0) {
   col_table <- col_table %>%
     left_join(
-      image_log %>% distinct(shortname, .keep_all=TRUE),
-      by=c("name"="shortname")
+      image_log %>% distinct(name, .keep_all=TRUE),
+      by=c("name")
     )
 }
 

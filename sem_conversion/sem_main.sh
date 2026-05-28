@@ -4,7 +4,7 @@ set -euo pipefail
 mode="${1:-interactive}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 timestamp="$(date +%Y-%m-%d_%H-%M)"
-resume="${RESUME:-TRUE}"
+resume="${RESUME:-FALSE}"
 
 case "$mode" in
   cluster)
@@ -20,7 +20,7 @@ case "$mode" in
     profile="interactive"
     default_sheet_mode="google"
     default_workflow_stage="all"
-    default_dryrun="TRUE"
+    default_dryrun="FALSE"
     module load Nextflow/24.10.4
     ;;
   local)
@@ -45,7 +45,7 @@ outdir="${OUTDIR:-${main_dir}/processed}"
 logdir="${LOGDIR:-${main_dir}/logs/wfSEM_${timestamp}}"
 local_log="${LOCAL_LOG:-${main_dir}/sem_image_log_local.tsv}"
 s3_bucket="${S3_BUCKET:-s3embl/semscreen}"
-sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282}"
+sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/1jcpyMkSR4npSxST3D5cFzkAIi9UPmwbPvzAdr2ws55U/edit?gid=2132397683#gid=2132397683}"
 collection_table_url="${COLLECTION_TABLE_URL:-https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951}"
 
 mkdir -p "$logdir" "$outdir"
