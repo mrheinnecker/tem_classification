@@ -1,28 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
 
+mode="${1:-interactive}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+timestamp="$(date +%Y-%m-%d_%H-%M)"
+resume="${RESUME:-TRUE}"
 
-## SEM: /g/schwab/Chandni/SEM/IMATREC SEM
+case "$mode" in
+  cluster)
+    main_dir="${SEM_SCREEN_DIR:-/scratch/rheinnec/sem_screen}"
+    profile="cluster"
+    default_sheet_mode="google"
+    default_workflow_stage="all"
+    default_dryrun="FALSE"
+    module load Nextflow/24.10.4
+    ;;
+  interactive)
+    main_dir="${SEM_SCREEN_DIR:-/scratch/rheinnec/sem_screen}"
+    profile="interactive"
+    default_sheet_mode="local"
+    default_workflow_stage="process"
+    default_dryrun="TRUE"
+    module load Nextflow/24.10.4
+    ;;
+  local)
+    main_dir="${SEM_SCREEN_DIR:-C:/projects/sem_screen}"
+    profile="local"
+    default_sheet_mode="local"
+    default_workflow_stage="discover"
+    default_dryrun="TRUE"
+    ;;
+  *)
+    echo "Usage: $0 [local|interactive|cluster]"
+    exit 1
+    ;;
+esac
 
-## in the collection tabel: site date, time, TARA-overalp fraction, annotation
+sheet_mode="${SHEET_MODE:-$default_sheet_mode}"
+workflow_stage="${WORKFLOW_STAGE:-$default_workflow_stage}"
+dryrun="${DRYRUN:-$default_dryrun}"
 
+rawdir="${RAWDIR:-/g/schwab/Chandni/SEM/IMATREC SEM}"
+outdir="${OUTDIR:-${main_dir}/processed}"
+logdir="${LOGDIR:-${main_dir}/logs/wfSEM_${timestamp}}"
+local_log="${LOCAL_LOG:-${main_dir}/sem_image_log_local.tsv}"
+s3_bucket="${S3_BUCKET:-s3embl/semscreen}"
 
-## cryo samples
+mkdir -p "$logdir" "$outdir"
+cd "$main_dir"
 
+nextflow_args=(
+  run "${script_dir}/wfSEM.nf"
+  -c "${script_dir}/nextflow.config"
+  --script_dir "$script_dir"
+  --logdir "$logdir"
+  --rawdir "$rawdir"
+  --outdir "$outdir"
+  --local_log "$local_log"
+  --sheet_mode "$sheet_mode"
+  --workflow_stage "$workflow_stage"
+  --dryrun "$dryrun"
+  --s3_bucket "$s3_bucket"
+  -profile "$profile"
+)
 
+case "$resume" in
+  TRUE|true|1|yes|YES)
+    nextflow_args+=("-resume")
+    ;;
+  FALSE|false|0|no|NO)
+    ;;
+  *)
+    echo "RESUME must be TRUE or FALSE"
+    exit 1
+    ;;
+esac
 
-singularity shell --bind /g --bind /scratch /g/schwab/marco/container_legacy/python_latest.sif
-
-cd /g/schwab/marco/repos/tem_classification
-
-python sem_conversion/extract_metadata.py /g/schwab/marco/tiftest/ATH_20240701_PM_104.tif /g/schwab/marco/tiftest/output_metadata.json
-
-
-
-
-
- eubi to_zarr \
-    /g/schwab/marco/tiftest/ATH_20240701_PM_104.tif \
-    /g/schwab/marco/tiftest/out_omezarr \
-      --x_unit nm \
-      --y_unit nm \
-      --x_scale "${params.pixel_scale_x}" \
-      --y_scale "${params.pixel_scale_y}"
+nextflow "${nextflow_args[@]}"

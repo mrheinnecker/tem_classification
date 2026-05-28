@@ -9,7 +9,7 @@ params.collection_table_url = params.collection_table_url ?: ""
 params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
 params.local_log = params.local_log ?: "${params.outdir}/sem_image_log_local.tsv"
 params.workflow_stage = params.workflow_stage ?: "discover"
-params.s3_bucket = params.s3_bucket ?: "s3embl/temscreen"
+params.s3_bucket = params.s3_bucket ?: "s3embl/semscreen"
 params.zarr_format = params.zarr_format ?: 2
 
 

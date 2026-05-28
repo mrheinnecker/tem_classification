@@ -108,7 +108,7 @@ col_table <-
   mutate(
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw),
-    uri=file.path("https://s3.embl.de/temscreen", s3_raw),
+    uri=file.path("https://s3.embl.de/semscreen", s3_raw),
     view=name,
     grid="SEM",
     site=str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
