@@ -34,7 +34,6 @@ process SELECTSEMIMAGES {
     output:
     path "images_to_process.csv", emit: to_process
     path "all_datasets.tsv", emit: all_datasets
-    path "manually_filled_log*"
 
     script:
     """
@@ -202,6 +201,8 @@ process MAKESEMCOLLECTIONTABLE {
 
     script:
     """
+    
+    echo "letsgo"
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "${all_s3}" \
       --metadata_dir "." \

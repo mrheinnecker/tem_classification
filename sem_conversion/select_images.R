@@ -74,7 +74,7 @@ all_files <- all_files_raw %>%
   )
 
 if (as.logical(dryrun)) {
-  to_run <- head(all_files, 2)
+  to_run <- head(all_files, 10)
 } else {
   to_run <- all_files %>%
     filter(!file.exists(omezarr_dir))
@@ -104,23 +104,23 @@ read_image_log <- function() {
   }
 }
 
-current_log <- read_image_log()
+#current_log <- read_image_log()
 timestamp <- Sys.time() %>% as.character() %>% str_replace_all(" |:|\\.", "_")
-write_tsv(current_log, file=paste0("manually_filled_log_", timestamp, ".tsv"))
+#write_tsv(current_log, file=paste0("manually_filled_log_", timestamp, ".tsv"))
 
 new_log <- all_files %>%
-  select(shortname, site, sem_date, sampling_time, size_frac) %>%
-  left_join(
-    current_log,
-    by=c("shortname", "site", "sem_date", "sampling_time", "size_frac")
-  )
+  select(shortname, site, sem_date, sampling_time, size_frac) #%>%
+  # left_join(
+  #   current_log,
+  #   by=c("shortname", "site", "sem_date", "sampling_time", "size_frac")
+  # )
 
-if (sheet_mode == "google") {
-  library(googlesheets4)
-  write_sheet(new_log, ss=opt$sheet_url, sheet="sem_image_log")
-} else {
-  write_tsv(new_log, file=local_log)
-}
+# if (sheet_mode == "google") {
+#   library(googlesheets4)
+#   write_sheet(new_log, ss=opt$sheet_url, sheet="sem_image_log")
+# } else {
+write_tsv(new_log, file=local_log)
+#}
 
 write_csv(to_run, file="images_to_process.csv")
 write_tsv(all_files, file="all_datasets.tsv")

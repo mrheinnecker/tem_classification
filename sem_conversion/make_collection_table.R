@@ -14,6 +14,11 @@ spec <- matrix(c(
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
+#opt$all_s3 <- "/scratch/rheinnec/sem_screen/work/c0/fde5b0abcfc45b9f759d24fc0f1b20/all_s3_entries.txt"
+
+
+print(opt$google_key)
+
 sheet_mode <- opt$sheet_mode
 if (is.null(sheet_mode) || is.na(sheet_mode)) {
   sheet_mode <- "local"
@@ -109,14 +114,16 @@ col_table <-
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw),
     uri=file.path("https://s3.embl.de/semscreen", s3_raw),
-    view=name,
-    grid="SEM",
+   
+    
     site=str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
     sem_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
-    size_frac=str_extract(name, "\\d+to\\d+")
+    size_frac=str_extract(name, "\\d+to\\d+"),
+    grid=site,
+    view=site,
   ) %>%
-  filter(!is.na(s3_raw), str_detect(s3_raw, "_omezarr/?$")) %>%
+  filter(!is.na(s3_raw), str_detect(s3_raw, "zarr/?$")) %>%
   distinct(uri, .keep_all=TRUE) %>%
   select(uri, name, view, grid, site, sem_date, sampling_time, size_frac, s3_raw)
 
