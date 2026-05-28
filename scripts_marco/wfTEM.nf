@@ -246,7 +246,7 @@ process EXPORTOVPNG {
 process CORRECTGRADIENT {
   
     cpus   = 1
-    memory { "${Math.min(Math.max((req_mem as Integer) * 2, 16), 128)}GB" }
+    memory { "${Math.min(Math.max((req_mem as Integer) * 3, 16), 192)}GB" }
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -279,7 +279,7 @@ process CORRECTGRADIENT {
 process EXTRACTIMAGESTATS {
   
     cpus   = 1
-    memory = "2GB"
+    memory = "32GB"
     time   = "10m"    
   
     publishDir "${params.logdir}/image_stats", mode:'copy'

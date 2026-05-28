@@ -8,7 +8,7 @@ resume="${RESUME:-TRUE}"
 
 case "$mode" in
   cluster)
-    main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -28,7 +28,7 @@ case "$mode" in
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
-    default_dryrun="FALSE"
+    default_dryrun="TRUE"
     module load Nextflow/24.10.4
     ;;
   *)

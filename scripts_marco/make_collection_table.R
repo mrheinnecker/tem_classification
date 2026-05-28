@@ -18,6 +18,7 @@ byrow = TRUE)
 opt <- getopt(spec)
 
 #opt$all_s3 <- "/g/schwab/marco/repos/tem_classification/all_s3_entries.txt"
+#opt$google_key <- "/g/schwab/marco/repos/tem_classification/scripts_marco/trec-tem-screen-e98a2e03f58b.json"
 
 sheet_mode <- opt$sheet_mode
 if (is.null(sheet_mode) || is.na(sheet_mode)) {

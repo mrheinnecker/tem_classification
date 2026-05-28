@@ -163,7 +163,6 @@ if(as.logical(opt$dryrun)){
   sheet_name <- "image_log"
 }
 
-sheet_name <- "image_log_test"
 
 
 if (sheet_mode == "google") {
