@@ -19,7 +19,7 @@ case "$mode" in
     main_dir="${SEM_SCREEN_DIR:-/scratch/rheinnec/sem_screen}"
     profile="interactive"
     default_sheet_mode="local"
-    default_workflow_stage="process"
+    default_workflow_stage="all"
     default_dryrun="TRUE"
     module load Nextflow/24.10.4
     ;;

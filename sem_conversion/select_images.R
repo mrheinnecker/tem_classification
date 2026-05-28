@@ -74,7 +74,7 @@ all_files <- all_files_raw %>%
   )
 
 if (as.logical(dryrun)) {
-  to_run <- head(all_files, 5)
+  to_run <- head(all_files, 2)
 } else {
   to_run <- all_files %>%
     filter(!file.exists(omezarr_dir))
