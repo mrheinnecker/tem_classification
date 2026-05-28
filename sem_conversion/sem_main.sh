@@ -9,8 +9,11 @@
 
 
 
+singularity shell --bind /g --bind /scratch /g/schwab/marco/container_legacy/python_latest.sif
 
+cd /g/schwab/marco/repos/tem_classification
 
+python sem_conversion/extract_metadata.py /g/schwab/marco/tiftest/ATH_20240701_PM_104.tif /g/schwab/marco/tiftest/output_metadata.json
 
 
 
