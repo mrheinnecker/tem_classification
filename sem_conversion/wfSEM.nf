@@ -143,7 +143,7 @@ process S3UPLOADSEM {
     tuple val(filename), path(omezarr)
 
     output:
-    path "done.txt"
+    path "${filename}_s3_upload_done.txt"
 
     script:
     """
@@ -157,7 +157,7 @@ process S3UPLOADSEM {
     fi
 
     mc cp "\${image_zarr}/" "${params.s3_bucket}/" -r
-    touch done.txt
+    touch "${filename}_s3_upload_done.txt"
     """
 }
 
