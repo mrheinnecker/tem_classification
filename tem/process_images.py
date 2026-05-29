@@ -310,7 +310,7 @@ def main():
     preview_factor = max(1, args.preview_factor)
     image_label = args.image_label if args.image_label is not None else short_name_from_path(args.input)
 
-    with mrcfile.open(args.input, permissive=True) as mrc:
+    with mrcfile.mmap(args.input, permissive=True) as mrc:
         img = get_mrc_2d_view(mrc)
         voxel_size = mrc.voxel_size
         preview = img[::preview_factor, ::preview_factor] if preview_factor > 1 else img

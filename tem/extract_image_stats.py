@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--output", required=True, help="Output TSV file")
     args = parser.parse_args()
 
-    with mrcfile.open(args.input, permissive=True) as mrc:
+    with mrcfile.mmap(args.input, permissive=True) as mrc:
         data = mrc.data
         min_gray = float(np.nanmin(data))
         max_gray = float(np.nanmax(data))

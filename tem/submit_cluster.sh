@@ -8,14 +8,15 @@
 
 set -euo pipefail
 
-# script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# 
-# cd "$script_dir/../.."
+PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-RESUME="${RESUME:-TRUE}" \
-DRYRUN="${DRYRUN:-FALSE}" \
-WORKFLOW_STAGE="${WORKFLOW_STAGE:-all}" \
-
-
-
-"/g/schwab/marco/repos/tem_classification/tem/main.sh" cluster
+bash "${script_dir}/main.sh" \
+  --profile cluster \
+  --resume "${RESUME:-TRUE}" \
+  --dryrun "${DRYRUN:-FALSE}" \
+  --sheet_mode "${SHEET_MODE:-google}" \
+  --workflow_stage "${WORKFLOW_STAGE:-all}" \
+  --main_dir "${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}" \
+  --gradient_chunk_rows "${GRADIENT_CHUNK_ROWS:-512}" \
+  --gradient_downsample "${GRADIENT_DOWNSAMPLE:-16}"

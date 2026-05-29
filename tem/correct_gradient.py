@@ -2,6 +2,7 @@
 
 import argparse
 from pathlib import Path
+import shutil
 
 import matplotlib.pyplot as plt
 import mrcfile
@@ -58,33 +59,19 @@ def estimate_gradient(img, downsample, background_sigma):
         "direction": direction,
         "x_slope": float(x_slope),
         "y_slope": float(y_slope),
+        "coeffs": coeffs.astype(np.float32),
         "plane_small": plane,
         "smooth_small": smooth,
     }
 
 
-def correct_image(data, plane_small, downsample):
-    target_shape = data.shape[-2:]
-    zoom = (
-        target_shape[0] / plane_small.shape[0],
-        target_shape[1] / plane_small.shape[1],
+def plane_chunk(coeffs, y0, y1, width, downsample, plane_offset):
+    x = np.arange(width, dtype=np.float32) / downsample
+    y = np.arange(y0, y1, dtype=np.float32)[:, None] / downsample
+    return (coeffs[0] * x[None, :] + coeffs[1] * y + coeffs[2] - plane_offset).astype(
+        np.float32,
+        copy=False,
     )
-    plane = ndi.zoom(plane_small, zoom, order=1)
-    plane = plane[: target_shape[0], : target_shape[1]]
-    plane = plane - np.median(plane)
-
-    if data.dtype == np.float32:
-        corrected = data
-    else:
-        corrected = data.astype(np.float32, copy=False)
-    if corrected.ndim == 2:
-        corrected -= plane
-    elif corrected.ndim == 3:
-        corrected -= plane[None, :, :]
-    else:
-        raise ValueError(f"Unsupported MRC dimensionality: {data.shape}")
-
-    return corrected
 
 
 def save_qc_png(img, corrected_img, plane_small, out_png, score, corrected, threshold, direction):
@@ -111,10 +98,44 @@ def save_qc_png(img, corrected_img, plane_small, out_png, score, corrected, thre
     plt.close(fig)
 
 
-def write_mrc(output_path, data, voxel_size):
-    with mrcfile.new(output_path, overwrite=True) as out:
-        out.set_data(data)
+def copy_mrc(input_path, output_path):
+    shutil.copy2(input_path, output_path)
+
+
+def write_corrected_mrc_chunked(
+    output_path,
+    data,
+    voxel_size,
+    coeffs,
+    downsample,
+    plane_offset,
+    chunk_rows,
+):
+    height, width = data.shape[-2:]
+
+    with mrcfile.new_mmap(
+        output_path,
+        shape=data.shape,
+        mrc_mode=2,
+        overwrite=True,
+    ) as out:
         out.voxel_size = voxel_size
+
+        if data.ndim == 2:
+            for y0 in range(0, height, chunk_rows):
+                y1 = min(height, y0 + chunk_rows)
+                plane = plane_chunk(coeffs, y0, y1, width, downsample, plane_offset)
+                out.data[y0:y1, :] = data[y0:y1, :].astype(np.float32, copy=False) - plane
+        elif data.ndim == 3:
+            for z in range(data.shape[0]):
+                for y0 in range(0, height, chunk_rows):
+                    y1 = min(height, y0 + chunk_rows)
+                    plane = plane_chunk(coeffs, y0, y1, width, downsample, plane_offset)
+                    out.data[z, y0:y1, :] = (
+                        data[z, y0:y1, :].astype(np.float32, copy=False) - plane
+                    )
+        else:
+            raise ValueError(f"Unsupported MRC dimensionality: {data.shape}")
 
 
 def main():
@@ -128,6 +149,7 @@ def main():
     parser.add_argument("--threshold", type=float, default=0.18)
     parser.add_argument("--downsample", type=int, default=16)
     parser.add_argument("--background-sigma", type=float, default=20)
+    parser.add_argument("--chunk-rows", type=int, default=2048)
     parser.add_argument(
         "--mode",
         choices=["detect_only", "auto"],
@@ -136,31 +158,46 @@ def main():
     )
     args = parser.parse_args()
 
-    with mrcfile.open(args.input, permissive=True) as mrc:
-        data = np.asarray(mrc.data).copy()
+    with mrcfile.mmap(args.input, permissive=True) as mrc:
+        data = mrc.data
         voxel_size = mrc.voxel_size
 
-    img2d = squeeze_to_2d(data).astype(np.float32, copy=False)
-    stats = estimate_gradient(img2d, max(1, args.downsample), args.background_sigma)
-    should_correct = args.mode == "auto" and stats["score"] >= args.threshold
+        img2d = squeeze_to_2d(data)
+        downsample = max(1, args.downsample)
+        stats = estimate_gradient(img2d, downsample, args.background_sigma)
+        should_correct = args.mode == "auto" and stats["score"] >= args.threshold
 
-    if should_correct:
-        output_data = correct_image(data, stats["plane_small"], max(1, args.downsample))
-    else:
-        output_data = data
+        plane_offset = float(np.median(stats["plane_small"]))
+        small_preview = img2d[::downsample, ::downsample].astype(np.float32, copy=False)
+        corrected_preview = (
+            small_preview - (stats["plane_small"] - plane_offset)
+            if should_correct
+            else small_preview
+        )
 
-    output_2d = squeeze_to_2d(output_data).astype(np.float32, copy=False)
-    write_mrc(args.output, output_data, voxel_size)
-    save_qc_png(
-        img2d,
-        output_2d,
-        stats["plane_small"],
-        args.qc_png,
-        stats["score"],
-        should_correct,
-        args.threshold,
-        stats["direction"],
-    )
+        if should_correct:
+            write_corrected_mrc_chunked(
+                args.output,
+                data,
+                voxel_size,
+                stats["coeffs"],
+                downsample,
+                plane_offset,
+                max(1, args.chunk_rows),
+            )
+        else:
+            copy_mrc(args.input, args.output)
+
+        save_qc_png(
+            small_preview,
+            corrected_preview,
+            stats["plane_small"],
+            args.qc_png,
+            stats["score"],
+            should_correct,
+            args.threshold,
+            stats["direction"],
+        )
 
     metrics = pd.DataFrame(
         [

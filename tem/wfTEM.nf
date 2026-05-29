@@ -15,6 +15,7 @@ params.gradient_mode = params.gradient_mode ?: "auto"
 params.gradient_threshold = params.gradient_threshold ?: 0.18
 params.gradient_downsample = params.gradient_downsample ?: 16
 params.gradient_background_sigma = params.gradient_background_sigma ?: 20
+params.gradient_chunk_rows = params.gradient_chunk_rows ?: 2048
 
 // process EXTRACTFEATURES {
   
@@ -246,7 +247,7 @@ process EXPORTOVPNG {
 process CORRECTGRADIENT {
   
     cpus   = 1
-    memory { "${Math.min(Math.max((req_mem as Integer) * 3, 16), 256)}GB" }
+    memory { "${Math.min(Math.max((req_mem as Integer), 16), 96)}GB" }
     time   = "1h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
@@ -271,7 +272,8 @@ process CORRECTGRADIENT {
         --mode "${params.gradient_mode}" \
         --threshold "${params.gradient_threshold}" \
         --downsample "${params.gradient_downsample}" \
-        --background-sigma "${params.gradient_background_sigma}"
+        --background-sigma "${params.gradient_background_sigma}" \
+        --chunk-rows "${params.gradient_chunk_rows}"
     """  
 }
 

@@ -8,7 +8,7 @@ The workflow is configured by `nextflow.config` and can run in two modes:
 ## Local discovery run
 
 ```bash
-./main.sh local
+bash ./main.sh --profile local
 ```
 
 This creates:
@@ -25,7 +25,10 @@ By default local mode uses `DRYRUN=TRUE` and `WORKFLOW_STAGE=discover`, so it li
 If IMOD, EUBI, and the segmentation Python container/tools are available locally but you do not want S3 upload, use:
 
 ```bash
-WORKFLOW_STAGE=process DRYRUN=FALSE ./main.sh local
+bash ./main.sh \
+  --profile local \
+  --workflow_stage process \
+  --dryrun FALSE
 ```
 
 This produces the corrected image, gradient QC/metrics, and the overview PNG with scale bar.
@@ -43,16 +46,26 @@ Memory for the larger image-processing steps is derived from the `req_mem` estim
 If all external tools, including MinIO/S3 access, are available locally, use:
 
 ```bash
-WORKFLOW_STAGE=all DRYRUN=FALSE ./main.sh local
+bash ./main.sh \
+  --profile local \
+  --workflow_stage all \
+  --dryrun FALSE
 ```
 
 ## Cluster run
 
 ```bash
-./main.sh cluster
+bash ./main.sh \
+  --profile cluster \
+  --resume TRUE \
+  --dryrun FALSE \
+  --sheet_mode google \
+  --workflow_stage all
 ```
 
 Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, uploads both image OME-Zarrs and coarse-mask OME-Zarrs, and runs the full workflow.
+
+For repeatable runs, use `run_command_template.sh` as a copy/edit template. It is intentionally guarded so that running the file itself only prints a short message; copy one multiline command block from it into your terminal and execute that command.
 
 To submit the whole Nextflow driver as one Slurm job:
 
@@ -71,7 +84,12 @@ RESUME=FALSE DRYRUN=TRUE WORKFLOW_STAGE=discover sbatch ./submit_cluster.sh
 After allocating an interactive cluster node, run:
 
 ```bash
-./main.sh interactive
+bash ./main.sh \
+  --profile interactive \
+  --resume TRUE \
+  --dryrun TRUE \
+  --sheet_mode local \
+  --workflow_stage process
 ```
 
 Interactive mode uses the cluster paths and containers, but runs Nextflow tasks with the local executor inside the allocated node instead of submitting each task as a Slurm batch job. By default it uses `SHEET_MODE=local`, `WORKFLOW_STAGE=process`, and `DRYRUN=TRUE`, so it avoids Google/S3 while debugging.
@@ -81,11 +99,11 @@ Interactive mode uses the cluster paths and containers, but runs Nextflow tasks 
 All paths can be changed without editing code:
 
 ```bash
-TEM_SCREEN_DIR=/some/other/tem_screen ./main.sh local
-RAWDIR=/path/to/raw PNGDIR=/path/to/pngs OUTDIR=/path/to/processed ./main.sh local
-SHEET_MODE=local WORKFLOW_STAGE=discover DRYRUN=TRUE ./main.sh cluster
-DRYRUN=FALSE WORKFLOW_STAGE=process ./main.sh interactive
-RESUME=FALSE ./main.sh interactive
+bash ./main.sh --profile local --main_dir /some/other/tem_screen
+bash ./main.sh --profile local --rawdir /path/to/raw --pngdir /path/to/pngs --outdir /path/to/processed
+bash ./main.sh --profile cluster --sheet_mode local --workflow_stage discover --dryrun TRUE
+bash ./main.sh --profile interactive --dryrun FALSE --workflow_stage process
+bash ./main.sh --profile interactive --resume FALSE
 ```
 
 `RESUME=TRUE` is the default and adds Nextflow's `-resume` flag. Use `RESUME=FALSE` when you want a clean debug run and do not want Nextflow to reuse cached process outputs.
