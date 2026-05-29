@@ -64,6 +64,7 @@ bash sem_main.sh \
   --work_dir /scratch/rheinnec/sem_screen/work \
   --workflow_stage all \
   --dryrun FALSE
+  --resume FALSE
 
 
 
