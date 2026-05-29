@@ -28,6 +28,7 @@ Options:
   --pngdir PATH                    PNG output directory.
   --outdir PATH                    Processed output directory.
   --logdir PATH                    Workflow log directory.
+  --work_dir PATH                  Nextflow work directory.
   --local_log PATH                 Local image log TSV.
   --gradient_chunk_rows VALUE      Row chunk size for gradient correction.
   --gradient_downsample VALUE      Downsample factor for gradient detection.
@@ -35,7 +36,8 @@ Options:
 
 Environment overrides are still supported for compatibility:
   RESUME, DRYRUN, SHEET_MODE, WORKFLOW_STAGE, TEM_SCREEN_DIR, RAWDIR,
-  PNGDIR, OUTDIR, LOGDIR, LOCAL_LOG, GRADIENT_CHUNK_ROWS, GRADIENT_DOWNSAMPLE.
+  PNGDIR, OUTDIR, LOGDIR, WORK_DIR, LOCAL_LOG, GRADIENT_CHUNK_ROWS,
+  GRADIENT_DOWNSAMPLE.
 EOF
 }
 
@@ -78,6 +80,7 @@ done
 case "$mode" in
   local)
     main_dir="${TEM_SCREEN_DIR:-C:/projects/tem_screen}"
+    default_work_dir="${WORK_DIR:-${main_dir}/work}"
     profile="local"
     default_sheet_mode="local"
     default_workflow_stage="discover"
@@ -85,6 +88,7 @@ case "$mode" in
     ;;
   cluster)
     main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
+    default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -95,6 +99,7 @@ case "$mode" in
     ;;
   interactive)
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
     profile="interactive"
     default_sheet_mode="local"
     default_workflow_stage="process"
@@ -104,7 +109,8 @@ case "$mode" in
     fi
     ;;
   devel)
-    main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
+    default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -129,6 +135,7 @@ rawdir="${RAWDIR:-}"
 pngdir="${PNGDIR:-}"
 outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
+work_dir="${WORK_DIR:-$default_work_dir}"
 local_log="${LOCAL_LOG:-}"
 gradient_chunk_rows="${GRADIENT_CHUNK_ROWS:-}"
 gradient_downsample="${GRADIENT_DOWNSAMPLE:-}"
@@ -221,6 +228,14 @@ while [[ $# -gt 0 ]]; do
       logdir="${1#*=}"
       shift
       ;;
+    --work_dir|--work-dir)
+      work_dir="${2:?--work_dir requires a path}"
+      shift 2
+      ;;
+    --work_dir=*|--work-dir=*)
+      work_dir="${1#*=}"
+      shift
+      ;;
     --local_log|--local-log)
       local_log="${2:?--local_log requires a path}"
       shift 2
@@ -259,12 +274,13 @@ outdir="${outdir:-${main_dir}/processed}"
 logdir="${logdir:-${main_dir}/logs/wfTEM_${timestamp}}"
 local_log="${local_log:-${main_dir}/image_log_local.tsv}"
 
-mkdir -p "$logdir" "$pngdir" "$outdir"
+mkdir -p "$logdir" "$pngdir" "$outdir" "$work_dir"
 cd "$main_dir"
 
 nextflow_args=(
   run "${script_dir}/wfTEM.nf"
   -c "${script_dir}/nextflow.config"
+  -work-dir "$work_dir"
   --script_dir "$script_dir"
   --logdir "$logdir"
   --pngdir "$pngdir"

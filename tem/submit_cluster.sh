@@ -17,6 +17,7 @@ bash "${script_dir}/main.sh" \
   --dryrun "${DRYRUN:-FALSE}" \
   --sheet_mode "${SHEET_MODE:-google}" \
   --workflow_stage "${WORKFLOW_STAGE:-all}" \
-  --main_dir "${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}" \
+  --main_dir "${TEM_SCREEN_DIR:-/g/schwab/tem_screen}" \
+  --work_dir "${WORK_DIR:-/scratch/rheinnec/tem_screen/work}" \
   --gradient_chunk_rows "${GRADIENT_CHUNK_ROWS:-512}" \
   --gradient_downsample "${GRADIENT_DOWNSAMPLE:-16}"

@@ -60,10 +60,12 @@ bash ./main.sh \
   --resume TRUE \
   --dryrun FALSE \
   --sheet_mode google \
-  --workflow_stage all
+  --workflow_stage all \
+  --main_dir /g/schwab/tem_screen \
+  --work_dir /scratch/rheinnec/tem_screen/work
 ```
 
-Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, uploads both image OME-Zarrs and coarse-mask OME-Zarrs, and runs the full workflow.
+Cluster mode loads Nextflow, uses the `cluster` profile, enables Singularity, writes to Google Sheets, uploads both image OME-Zarrs and coarse-mask OME-Zarrs, and runs the full workflow. By default, data paths are under `/g/schwab/tem_screen`, while Nextflow's `work/` directory is under `/scratch/rheinnec/tem_screen/work`.
 
 For repeatable runs, use `run_command_template.sh` as a copy/edit template. It is intentionally guarded so that running the file itself only prints a short message; copy one multiline command block from it into your terminal and execute that command.
 
@@ -100,6 +102,7 @@ All paths can be changed without editing code:
 
 ```bash
 bash ./main.sh --profile local --main_dir /some/other/tem_screen
+bash ./main.sh --profile cluster --work_dir /scratch/rheinnec/other_tem_work
 bash ./main.sh --profile local --rawdir /path/to/raw --pngdir /path/to/pngs --outdir /path/to/processed
 bash ./main.sh --profile cluster --sheet_mode local --workflow_stage discover --dryrun TRUE
 bash ./main.sh --profile interactive --dryrun FALSE --workflow_stage process

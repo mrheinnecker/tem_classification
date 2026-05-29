@@ -96,18 +96,23 @@ Useful entry points:
 
 ```bash
 cd sem
-./sem_main.sh local
-./sem_main.sh interactive
-./sem_main.sh cluster
+bash ./sem_main.sh --profile local
+bash ./sem_main.sh --profile interactive
+bash ./sem_main.sh --profile cluster
 ```
 
-As with the TEM workflow, common behavior is controlled through environment variables:
+As with the TEM workflow, the SEM launcher separates persistent data paths from Nextflow's working directory:
 
 ```bash
-WORKFLOW_STAGE=discover DRYRUN=TRUE ./sem_main.sh local
-WORKFLOW_STAGE=process DRYRUN=FALSE ./sem_main.sh interactive
-WORKFLOW_STAGE=all DRYRUN=FALSE ./sem_main.sh cluster
+bash ./sem_main.sh \
+  --profile cluster \
+  --main_dir /g/schwab/sem_screen \
+  --work_dir /scratch/rheinnec/sem_screen/work \
+  --workflow_stage all \
+  --dryrun FALSE
 ```
+
+For cluster and interactive runs, `/g/schwab/sem_screen` is the default output/log base and `/scratch/rheinnec/sem_screen/work` is the default Nextflow work directory. You can still override the same values with `SEM_SCREEN_DIR`, `WORK_DIR`, `OUTDIR`, `LOGDIR`, and `RAWDIR`.
 
 ## Run Modes
 
@@ -126,7 +131,12 @@ RAWDIR=/path/to/raw OUTDIR=/path/to/output LOGDIR=/path/to/logs ./main.sh intera
 or, for SEM:
 
 ```bash
-RAWDIR=/path/to/sem/raw OUTDIR=/path/to/output LOGDIR=/path/to/logs ./sem_main.sh interactive
+bash ./sem_main.sh \
+  --profile interactive \
+  --rawdir /path/to/sem/raw \
+  --outdir /path/to/output \
+  --logdir /path/to/logs \
+  --work_dir /scratch/rheinnec/other_sem_work
 ```
 
 ## External Dependencies

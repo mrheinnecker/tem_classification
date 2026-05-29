@@ -13,6 +13,7 @@ bash /g/schwab/marco/repos/tem_classification/tem/main.sh \
   --sheet_mode google \
   --workflow_stage all \
   --main_dir /g/schwab/tem_screen \
+  --work_dir /scratch/rheinnec/tem_screen/work \
   --rawdir /g/schwab/tem_screen/raw \
   --pngdir /g/schwab/tem_screen/pngs \
   --outdir /g/schwab/tem_screen/processed \
@@ -28,6 +29,7 @@ bash /g/schwab/marco/repos/tem_classification/tem/main.sh \
   --sheet_mode google \
   --workflow_stage all \
   --main_dir /scratch/rheinnec/tem_screen \
+  --work_dir /scratch/rheinnec/tem_screen/work \
   --rawdir /scratch/rheinnec/tem_screen/raw \
   --pngdir /scratch/rheinnec/tem_screen/pngs \
   --outdir /scratch/rheinnec/tem_screen/processed \
@@ -43,6 +45,7 @@ bash C:/repos/tem_classification/tem/main.sh \
   --sheet_mode local \
   --workflow_stage discover \
   --main_dir C:/projects/tem_screen \
+  --work_dir C:/projects/tem_screen/work \
   --rawdir C:/projects/tem_screen/raw \
   --pngdir C:/projects/tem_screen/pngs \
   --outdir C:/projects/tem_screen/processed \
