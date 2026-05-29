@@ -84,7 +84,7 @@ case "$mode" in
     default_dryrun="TRUE"
     ;;
   cluster)
-    main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
+    main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"

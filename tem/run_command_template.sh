@@ -12,11 +12,11 @@ bash /g/schwab/marco/repos/tem_classification/tem/main.sh \
   --dryrun FALSE \
   --sheet_mode google \
   --workflow_stage all \
-  --main_dir /scratch/rheinnec/tem_screen \
-  --rawdir /scratch/rheinnec/tem_screen/raw \
-  --pngdir /scratch/rheinnec/tem_screen/pngs \
-  --outdir /scratch/rheinnec/tem_screen/processed \
-  --local_log /scratch/rheinnec/tem_screen/image_log_local.tsv \
+  --main_dir /g/schwab/tem_screen \
+  --rawdir /g/schwab/tem_screen/raw \
+  --pngdir /g/schwab/tem_screen/pngs \
+  --outdir /g/schwab/tem_screen/processed \
+  --local_log /g/schwab/tem_screen/image_log_local.tsv \
   --gradient_chunk_rows 512 \
   --gradient_downsample 16
 
@@ -24,9 +24,9 @@ bash /g/schwab/marco/repos/tem_classification/tem/main.sh \
 bash /g/schwab/marco/repos/tem_classification/tem/main.sh \
   --profile interactive \
   --resume TRUE \
-  --dryrun TRUE \
-  --sheet_mode local \
-  --workflow_stage process \
+  --dryrun FALSE \
+  --sheet_mode google \
+  --workflow_stage all \
   --main_dir /scratch/rheinnec/tem_screen \
   --rawdir /scratch/rheinnec/tem_screen/raw \
   --pngdir /scratch/rheinnec/tem_screen/pngs \
