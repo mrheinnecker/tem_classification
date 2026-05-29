@@ -18,4 +18,4 @@ WORKFLOW_STAGE="${WORKFLOW_STAGE:-all}" \
 
 
 
-"/g/schwab/marco/repos/tem_classification/scripts_marco/main.sh" cluster
+"/g/schwab/marco/repos/tem_classification/tem/main.sh" cluster

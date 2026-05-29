@@ -52,6 +52,7 @@ cd "$main_dir"
 
 nextflow_args=(
   run "${script_dir}/wfTEM.nf"
+  -c "${script_dir}/nextflow.config"
   --script_dir "$script_dir"
   --logdir "$logdir"
   --pngdir "$pngdir"
