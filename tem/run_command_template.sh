@@ -50,3 +50,20 @@ bash C:/repos/tem_classification/tem/main.sh \
   --pngdir C:/projects/tem_screen/pngs \
   --outdir C:/projects/tem_screen/processed \
   --local_log C:/projects/tem_screen/image_log_local.tsv
+
+
+
+
+
+
+
+
+bash sem_main.sh \
+  --profile interactive \
+  --main_dir /g/schwab/sem_screen \
+  --work_dir /scratch/rheinnec/sem_screen/work \
+  --workflow_stage all \
+  --dryrun FALSE
+
+
+
