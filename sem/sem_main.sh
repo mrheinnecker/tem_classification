@@ -4,7 +4,7 @@ set -euo pipefail
 PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 timestamp="$(date +%Y-%m-%d_%H-%M)"
-resume="${RESUME:-FALSE}"
+resume="${RESUME:-TRUE}"
 mode="${MODE:-interactive}"
 
 if [[ $# -gt 0 && "${1:-}" != --* && "${1:-}" != "-resume" ]]; then

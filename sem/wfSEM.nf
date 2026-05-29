@@ -202,6 +202,11 @@ process MAKESEMCOLLECTIONTABLE {
     script:
     """
     
+    echo "done hopefully"
+    echo "jkj"
+    echo "hoiaosjdoa"
+    
+    
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "${all_s3}" \
       --metadata_dir "." \
@@ -211,6 +216,9 @@ process MAKESEMCOLLECTIONTABLE {
       --local_collection_table "sem_collection_table.tsv" \
       --image_log_url "${params.sheet_url}" \
       --local_image_log "${params.local_log}"
+      
+      
+      
     """
 }
 

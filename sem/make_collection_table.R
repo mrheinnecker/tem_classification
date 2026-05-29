@@ -145,7 +145,8 @@ if (nrow(image_log) > 0) {
     left_join(
       image_log %>% distinct(name, .keep_all=TRUE),
       by=c("name")
-    )
+    ) %>%
+    filter(!is.na(Date))
 }
 
 if (sheet_mode == "google") {
