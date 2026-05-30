@@ -95,13 +95,10 @@ process EUBIHITTCONVERSION {
       --y_unit nm \
       --x_scale "${params.x_scale}" \
       --y_scale "${params.y_scale}" \
-      --dimension_order xyzct \
       --concatenation_axes z \
-      --z_tag "slice_" \
-      --squeeze True \
+      --z_tag "slice" \
       --save_omexml True \
       --zar_format "${params.zarr_format}" \
-      --auto_chunk True \
       --max_workers 1
 
     touch "${filename}_conversion_done.txt"
