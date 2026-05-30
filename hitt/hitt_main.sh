@@ -32,7 +32,7 @@ Options:
   --y_scale VALUE                  Y pixel scale in nm, default 100.
   --input_suffix PATH              Path below tmp_copy_path, default recon_111_1/tomo.
   --output_name NAME               Output folder below tmp_copy_path, default omezarr.
-  --overwrite TRUE|FALSE           Replace existing output omezarr when TRUE.
+  --overwrite TRUE|FALSE           Kept for compatibility; conversion currently always rebuilds output.
   --resume TRUE|FALSE              Add Nextflow -resume when TRUE.
   --help                           Show this message.
 EOF
@@ -122,7 +122,7 @@ x_scale="${X_SCALE:-100}"
 y_scale="${Y_SCALE:-100}"
 input_suffix="${INPUT_SUFFIX:-recon_111_1/tomo}"
 output_name="${OUTPUT_NAME:-omezarr}"
-overwrite="$(to_upper_bool "${OVERWRITE:-FALSE}")"
+overwrite="$(to_upper_bool "${OVERWRITE:-TRUE}")"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

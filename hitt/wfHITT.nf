@@ -17,7 +17,7 @@ params.x_scale = params.x_scale ?: 100
 params.y_scale = params.y_scale ?: 100
 params.input_suffix = params.input_suffix ?: "recon_111_1/tomo"
 params.output_name = params.output_name ?: "omezarr"
-params.overwrite = params.overwrite ?: "FALSE"
+params.overwrite = params.overwrite ?: "TRUE"
 
 
 process SELECTHITTIMAGES {
@@ -86,31 +86,23 @@ process EUBIHITTCONVERSION {
       exit 1
     fi
 
-    case "${params.overwrite}" in
-      TRUE|true|1|yes|YES)
-        rm -rf "\$output_path"
-        ;;
-    esac
+    rm -rf "\$output_path"
 
-    if [ ! -e "\$output_path" ]; then
-      eubi to_zarr \
-        "\$input_path" \
-        "\$output_path" \
-        --x_unit nm \
-        --y_unit nm \
-        --x_scale "${params.x_scale}" \
-        --y_scale "${params.y_scale}" \
-        --dimension_order xyzct \
-        --concatenation_axes z \
-        --z_tag "slice_" \
-        --squeeze True \
-        --save_omexml True \
-        --zar_format "${params.zarr_format}" \
-        --auto_chunk True \
-        --max_workers 1
-    else
-      echo "Skipping conversion because output already exists: \$output_path"
-    fi
+    eubi to_zarr \
+      "\$input_path" \
+      "\$output_path" \
+      --x_unit nm \
+      --y_unit nm \
+      --x_scale "${params.x_scale}" \
+      --y_scale "${params.y_scale}" \
+      --dimension_order xyzct \
+      --concatenation_axes z \
+      --z_tag "slice_" \
+      --squeeze True \
+      --save_omexml True \
+      --zar_format "${params.zarr_format}" \
+      --auto_chunk True \
+      --max_workers 1
 
     touch "${filename}_conversion_done.txt"
     """
@@ -143,7 +135,7 @@ process S3UPLOADHITT {
       exit 1
     fi
 
-    mc cp "${omezarr_path}" "${params.s3_bucket}/${filename}" --recursive
+    mc cp "${omezarr_path}/" "${params.s3_bucket}/${filename}/" --recursive
     touch "${filename}_s3_upload_done.txt"
     """
 }

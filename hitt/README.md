@@ -53,8 +53,7 @@ bash hitt_main.sh interactive \
   --sheet_mode google \
   --x_scale 100 \
   --y_scale 100 \
-  --s3_bucket s3embl/hitttest \
-  --overwrite FALSE
+  --s3_bucket s3embl/hitttest
 ```
 
 `workflow_stage` supports:
@@ -62,6 +61,14 @@ bash hitt_main.sh interactive \
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
 - `process`: convert listed images to OME-Zarr.
 - `all`: convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
+
+Uploads copy the contents of each local `omezarr` directory into an S3 prefix named after the original image folder, for example:
+
+```text
+s3embl/hitttest/TES_10to40_20231003_PM_01_epo_03/
+```
+
+During development, conversion always removes and rebuilds the local `omezarr` folder.
 
 The collection table is written to the `hitt_collection_table` sheet in:
 
