@@ -28,6 +28,8 @@ and writes OME-Zarr output to:
 omezarr
 ```
 
+Before conversion, the workflow renumbers `slice_*.tif` / `slice_*.tiff` files in the `tomo` directory so the stack starts at `Z0001.tif` and increments by one. A per-image renaming log is written under the workflow logs.
+
 ## Run examples
 
 ```bash
@@ -59,8 +61,8 @@ bash hitt_main.sh interactive \
 `workflow_stage` supports:
 
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
-- `process`: convert listed images to OME-Zarr.
-- `all`: convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
+- `process`: renumber slice files and convert listed images to OME-Zarr.
+- `all`: renumber slice files, convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
 
 Uploads copy the contents of each local `omezarr` directory into an S3 prefix named after the original image folder, for example:
 

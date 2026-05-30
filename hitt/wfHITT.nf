@@ -96,12 +96,79 @@ process EUBIHITTCONVERSION {
       --x_scale "${params.x_scale}" \
       --y_scale "${params.y_scale}" \
       --concatenation_axes z \
-      --z_tag "slice" \
+      --z_tag "Z" \
       --save_omexml True \
       --zar_format "${params.zarr_format}" \
       --max_workers 1
 
     touch "${filename}_conversion_done.txt"
+    """
+}
+
+
+process NORMALIZEHITTSLICES {
+
+    cpus 1
+    memory "1GB"
+    time "20m"
+
+    publishDir "${params.logdir}/slice_renaming", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem)
+
+    output:
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), emit: normalized_images
+    path "${filename}_slice_renaming.tsv"
+
+    script:
+    """
+    set -euo pipefail
+
+    input_path="${tmp_copy_path}/${params.input_suffix}"
+    log_file="${filename}_slice_renaming.tsv"
+
+    if [ ! -d "\$input_path" ]; then
+      echo "Expected tomo directory does not exist: \$input_path" >&2
+      exit 1
+    fi
+
+    printf "old_name\\tnew_name\\n" > "\$log_file"
+
+    mapfile -t files < <(
+      find "\$input_path" -maxdepth 1 -type f \
+        \\( -iname 'slice_*.tif' -o -iname 'slice_*.tiff' \\) \
+        | sort -V
+    )
+
+    if [ "\${#files[@]}" -eq 0 ]; then
+      echo "No slice_*.tif(f) files found in \$input_path" >&2
+      exit 1
+    fi
+
+    tmp_files=()
+    idx=1
+    for file in "\${files[@]}"; do
+      base="\$(basename "\$file")"
+      tmp="\$input_path/.nextflow_renaming_\$(printf '%06d' "\$idx")_\$base"
+      mv -- "\$file" "\$tmp"
+      tmp_files+=("\$tmp")
+      idx=\$((idx + 1))
+    done
+
+    idx=1
+    for tmp in "\${tmp_files[@]}"; do
+      old_base="\$(basename "\$tmp")"
+      old_base="\${old_base#".nextflow_renaming_"}"
+      old_base="\${old_base#*_}"
+      ext="\${old_base##*.}"
+      new_base="\$(printf 'Z%04d.%s' "\$idx" "\$ext")"
+      new_file="\$input_path/\$new_base"
+      mv -- "\$tmp" "\$new_file"
+      printf "%s\\t%s\\n" "\$old_base" "\$new_base" >> "\$log_file"
+      idx=\$((idx + 1))
+    done
     """
 }
 
@@ -210,7 +277,9 @@ workflow {
             .map { row -> tuple(row.filename, row.tmp_copy_path, "${row.tmp_copy_path}/${params.output_name}", row.req_mem) }
             .set { hitt_batch_ch }
 
-        EUBIHITTCONVERSION(hitt_batch_ch)
+        NORMALIZEHITTSLICES(hitt_batch_ch)
+
+        EUBIHITTCONVERSION(NORMALIZEHITTSLICES.out.normalized_images)
 
         if (params.workflow_stage == "all") {
             upload_done_ch = S3UPLOADHITT(EUBIHITTCONVERSION.out.omezarr).collect()
