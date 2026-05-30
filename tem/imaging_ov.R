@@ -11,7 +11,8 @@ spec <- matrix(c(
   "sheet_mode", "m", 1, "character",
   "sheet_url", "u", 1, "character",
   "google_key", "k", 1, "character",
-  "local_log", "l", 1, "character"
+  "local_log", "l", 1, "character",
+  "existing_s3", "e", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -55,6 +56,39 @@ if (is.null(local_log) || is.na(local_log)) {
 raw_dir <- opt$rawdir
 png_dir <- opt$pngdir
 
+existing_s3 <- opt$existing_s3
+if (is.null(existing_s3) || is.na(existing_s3)) {
+  existing_s3 <- NULL
+}
+
+parse_mc_ls_path <- function(line) {
+  parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
+  ifelse(
+    is.na(parsed),
+    str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2],
+    parsed
+  )
+}
+
+existing_s3_paths <- character()
+if (!is.null(existing_s3) && file.exists(existing_s3)) {
+  existing_s3_paths <- read_lines(existing_s3) %>%
+    parse_mc_ls_path() %>%
+    str_remove("/$") %>%
+    discard(is.na)
+}
+
+has_s3_omezarr <- function(filename) {
+  if (length(existing_s3_paths) == 0) {
+    return(FALSE)
+  }
+
+  any(
+    str_detect(existing_s3_paths, fixed(paste0(filename, "_omezarr"))) |
+      str_detect(existing_s3_paths, fixed(filename))
+  )
+}
+
 all_files_raw <- 
   tibble(file=list.files(raw_dir, pattern="c\\d+.mrc$", recursive = T, full.names=T) %>%
   .[which(!str_detect(.,"canc_"))]) %>%
@@ -74,23 +108,38 @@ all_files_raw <-
     filename=str_split(basename(dirname(file)), "Cut\\d*_") %>% map_chr(.,2) %>% paste(shortname,., sep="_"),
     justblend_file=file.path(png_dir, site, paste0(filename, "_blend.png")),
     correctionblend_file=file.path(png_dir, site, paste0(filename, "_correctionblend.png")),
+    png_export_file=file.path(png_dir, site, paste0(filename, "_correctionblend_gradientcorrected.png")),
+    omezarr_name=paste0(filename, "_omezarr"),
     
     #grid=
   ) %>%
   rowwise() %>%
   mutate(
     filesize=file.info(file)$size,
-    req_mem=min(max(16, round(20*filesize/10^9)), 128)
+    req_mem=min(max(16, round(20*filesize/10^9)), 128),
+    s3_omezarr_present=has_s3_omezarr(filename),
+    png_export_present=file.exists(png_export_file),
+    needs_s3=!s3_omezarr_present,
+    needs_png=!png_export_present,
+    needs_processing=needs_s3 | needs_png
   ) 
 
 all_files <- all_files_raw %>%
-  select(filename, file, mdoc_file, shortname, req_mem, justblend_file, correctionblend_file, filesize) #%>%
+  ungroup() %>%
+  select(
+    filename, file, mdoc_file, shortname, req_mem,
+    justblend_file, correctionblend_file, png_export_file, omezarr_name,
+    s3_omezarr_present, png_export_present, needs_s3, needs_png, needs_processing,
+    filesize
+  ) #%>%
 
 if(as.logical(opt$dryrun)){
-  to_run <- head(all_files, 10)
+  to_run <- all_files %>%
+    filter(needs_processing) %>%
+    head(10)
 } else {
   to_run <- all_files %>%
-    filter(!(file.exists(correctionblend_file)))  
+    filter(needs_processing)
 }
 
 

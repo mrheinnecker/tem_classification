@@ -17,6 +17,57 @@ params.gradient_downsample = params.gradient_downsample ?: 16
 params.gradient_background_sigma = params.gradient_background_sigma ?: 20
 params.gradient_chunk_rows = params.gradient_chunk_rows ?: 2048
 
+process CHECKEXISTINGS3FILES {
+
+    cpus 1
+    memory "1 GB"
+    time "10m"
+
+    publishDir "${params.logdir}", mode:'copy'
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    val s3_bucket
+    val workflow_stage
+    val dryrun
+
+    output:
+    path "existing_s3_entries.txt", emit: existing_s3
+
+    script:
+    """
+    set -euo pipefail
+
+    require_s3="FALSE"
+    dryrun_is_false="FALSE"
+    case "${dryrun}" in
+      FALSE|false|0|no|NO)
+        dryrun_is_false="TRUE"
+        ;;
+    esac
+
+    if [ "${workflow_stage}" = "all" ] && [ "\$dryrun_is_false" = "TRUE" ]; then
+      require_s3="TRUE"
+    fi
+
+    if command -v mc >/dev/null 2>&1; then
+      if ! mc ls "${s3_bucket}" > "existing_s3_entries.txt"; then
+        if [ "\$require_s3" = "TRUE" ]; then
+          echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
+          exit 1
+        fi
+        : > "existing_s3_entries.txt"
+      fi
+    else
+      if [ "\$require_s3" = "TRUE" ]; then
+        echo "mc command is not available; refusing to continue because this run depends on S3 skip detection." >&2
+        exit 1
+      fi
+      : > "existing_s3_entries.txt"
+    fi
+    """
+}
+
 // process EXTRACTFEATURES {
   
 //     cpus   = 1
@@ -97,6 +148,7 @@ process CHECKNEWIMAGES {
     val sheet_url
     val google_key
     val local_log
+    path existing_s3
 
     output:
     path "images_to_process.csv", emit: to_process
@@ -115,7 +167,8 @@ process CHECKNEWIMAGES {
       --sheet_mode "${sheet_mode}" \
       --sheet_url "${sheet_url}" \
       --google_key "${google_key}" \
-      --local_log "${local_log}"
+      --local_log "${local_log}" \
+      --existing_s3 "${existing_s3}"
     
     """  
 }
@@ -462,6 +515,11 @@ process MAKECOLLECTIONTABLE {
 
 workflow {
   
+  CHECKEXISTINGS3FILES(
+    params.s3_bucket,
+    params.workflow_stage,
+    params.dryrun
+  )
 
   CHECKNEWIMAGES(
     params.rawdir,
@@ -471,7 +529,8 @@ workflow {
     params.sheet_mode,
     params.sheet_url,
     params.google_key,
-    params.local_log
+    params.local_log,
+    CHECKEXISTINGS3FILES.out.existing_s3
   )
 
   if (params.workflow_stage != "discover") {
