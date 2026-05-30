@@ -248,33 +248,36 @@ def save_qc_png(
     voxel_size,
     out_png,
     scalebar_length_nm,
-    preview_factor,
+    pixel_size_factor,
     image_label,
 ):
     ymin, ymax, xmin, xmax = bbox
-    pixel_size_nm = float(voxel_size.x) / 10.0
-    preview = img_uint8[::preview_factor, ::preview_factor] if preview_factor > 1 else img_uint8
-    mask_preview = mask[::preview_factor, ::preview_factor] if preview_factor > 1 else mask
-    final_preview = final_mask[::preview_factor, ::preview_factor] if preview_factor > 1 else final_mask
-    preview_pixel_size_nm = pixel_size_nm * preview_factor
+    pixel_size_nm = float(voxel_size.x) / 10.0 * pixel_size_factor
 
     fig, ax = plt.subplots(figsize=(10, 10))
-    ax.imshow(preview, cmap="gray", vmin=0, vmax=255)
+    ax.imshow(img_uint8, cmap="gray", vmin=0, vmax=255)
     add_image_label(ax, image_label)
-    ax.contour(mask_preview, levels=[0.5], linewidths=1, colors="magenta")
-    ax.contour(final_preview, levels=[0.5], linewidths=1, colors="cyan")
+    ax.contour(mask, levels=[0.5], linewidths=1, colors="magenta")
+    ax.contour(final_mask, levels=[0.5], linewidths=1, colors="cyan")
 
     box_x = [xmin, xmax, xmax, xmin, xmin]
     box_y = [ymin, ymin, ymax, ymax, ymin]
-    if preview_factor > 1:
-        box_x = [x / preview_factor for x in box_x]
-        box_y = [y / preview_factor for y in box_y]
     ax.plot(box_x, box_y, linewidth=2)
     ax.axis("off")
-    add_scalebar(ax, preview.shape, preview_pixel_size_nm, scalebar_length_nm)
+    add_scalebar(ax, img_uint8.shape, pixel_size_nm, scalebar_length_nm)
     plt.tight_layout()
     plt.savefig(out_png, dpi=200)
     plt.close(fig)
+
+
+def scale_area_for_downsample(area, factor):
+    return max(1, int(round(area / (factor * factor))))
+
+
+def scale_length_for_downsample(length, factor):
+    if length <= 0:
+        return 0
+    return max(1, int(round(length / factor)))
 
 
 def parse_args():
@@ -287,6 +290,13 @@ def parse_args():
     parser.add_argument("--image-label", default=None, help="Label written at pixel coordinate 0,0")
     parser.add_argument("--scalebar-length-nm", type=float, default=5000)
     parser.add_argument("--preview-factor", type=int, default=4)
+    parser.add_argument("--qc-factor", type=int, default=16)
+    parser.add_argument(
+        "--segmentation",
+        choices=["TRUE", "FALSE", "true", "false", "1", "0", "yes", "no"],
+        default="FALSE",
+        help="Run optional coarse segmentation and QC mask export.",
+    )
     parser.add_argument(
         "--segmentation-mode",
         choices=["foreground", "background_negative"],
@@ -308,6 +318,7 @@ def parse_args():
 def main():
     args = parse_args()
     preview_factor = max(1, args.preview_factor)
+    run_segmentation = args.segmentation.lower() in {"true", "1", "yes"}
     image_label = args.image_label if args.image_label is not None else short_name_from_path(args.input)
 
     with mrcfile.mmap(args.input, permissive=True) as mrc:
@@ -328,46 +339,60 @@ def main():
             preview_factor,
             image_label,
         )
-        if args.qc_output:
-            full_img = np.asarray(img, dtype=np.float32).copy()
+        if run_segmentation:
+            qc_factor = max(1, args.qc_factor)
+            qc_preview = img[::qc_factor, ::qc_factor] if qc_factor > 1 else img
+            qc_img = np.asarray(qc_preview, dtype=np.float32).copy()
+            print("QC downsample factor:", qc_factor)
+            print("QC image shape:", qc_img.shape)
     print("Saved overview PNG:", args.output)
 
-    if args.qc_output:
+    if run_segmentation:
+        if not args.qc_output:
+            raise ValueError("--qc-output is required when --segmentation TRUE")
+
+        qc_sigma = max(args.sigma / qc_factor, 1)
+        qc_min_object_size = scale_area_for_downsample(args.min_object_size, qc_factor)
+        qc_min_hole_size = scale_area_for_downsample(args.min_hole_size, qc_factor)
+        qc_closing_radius = scale_length_for_downsample(args.closing_radius, qc_factor)
+        qc_opening_radius = scale_length_for_downsample(args.opening_radius, qc_factor)
+        qc_padding = scale_length_for_downsample(args.padding, qc_factor)
+
         if args.segmentation_mode == "foreground":
             mask, thr = make_mask(
-                full_img,
+                qc_img,
                 foreground=args.foreground,
-                sigma=args.sigma,
+                sigma=qc_sigma,
                 threshold_method=args.threshold,
-                min_object_size=args.min_object_size,
-                min_hole_size=args.min_hole_size,
-                closing_radius=args.closing_radius,
-                opening_radius=args.opening_radius,
+                min_object_size=qc_min_object_size,
+                min_hole_size=qc_min_hole_size,
+                closing_radius=qc_closing_radius,
+                opening_radius=qc_opening_radius,
                 threshold_scale=args.threshold_scale,
             )
         else:
             mask, thr = make_mask_background_negative(
-                full_img,
-                sigma=args.sigma,
+                qc_img,
+                sigma=qc_sigma,
                 threshold_method=args.threshold,
-                min_object_size=args.min_object_size,
-                min_hole_size=args.min_hole_size,
-                closing_radius=args.closing_radius,
-                opening_radius=args.opening_radius,
+                min_object_size=qc_min_object_size,
+                min_hole_size=qc_min_hole_size,
+                closing_radius=qc_closing_radius,
+                opening_radius=qc_opening_radius,
                 threshold_scale=args.threshold_scale,
             )
 
         final_mask = dilate_mask(mask, args.mask_dilation_fraction)
-        bbox = bbox_from_mask(final_mask, padding=args.padding)
+        bbox = bbox_from_mask(final_mask, padding=qc_padding)
         save_qc_png(
-            normalize_for_display(full_img),
+            normalize_for_display(qc_img),
             mask,
             final_mask,
             bbox,
             voxel_size,
             args.qc_output,
             args.scalebar_length_nm,
-            preview_factor,
+            qc_factor,
             image_label,
         )
         print(f"Threshold: {thr:.4f}")

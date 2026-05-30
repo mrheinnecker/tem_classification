@@ -16,6 +16,8 @@ params.gradient_threshold = params.gradient_threshold ?: 0.18
 params.gradient_downsample = params.gradient_downsample ?: 16
 params.gradient_background_sigma = params.gradient_background_sigma ?: 20
 params.gradient_chunk_rows = params.gradient_chunk_rows ?: 2048
+params.png_segmentation = params.png_segmentation ?: "FALSE"
+params.png_qc_factor = params.png_qc_factor ?: 16
 
 process CHECKEXISTINGS3FILES {
 
@@ -291,7 +293,9 @@ process EXPORTOVPNG {
         --padding 1000 \
         --mask-dilation-fraction 0.2 \
         --min-object-size 50000 \
-        --threshold-scale 1
+        --threshold-scale 1 \
+        --segmentation "${params.png_segmentation}" \
+        --qc-factor "${params.png_qc_factor}"
 
     """  
 }
