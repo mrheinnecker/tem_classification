@@ -1,8 +1,14 @@
 # HITT table-driven workflow
 
-This workflow converts a table of large image directories into OME-Zarr and optionally uploads the outputs to S3.
+This workflow converts a Google Sheet or local table of large image directories into OME-Zarr and optionally uploads the outputs to S3.
 
-The input table must contain a `tmp_copy_path` column:
+The input table must contain a `tmp_copy_path` column. By default, interactive and cluster runs read this Google Sheet:
+
+```text
+https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0
+```
+
+Local table input is still supported for development:
 
 ```text
 tmp_copy_path
@@ -27,7 +33,7 @@ omezarr
 ```bash
 cd hitt
 bash hitt_main.sh interactive \
-  --input_table /scratch/rheinnec/tmp_hitt/hitt_images.tsv \
+  --sheet_mode google \
   --workflow_stage process
 ```
 
@@ -36,7 +42,7 @@ Run conversion and upload:
 ```bash
 cd hitt
 bash hitt_main.sh cluster \
-  --input_table /scratch/rheinnec/tmp_hitt/hitt_images.tsv \
+  --sheet_mode google \
   --workflow_stage all
 ```
 
@@ -44,7 +50,7 @@ Useful overrides:
 
 ```bash
 bash hitt_main.sh interactive \
-  --input_table /scratch/rheinnec/tmp_hitt/hitt_images.tsv \
+  --sheet_mode google \
   --x_scale 100 \
   --y_scale 100 \
   --s3_bucket s3embl/hitttest \

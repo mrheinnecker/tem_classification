@@ -1,4 +1,8 @@
 params.input_table = params.input_table ?: "hitt_images.tsv"
+params.sheet_mode = params.sheet_mode ?: "local"
+params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0"
+params.sheet_name = params.sheet_name ?: ""
+params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
 params.dryrun = params.dryrun ?: "FALSE"
 params.dryrun_n = params.dryrun_n ?: 2
 params.script_dir = params.script_dir ?: baseDir.toString()
@@ -24,6 +28,10 @@ process SELECTHITTIMAGES {
 
     input:
     val input_table
+    val sheet_mode
+    val sheet_url
+    val sheet_name
+    val google_key
     val dryrun
     val dryrun_n
 
@@ -35,6 +43,10 @@ process SELECTHITTIMAGES {
     """
     Rscript "${params.script_dir}/select_images.R" \
       --input_table "${input_table}" \
+      --sheet_mode "${sheet_mode}" \
+      --sheet_url "${sheet_url}" \
+      --sheet_name "${sheet_name}" \
+      --google_key "${google_key}" \
       --dryrun "${dryrun}" \
       --dryrun_n "${dryrun_n}"
     """
@@ -160,6 +172,10 @@ workflow {
 
     SELECTHITTIMAGES(
         params.input_table,
+        params.sheet_mode,
+        params.sheet_url,
+        params.sheet_name,
+        params.google_key,
         params.dryrun,
         params.dryrun_n
     )

@@ -3,14 +3,24 @@ library(getopt)
 
 spec <- matrix(c(
   "input_table", "i", 1, "character",
+  "sheet_mode", "m", 1, "character",
+  "sheet_url", "u", 1, "character",
+  "sheet_name", "s", 1, "character",
+  "google_key", "k", 1, "character",
   "dryrun", "d", 1, "character",
   "dryrun_n", "n", 1, "integer"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
-input_table <- opt$input_table
-if (is.null(input_table) || is.na(input_table)) {
-  stop("--input_table is required")
+sheet_mode <- opt$sheet_mode
+if (is.null(sheet_mode) || is.na(sheet_mode)) {
+  sheet_mode <- "local"
+}
+
+sheet_url <- opt$sheet_url
+sheet_name <- opt$sheet_name
+if (is.null(sheet_name) || is.na(sheet_name)) {
+  sheet_name <- ""
 }
 
 dryrun <- opt$dryrun
@@ -30,7 +40,10 @@ sanitize_name <- function(x) {
     str_replace_all("^_|_$", "")
 }
 
-read_input_table <- function(path) {
+read_local_table <- function(path) {
+  if (is.null(path) || is.na(path)) {
+    stop("--input_table is required when --sheet_mode local")
+  }
   if (str_detect(path, "\\.[Cc][Ss][Vv]$")) {
     read_csv(path, col_types=cols(.default=col_character()))
   } else {
@@ -38,7 +51,31 @@ read_input_table <- function(path) {
   }
 }
 
-images <- read_input_table(input_table) %>%
+read_google_table <- function(url, sheet) {
+  if (is.null(url) || is.na(url)) {
+    stop("--sheet_url is required when --sheet_mode google")
+  }
+  json_key <- opt$google_key
+  if (is.null(json_key) || is.na(json_key)) {
+    stop("--google_key is required when --sheet_mode google")
+  }
+
+  library(googlesheets4)
+  gs4_auth(path=json_key)
+  if (is.null(sheet) || is.na(sheet) || sheet == "") {
+    read_sheet(url, col_types="c")
+  } else {
+    read_sheet(url, sheet=sheet, col_types="c")
+  }
+}
+
+images <- if (sheet_mode == "google") {
+  read_google_table(sheet_url, sheet_name)
+} else {
+  read_local_table(opt$input_table)
+}
+
+images <- images %>%
   mutate(across(everything(), ~na_if(.x, "")))
 
 if (!"tmp_copy_path" %in% names(images)) {

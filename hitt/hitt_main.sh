@@ -15,6 +15,10 @@ Usage:
 Options:
   --profile, --mode VALUE          Runtime profile: local, interactive, cluster.
   --input_table PATH               TSV/CSV table with a tmp_copy_path column.
+  --sheet_mode VALUE               local or google, default depends on profile.
+  --sheet_url URL                  Google Sheet URL for table input.
+  --sheet_name VALUE               Google Sheet tab name. Empty/default reads the first tab.
+  --google_key PATH                Google service-account JSON key.
   --main_dir PATH                  Base HITT workflow directory.
   --logdir PATH                    Workflow log directory.
   --work_dir PATH                  Nextflow work directory.
@@ -66,6 +70,7 @@ case "$mode" in
     default_work_dir="${WORK_DIR:-${main_dir}/work}"
     profile="local"
     default_workflow_stage="discover"
+    default_sheet_mode="local"
     default_dryrun="TRUE"
     ;;
   interactive)
@@ -73,6 +78,7 @@ case "$mode" in
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/hitt_screen/work}"
     profile="interactive"
     default_workflow_stage="process"
+    default_sheet_mode="google"
     default_dryrun="FALSE"
     if command -v module >/dev/null 2>&1; then
       module load Nextflow/24.10.4
@@ -83,6 +89,7 @@ case "$mode" in
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/hitt_screen/work}"
     profile="cluster"
     default_workflow_stage="all"
+    default_sheet_mode="google"
     default_dryrun="FALSE"
     if command -v module >/dev/null 2>&1; then
       module load Nextflow/24.10.4
@@ -97,9 +104,13 @@ esac
 
 resume="$(to_upper_bool "$resume")"
 workflow_stage="${WORKFLOW_STAGE:-$default_workflow_stage}"
+sheet_mode="${SHEET_MODE:-$default_sheet_mode}"
 dryrun="$(to_upper_bool "${DRYRUN:-$default_dryrun}")"
 dryrun_n="${DRYRUN_N:-2}"
 input_table="${INPUT_TABLE:-}"
+sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0}"
+sheet_name="${SHEET_NAME:-}"
+google_key="${GOOGLE_KEY:-${script_dir}/trec-tem-screen-e98a2e03f58b.json}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3embl/hitttest}"
@@ -157,6 +168,14 @@ while [[ $# -gt 0 ]]; do
       workflow_stage="${1#*=}"
       shift
       ;;
+    --sheet_mode|--sheet-mode)
+      sheet_mode="${2:?--sheet_mode requires a value}"
+      shift 2
+      ;;
+    --sheet_mode=*|--sheet-mode=*)
+      sheet_mode="${1#*=}"
+      shift
+      ;;
     --main_dir|--main-dir)
       main_dir="${2:?--main_dir requires a path}"
       shift 2
@@ -171,6 +190,30 @@ while [[ $# -gt 0 ]]; do
       ;;
     --input_table=*|--input-table=*)
       input_table="${1#*=}"
+      shift
+      ;;
+    --sheet_url|--sheet-url)
+      sheet_url="${2:?--sheet_url requires a URL}"
+      shift 2
+      ;;
+    --sheet_url=*|--sheet-url=*)
+      sheet_url="${1#*=}"
+      shift
+      ;;
+    --sheet_name|--sheet-name)
+      sheet_name="${2:?--sheet_name requires a value}"
+      shift 2
+      ;;
+    --sheet_name=*|--sheet-name=*)
+      sheet_name="${1#*=}"
+      shift
+      ;;
+    --google_key|--google-key)
+      google_key="${2:?--google_key requires a path}"
+      shift 2
+      ;;
+    --google_key=*|--google-key=*)
+      google_key="${1#*=}"
       shift
       ;;
     --logdir)
@@ -258,6 +301,10 @@ nextflow_args=(
   --script_dir "$script_dir"
   --logdir "$logdir"
   --input_table "$input_table"
+  --sheet_mode "$sheet_mode"
+  --sheet_url "$sheet_url"
+  --sheet_name "$sheet_name"
+  --google_key "$google_key"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"
