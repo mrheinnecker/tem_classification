@@ -19,6 +19,8 @@ Options:
   --sheet_url URL                  Google Sheet URL for table input.
   --sheet_name VALUE               Google Sheet tab name. Empty/default reads the first tab.
   --google_key PATH                Google service-account JSON key.
+  --collection_table_url URL       Google Sheet URL for collection table output.
+  --collection_table_sheet VALUE   Output sheet name, default hitt_collection_table.
   --main_dir PATH                  Base HITT workflow directory.
   --logdir PATH                    Workflow log directory.
   --work_dir PATH                  Nextflow work directory.
@@ -111,6 +113,8 @@ input_table="${INPUT_TABLE:-}"
 sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0}"
 sheet_name="${SHEET_NAME:-}"
 google_key="${GOOGLE_KEY:-${script_dir}/trec-tem-screen-e98a2e03f58b.json}"
+collection_table_url="${COLLECTION_TABLE_URL:-https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1582290308#gid=1582290308}"
+collection_table_sheet="${COLLECTION_TABLE_SHEET:-hitt_collection_table}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3embl/hitttest}"
@@ -216,6 +220,22 @@ while [[ $# -gt 0 ]]; do
       google_key="${1#*=}"
       shift
       ;;
+    --collection_table_url|--collection-table-url)
+      collection_table_url="${2:?--collection_table_url requires a URL}"
+      shift 2
+      ;;
+    --collection_table_url=*|--collection-table-url=*)
+      collection_table_url="${1#*=}"
+      shift
+      ;;
+    --collection_table_sheet|--collection-table-sheet)
+      collection_table_sheet="${2:?--collection_table_sheet requires a value}"
+      shift 2
+      ;;
+    --collection_table_sheet=*|--collection-table-sheet=*)
+      collection_table_sheet="${1#*=}"
+      shift
+      ;;
     --logdir)
       logdir="${2:?--logdir requires a path}"
       shift 2
@@ -305,6 +325,8 @@ nextflow_args=(
   --sheet_url "$sheet_url"
   --sheet_name "$sheet_name"
   --google_key "$google_key"
+  --collection_table_url "$collection_table_url"
+  --collection_table_sheet "$collection_table_sheet"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"

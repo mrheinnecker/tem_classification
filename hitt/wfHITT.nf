@@ -3,6 +3,9 @@ params.sheet_mode = params.sheet_mode ?: "local"
 params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0"
 params.sheet_name = params.sheet_name ?: ""
 params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
+params.collection_table_url = params.collection_table_url ?: "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1582290308#gid=1582290308"
+params.collection_table_sheet = params.collection_table_sheet ?: "hitt_collection_table"
+params.local_collection_table = params.local_collection_table ?: "${params.logdir}/hitt_collection_table.tsv"
 params.dryrun = params.dryrun ?: "FALSE"
 params.dryrun_n = params.dryrun_n ?: 2
 params.script_dir = params.script_dir ?: baseDir.toString()
@@ -168,6 +171,37 @@ process COLLECTHITTS3FILES {
 }
 
 
+process MAKEHITTCOLLECTIONTABLE {
+
+    cpus 1
+    memory "1GB"
+    time "10m"
+
+    publishDir "${params.logdir}", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    path all_s3
+    path all_datasets
+
+    output:
+    path "done.tsv"
+    path "hitt_collection_table.tsv", optional:true
+
+    script:
+    """
+    Rscript "${params.script_dir}/make_collection_table.R" \
+      --all_s3 "${all_s3}" \
+      --all_datasets "${all_datasets}" \
+      --sheet_mode "${params.sheet_mode}" \
+      --google_key "${params.google_key}" \
+      --collection_table_url "${params.collection_table_url}" \
+      --collection_table_sheet "${params.collection_table_sheet}" \
+      --local_collection_table "hitt_collection_table.tsv"
+    """
+}
+
+
 workflow {
 
     SELECTHITTIMAGES(
@@ -193,7 +227,10 @@ workflow {
             upload_done_ch = S3UPLOADHITT(EUBIHITTCONVERSION.out.omezarr).collect()
             COLLECTHITTS3FILES(upload_done_ch)
 
-            // TODO: Add MoBIE collection table generation here once the table schema is finalized.
+            MAKEHITTCOLLECTIONTABLE(
+                COLLECTHITTS3FILES.out.all_s3,
+                SELECTHITTIMAGES.out.all_datasets
+            )
         }
     }
 }

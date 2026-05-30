@@ -37,7 +37,7 @@ bash hitt_main.sh interactive \
   --workflow_stage process
 ```
 
-Run conversion and upload:
+Run conversion, upload, and write the collection table:
 
 ```bash
 cd hitt
@@ -61,6 +61,10 @@ bash hitt_main.sh interactive \
 
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
 - `process`: convert listed images to OME-Zarr.
-- `all`: convert, upload to S3, and collect the S3 listing.
+- `all`: convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
 
-The MoBIE collection table step is intentionally left as a TODO in `wfHITT.nf` until the target table schema is finalized.
+The collection table is written to the `hitt_collection_table` sheet in:
+
+```text
+https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1582290308#gid=1582290308
+```
