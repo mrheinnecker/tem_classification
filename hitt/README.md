@@ -28,7 +28,7 @@ and writes OME-Zarr output to:
 omezarr
 ```
 
-Before conversion, the workflow renumbers `slice_*.tif` / `slice_*.tiff` files in the `tomo` directory so the stack starts at `Z0001.tif` and increments by one. A per-image renaming log is written under the workflow logs.
+Before conversion, the workflow stages a renamed copy of `slice_*.tif` / `slice_*.tiff` files in the Nextflow work directory so the stack starts at `Z0001.tif` and increments by one. The original `tomo` directory is left untouched. A per-image renaming log is written under the workflow logs.
 
 ## Run examples
 

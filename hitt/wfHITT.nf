@@ -68,7 +68,7 @@ process EUBIHITTCONVERSION {
     maxRetries 1
 
     input:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem)
+    tuple val(filename), path(normalized_tomo), val(omezarr_path), val(req_mem)
 
     output:
     tuple val(filename), val(omezarr_path), emit: omezarr
@@ -78,7 +78,7 @@ process EUBIHITTCONVERSION {
     """
     set -euo pipefail
 
-    input_path="${tmp_copy_path}/${params.input_suffix}"
+    input_path="${normalized_tomo}"
     output_path="${omezarr_path}"
 
     if [ ! -e "\$input_path" ]; then
@@ -119,7 +119,7 @@ process NORMALIZEHITTSLICES {
     tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem)
 
     output:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), emit: normalized_images
+    tuple val(filename), path("${filename}_normalized_tomo"), val(omezarr_path), val(req_mem), emit: normalized_images
     path "${filename}_slice_renaming.tsv"
 
     script:
@@ -127,6 +127,7 @@ process NORMALIZEHITTSLICES {
     set -euo pipefail
 
     input_path="${tmp_copy_path}/${params.input_suffix}"
+    normalized_path="${filename}_normalized_tomo"
     log_file="${filename}_slice_renaming.tsv"
 
     if [ ! -d "\$input_path" ]; then
@@ -135,6 +136,7 @@ process NORMALIZEHITTSLICES {
     fi
 
     printf "old_name\\tnew_name\\n" > "\$log_file"
+    mkdir -p "\$normalized_path"
 
     mapfile -t files < <(
       find "\$input_path" -maxdepth 1 -type f \
@@ -147,26 +149,13 @@ process NORMALIZEHITTSLICES {
       exit 1
     fi
 
-    tmp_files=()
     idx=1
     for file in "\${files[@]}"; do
       base="\$(basename "\$file")"
-      tmp="\$input_path/.nextflow_renaming_\$(printf '%06d' "\$idx")_\$base"
-      mv -- "\$file" "\$tmp"
-      tmp_files+=("\$tmp")
-      idx=\$((idx + 1))
-    done
-
-    idx=1
-    for tmp in "\${tmp_files[@]}"; do
-      old_base="\$(basename "\$tmp")"
-      old_base="\${old_base#".nextflow_renaming_"}"
-      old_base="\${old_base#*_}"
-      ext="\${old_base##*.}"
+      ext="\${base##*.}"
       new_base="\$(printf 'Z%04d.%s' "\$idx" "\$ext")"
-      new_file="\$input_path/\$new_base"
-      mv -- "\$tmp" "\$new_file"
-      printf "%s\\t%s\\n" "\$old_base" "\$new_base" >> "\$log_file"
+      cp -- "\$file" "\$normalized_path/\$new_base"
+      printf "%s\\t%s\\n" "\$base" "\$new_base" >> "\$log_file"
       idx=\$((idx + 1))
     done
     """
