@@ -43,6 +43,7 @@ Options:
   --remote_user VALUE              SSH username, default p3l-yschwab.
   --remote_host VALUE              SSH host, default cerberus.embl-hamburg.de.
   --remote_port VALUE              SSH port, default 22443.
+  --password VALUE                 SSH password passed through the workflow environment.
   --resume TRUE|FALSE              Add Nextflow -resume when TRUE.
   --help                           Show this message.
 EOF
@@ -143,6 +144,7 @@ copy_dest_root="${COPY_DEST_ROOT:-/scratch/rheinnec/tmp_hitt}"
 remote_user="${REMOTE_USER:-p3l-yschwab}"
 remote_host="${REMOTE_HOST:-cerberus.embl-hamburg.de}"
 remote_port="${REMOTE_PORT:-22443}"
+password="${HITT_SSHPASS:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -400,6 +402,14 @@ while [[ $# -gt 0 ]]; do
       remote_port="${1#*=}"
       shift
       ;;
+    --password)
+      password="${2:?--password requires a value}"
+      shift 2
+      ;;
+    --password=*)
+      password="${1#*=}"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       usage
@@ -413,6 +423,8 @@ logdir="${logdir:-${main_dir}/logs/wfHITT_${timestamp}}"
 
 mkdir -p "$logdir" "$work_dir"
 cd "$main_dir"
+
+export HITT_SSHPASS="$password"
 
 nextflow_args=(
   run "${script_dir}/wfHITT.nf"

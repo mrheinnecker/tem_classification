@@ -15,10 +15,19 @@ source_path
 /mnt/ximg/2024/p3l-yschwab/RECON/20240414/RAW_DATA/BIL_10to40_20231003_PM_01_epo_03/recon_111_1/tomo
 ```
 
-Before running the workflow, export the SSH password in the launch shell:
+Pass the SSH password when starting the workflow:
 
 ```bash
-export SSHPASS='PASSWORD'
+bash hitt_main.sh cluster --password 'PASSWORD' --workflow_stage all
+```
+
+The launcher keeps the password out of repository files and exports `SSHPASS` immediately before the `sshpass` copy command.
+
+Because command-line values can be stored in shell history, you can alternatively keep the launch command clean:
+
+```bash
+export HITT_SSHPASS='PASSWORD'
+bash hitt_main.sh cluster --workflow_stage all
 ```
 
 For each row, `rsync` copies the stack incrementally into:

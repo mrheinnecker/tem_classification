@@ -94,8 +94,8 @@ process COPYHITTDATA {
 
     case "${params.copy_data}" in
       TRUE|true|1|yes|YES)
-        if [ -z "\${SSHPASS:-}" ]; then
-          echo "SSHPASS is not set. Export SSHPASS before starting the workflow." >&2
+        if [ -z "\${HITT_SSHPASS:-}" ]; then
+          echo "SSH password is not set. Start hitt_main.sh with --password." >&2
           exit 1
         fi
 
@@ -106,10 +106,12 @@ process COPYHITTDATA {
         esac
 
         mkdir -p "\$local_tomo_path"
+        export SSHPASS="\$HITT_SSHPASS"
         sshpass -e rsync -avr \
           -e "ssh -p ${params.remote_port}" \
           "\${remote_source%/}/" \
           "\$local_tomo_path/"
+        unset SSHPASS
         ;;
       *)
         if [ ! -d "\$local_tomo_path" ]; then
