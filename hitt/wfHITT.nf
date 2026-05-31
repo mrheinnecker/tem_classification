@@ -18,6 +18,10 @@ params.y_scale = params.y_scale ?: 100
 params.input_suffix = params.input_suffix ?: "recon_111_1/tomo"
 params.output_name = params.output_name ?: "omezarr"
 params.overwrite = params.overwrite ?: "TRUE"
+params.convert_uint16 = params.convert_uint16 ?: "TRUE"
+params.uint16_lower_percentile = params.uint16_lower_percentile ?: 0.1
+params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
+params.uint16_sample_values = params.uint16_sample_values ?: 2000000
 
 
 process SELECTHITTIMAGES {
@@ -121,6 +125,7 @@ process NORMALIZEHITTSLICES {
     output:
     tuple val(filename), path("${filename}_normalized_tomo"), val(omezarr_path), val(req_mem), emit: normalized_images
     path "${filename}_slice_renaming.tsv"
+    path "${filename}_uint16_metrics.tsv"
 
     script:
     """
@@ -129,35 +134,22 @@ process NORMALIZEHITTSLICES {
     input_path="${tmp_copy_path}/${params.input_suffix}"
     normalized_path="${filename}_normalized_tomo"
     log_file="${filename}_slice_renaming.tsv"
+    metrics_file="${filename}_uint16_metrics.tsv"
 
     if [ ! -d "\$input_path" ]; then
       echo "Expected tomo directory does not exist: \$input_path" >&2
       exit 1
     fi
 
-    printf "old_name\\tnew_name\\n" > "\$log_file"
-    mkdir -p "\$normalized_path"
-
-    mapfile -t files < <(
-      find "\$input_path" -maxdepth 1 -type f \
-        \\( -iname 'slice_*.tif' -o -iname 'slice_*.tiff' \\) \
-        | sort -V
-    )
-
-    if [ "\${#files[@]}" -eq 0 ]; then
-      echo "No slice_*.tif(f) files found in \$input_path" >&2
-      exit 1
-    fi
-
-    idx=1
-    for file in "\${files[@]}"; do
-      base="\$(basename "\$file")"
-      ext="\${base##*.}"
-      new_base="\$(printf 'Z%04d.%s' "\$idx" "\$ext")"
-      cp -- "\$file" "\$normalized_path/\$new_base"
-      printf "%s\\t%s\\n" "\$base" "\$new_base" >> "\$log_file"
-      idx=\$((idx + 1))
-    done
+    python3 "${params.script_dir}/prepare_slices.py" \
+      --input-dir "\$input_path" \
+      --output-dir "\$normalized_path" \
+      --rename-log "\$log_file" \
+      --metrics "\$metrics_file" \
+      --convert-uint16 "${params.convert_uint16}" \
+      --lower-percentile "${params.uint16_lower_percentile}" \
+      --upper-percentile "${params.uint16_upper_percentile}" \
+      --sample-values "${params.uint16_sample_values}"
     """
 }
 

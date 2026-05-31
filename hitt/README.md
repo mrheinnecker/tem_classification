@@ -28,7 +28,15 @@ and writes OME-Zarr output to:
 omezarr
 ```
 
-Before conversion, the workflow stages a renamed copy of `slice_*.tif` / `slice_*.tiff` files in the Nextflow work directory so the stack starts at `Z0001.tif` and increments by one. The original `tomo` directory is left untouched. A per-image renaming log is written under the workflow logs.
+Before conversion, the workflow stages a renamed copy of `slice_*.tif` / `slice_*.tiff` files in the Nextflow work directory so the stack starts at `Z0001.tif` and increments by one. The original `tomo` directory is left untouched. Previously normalized `Z*.tif` stacks are also accepted for development recovery.
+
+By default, staged images are converted from `float32` to `uint16` using stack-wide `0.1` and `99.9` percentiles. Disable this when original reconstructed values are needed:
+
+```bash
+bash hitt_main.sh interactive --convert_uint16 FALSE
+```
+
+Per-image renaming and intensity-conversion TSV logs are written under the workflow logs.
 
 ## Run examples
 

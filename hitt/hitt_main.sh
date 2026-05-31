@@ -33,6 +33,10 @@ Options:
   --input_suffix PATH              Path below tmp_copy_path, default recon_111_1/tomo.
   --output_name NAME               Output folder below tmp_copy_path, default omezarr.
   --overwrite TRUE|FALSE           Kept for compatibility; conversion currently always rebuilds output.
+  --convert_uint16 TRUE|FALSE      Stage uint16 TIFFs when TRUE; preserve original dtype when FALSE.
+  --uint16_lower_percentile VALUE  Lower stack-wide clipping percentile, default 0.1.
+  --uint16_upper_percentile VALUE  Upper stack-wide clipping percentile, default 99.9.
+  --uint16_sample_values N         Approximate sampled pixels per stack, default 2000000.
   --resume TRUE|FALSE              Add Nextflow -resume when TRUE.
   --help                           Show this message.
 EOF
@@ -123,6 +127,10 @@ y_scale="${Y_SCALE:-100}"
 input_suffix="${INPUT_SUFFIX:-recon_111_1/tomo}"
 output_name="${OUTPUT_NAME:-omezarr}"
 overwrite="$(to_upper_bool "${OVERWRITE:-TRUE}")"
+convert_uint16="$(to_upper_bool "${CONVERT_UINT16:-TRUE}")"
+uint16_lower_percentile="${UINT16_LOWER_PERCENTILE:-0.1}"
+uint16_upper_percentile="${UINT16_UPPER_PERCENTILE:-99.9}"
+uint16_sample_values="${UINT16_SAMPLE_VALUES:-2000000}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -300,6 +308,38 @@ while [[ $# -gt 0 ]]; do
       overwrite="$(to_upper_bool "${1#*=}")"
       shift
       ;;
+    --convert_uint16|--convert-uint16)
+      convert_uint16="$(to_upper_bool "${2:?--convert_uint16 requires TRUE or FALSE}")"
+      shift 2
+      ;;
+    --convert_uint16=*|--convert-uint16=*)
+      convert_uint16="$(to_upper_bool "${1#*=}")"
+      shift
+      ;;
+    --uint16_lower_percentile|--uint16-lower-percentile)
+      uint16_lower_percentile="${2:?--uint16_lower_percentile requires a value}"
+      shift 2
+      ;;
+    --uint16_lower_percentile=*|--uint16-lower-percentile=*)
+      uint16_lower_percentile="${1#*=}"
+      shift
+      ;;
+    --uint16_upper_percentile|--uint16-upper-percentile)
+      uint16_upper_percentile="${2:?--uint16_upper_percentile requires a value}"
+      shift 2
+      ;;
+    --uint16_upper_percentile=*|--uint16-upper-percentile=*)
+      uint16_upper_percentile="${1#*=}"
+      shift
+      ;;
+    --uint16_sample_values|--uint16-sample-values)
+      uint16_sample_values="${2:?--uint16_sample_values requires a value}"
+      shift 2
+      ;;
+    --uint16_sample_values=*|--uint16-sample-values=*)
+      uint16_sample_values="${1#*=}"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       usage
@@ -336,6 +376,10 @@ nextflow_args=(
   --input_suffix "$input_suffix"
   --output_name "$output_name"
   --overwrite "$overwrite"
+  --convert_uint16 "$convert_uint16"
+  --uint16_lower_percentile "$uint16_lower_percentile"
+  --uint16_upper_percentile "$uint16_upper_percentile"
+  --uint16_sample_values "$uint16_sample_values"
   -profile "$profile"
 )
 
