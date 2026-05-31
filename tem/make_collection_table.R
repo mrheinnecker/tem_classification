@@ -11,7 +11,8 @@ spec <- matrix(c(
   "image_log_url", "i", 1, "character",
   "image_log_sheet", "s", 1, "character",
   "local_image_log", "a", 1, "character",
-  "image_stats_dir", "x", 1, "character"
+  "image_stats_dir", "x", 1, "character",
+  "expected_datasets", "e", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -55,6 +56,23 @@ if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
   image_stats_dir <- "."
 }
 
+expected_datasets <- opt$expected_datasets
+if (is.null(expected_datasets) || is.na(expected_datasets) || !file.exists(expected_datasets)) {
+  stop("--expected_datasets must point to the raw-derived all_datasets.tsv file.")
+}
+
+expected_omezarr_names <- read_tsv(
+  expected_datasets,
+  col_types=cols(.default=col_character())
+) %>%
+  pull(omezarr_name) %>%
+  discard(is.na) %>%
+  unique()
+
+if (length(expected_omezarr_names) == 0) {
+  stop("No expected OME-Zarr dataset names were found in the raw-derived dataset inventory.")
+}
+
 parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
   ifelse(
@@ -73,7 +91,7 @@ col_table <-
   filter(!str_detect(value, "coarse_mask")) %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
-    source_name=str_remove(s3_raw, "/$"),
+    source_name=str_remove(s3_raw, "/$") %>% basename(),
     site=str_extract(source_name, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
     cell_id=str_extract(source_name, "c0\\d+"),
     size_frac=str_extract(source_name, "\\d+to\\d+"),
@@ -84,6 +102,7 @@ col_table <-
     grid=site,
     #zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
   ) %>%
+  filter(source_name %in% expected_omezarr_names) %>%
   select(
     uri, name, view, grid,
     site, cell_id, size_frac, sampling_time, source_name, 

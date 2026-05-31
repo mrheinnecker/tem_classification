@@ -157,7 +157,7 @@ process CHECKNEWIMAGES {
     path "manually_filled_log*"
     path "TEM_screen_image_count.pdf"
     path "TEM_screen_image_count.png"
-    path "all_datasets.tsv"
+    path "all_datasets.tsv", emit: expected_datasets
     
     script:
     """
@@ -488,6 +488,7 @@ process MAKECOLLECTIONTABLE {
     input:
     path all_s3
     path image_stats
+    path expected_datasets
 
     output:
     path "done.tsv"
@@ -504,6 +505,7 @@ process MAKECOLLECTIONTABLE {
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "$all_s3" \
       --image_stats_dir "." \
+      --expected_datasets "$expected_datasets" \
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
@@ -594,7 +596,8 @@ workflow {
 
       MAKECOLLECTIONTABLE(
         COLLECTS3FILES.out.all_s3,
-        image_stats_ch
+        image_stats_ch,
+        CHECKNEWIMAGES.out.expected_datasets
       )
     }
   }
