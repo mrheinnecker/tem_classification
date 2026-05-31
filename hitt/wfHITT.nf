@@ -182,8 +182,8 @@ process EUBIHITTCONVERSION {
 process NORMALIZEHITTSLICES {
 
     cpus 1
-    memory "32GB"
-    time "60m"
+    memory "64GB"
+    time "30m"
 
     publishDir "${params.logdir}/slice_renaming", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
