@@ -105,6 +105,7 @@ process EUBIHITTCONVERSION {
       --concatenation_axes z \
       --z_tag "Z" \
       --save_omexml True \
+      --n_layers 11 \
       --zar_format "${params.zarr_format}" \
       --max_workers 1
 
@@ -116,8 +117,8 @@ process EUBIHITTCONVERSION {
 process NORMALIZEHITTSLICES {
 
     cpus 1
-    memory "1GB"
-    time "20m"
+    memory "32GB"
+    time "60m"
 
     publishDir "${params.logdir}/slice_renaming", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"

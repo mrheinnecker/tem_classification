@@ -124,6 +124,7 @@ work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3embl/hitttest}"
 x_scale="${X_SCALE:-650}"
 y_scale="${Y_SCALE:-650}"
+z_scale="${Z_SCALE:-650}"
 input_suffix="${INPUT_SUFFIX:-recon_111_1/tomo}"
 output_name="${OUTPUT_NAME:-omezarr}"
 overwrite="$(to_upper_bool "${OVERWRITE:-TRUE}")"
@@ -284,6 +285,14 @@ while [[ $# -gt 0 ]]; do
       y_scale="${1#*=}"
       shift
       ;;
+    --z_scale|--z-scale)
+      z_scale="${2:?--z_scale requires a value}"
+      shift 2
+      ;;
+    --z_scale=*|--z-scale=*)
+      z_scale="${1#*=}"
+      shift
+      ;;
     --input_suffix|--input-suffix)
       input_suffix="${2:?--input_suffix requires a value}"
       shift 2
@@ -373,6 +382,7 @@ nextflow_args=(
   --s3_bucket "$s3_bucket"
   --x_scale "$x_scale"
   --y_scale "$y_scale"
+  --z_scale "$z_scale"
   --input_suffix "$input_suffix"
   --output_name "$output_name"
   --overwrite "$overwrite"
