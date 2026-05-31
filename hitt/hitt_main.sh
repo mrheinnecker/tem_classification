@@ -14,7 +14,7 @@ Usage:
 
 Options:
   --profile, --mode VALUE          Runtime profile: local, interactive, cluster.
-  --input_table PATH               TSV/CSV table with a tmp_copy_path column.
+  --input_table PATH               TSV/CSV table with a source_path column.
   --sheet_mode VALUE               local or google, default depends on profile.
   --sheet_url URL                  Google Sheet URL for table input.
   --sheet_name VALUE               Google Sheet tab name. Empty/default reads the first tab.
@@ -28,8 +28,9 @@ Options:
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
   --s3_bucket VALUE                S3 bucket/prefix, default s3embl/hitttest.
-  --x_scale VALUE                  X pixel scale in nm, default 100.
-  --y_scale VALUE                  Y pixel scale in nm, default 100.
+  --x_scale VALUE                  X pixel scale in nm, default 650.
+  --y_scale VALUE                  Y pixel scale in nm, default 650.
+  --z_scale VALUE                  Z pixel scale in nm, default 650.
   --input_suffix PATH              Path below tmp_copy_path, default recon_111_1/tomo.
   --output_name NAME               Output folder below tmp_copy_path, default omezarr.
   --overwrite TRUE|FALSE           Kept for compatibility; conversion currently always rebuilds output.
@@ -37,6 +38,11 @@ Options:
   --uint16_lower_percentile VALUE  Lower stack-wide clipping percentile, default 0.1.
   --uint16_upper_percentile VALUE  Upper stack-wide clipping percentile, default 99.9.
   --uint16_sample_values N         Approximate sampled pixels per stack, default 2000000.
+  --copy_data TRUE|FALSE           Copy remote tomo stacks into scratch before processing.
+  --copy_dest_root PATH            Local scratch destination, default /scratch/rheinnec/tmp_hitt.
+  --remote_user VALUE              SSH username, default p3l-yschwab.
+  --remote_host VALUE              SSH host, default cerberus.embl-hamburg.de.
+  --remote_port VALUE              SSH port, default 22443.
   --resume TRUE|FALSE              Add Nextflow -resume when TRUE.
   --help                           Show this message.
 EOF
@@ -132,6 +138,11 @@ convert_uint16="$(to_upper_bool "${CONVERT_UINT16:-TRUE}")"
 uint16_lower_percentile="${UINT16_LOWER_PERCENTILE:-0.1}"
 uint16_upper_percentile="${UINT16_UPPER_PERCENTILE:-99.9}"
 uint16_sample_values="${UINT16_SAMPLE_VALUES:-2000000}"
+copy_data="$(to_upper_bool "${COPY_DATA:-TRUE}")"
+copy_dest_root="${COPY_DEST_ROOT:-/scratch/rheinnec/tmp_hitt}"
+remote_user="${REMOTE_USER:-p3l-yschwab}"
+remote_host="${REMOTE_HOST:-cerberus.embl-hamburg.de}"
+remote_port="${REMOTE_PORT:-22443}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -349,6 +360,46 @@ while [[ $# -gt 0 ]]; do
       uint16_sample_values="${1#*=}"
       shift
       ;;
+    --copy_data|--copy-data)
+      copy_data="$(to_upper_bool "${2:?--copy_data requires TRUE or FALSE}")"
+      shift 2
+      ;;
+    --copy_data=*|--copy-data=*)
+      copy_data="$(to_upper_bool "${1#*=}")"
+      shift
+      ;;
+    --copy_dest_root|--copy-dest-root)
+      copy_dest_root="${2:?--copy_dest_root requires a path}"
+      shift 2
+      ;;
+    --copy_dest_root=*|--copy-dest-root=*)
+      copy_dest_root="${1#*=}"
+      shift
+      ;;
+    --remote_user|--remote-user)
+      remote_user="${2:?--remote_user requires a value}"
+      shift 2
+      ;;
+    --remote_user=*|--remote-user=*)
+      remote_user="${1#*=}"
+      shift
+      ;;
+    --remote_host|--remote-host)
+      remote_host="${2:?--remote_host requires a value}"
+      shift 2
+      ;;
+    --remote_host=*|--remote-host=*)
+      remote_host="${1#*=}"
+      shift
+      ;;
+    --remote_port|--remote-port)
+      remote_port="${2:?--remote_port requires a value}"
+      shift 2
+      ;;
+    --remote_port=*|--remote-port=*)
+      remote_port="${1#*=}"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       usage
@@ -390,6 +441,11 @@ nextflow_args=(
   --uint16_lower_percentile "$uint16_lower_percentile"
   --uint16_upper_percentile "$uint16_upper_percentile"
   --uint16_sample_values "$uint16_sample_values"
+  --copy_data "$copy_data"
+  --copy_dest_root "$copy_dest_root"
+  --remote_user "$remote_user"
+  --remote_host "$remote_host"
+  --remote_port "$remote_port"
   -profile "$profile"
 )
 

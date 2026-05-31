@@ -7,6 +7,7 @@ spec <- matrix(c(
   "sheet_url", "u", 1, "character",
   "sheet_name", "s", 1, "character",
   "google_key", "k", 1, "character",
+  "copy_dest_root", "c", 1, "character",
   "dryrun", "d", 1, "character",
   "dryrun_n", "n", 1, "integer"
 ), ncol=4, byrow=TRUE)
@@ -33,11 +34,34 @@ if (is.null(dryrun_n) || is.na(dryrun_n)) {
   dryrun_n <- 2L
 }
 
+copy_dest_root <- opt$copy_dest_root
+if (is.null(copy_dest_root) || is.na(copy_dest_root)) {
+  copy_dest_root <- "/scratch/rheinnec/tmp_hitt"
+}
+
 sanitize_name <- function(x) {
   x %>%
     basename() %>%
     str_replace_all("[^A-Za-z0-9]+", "_") %>%
     str_replace_all("^_|_$", "")
+}
+
+dataset_name_from_path <- function(x) {
+  path <- x %>%
+    str_remove("^[^:]+:") %>%
+    str_remove("/+$")
+
+  dataset_root <- str_remove(path, "/recon_111_1/tomo$")
+  sanitize_name(dataset_root)
+}
+
+remote_tomo_path_from_source <- function(x) {
+  path <- str_remove(x, "/+$")
+  if_else(
+    str_detect(path, "/recon_111_1/tomo$"),
+    path,
+    file.path(path, "recon_111_1", "tomo")
+  )
 }
 
 read_local_table <- function(path) {
@@ -78,22 +102,27 @@ images <- if (sheet_mode == "google") {
 images <- images %>%
   mutate(across(everything(), ~na_if(.x, "")))
 
-if (!"tmp_copy_path" %in% names(images)) {
-  stop("Input table must contain a tmp_copy_path column")
+path_column <- intersect(c("source_path", "remote_path", "tmp_copy_path"), names(images))
+if (length(path_column) == 0) {
+  stop("Input table must contain a source_path, remote_path, or tmp_copy_path column")
 }
+path_column <- path_column[[1]]
 
 all_images <- images %>%
-  filter(!is.na(tmp_copy_path)) %>%
+  mutate(source_path=.data[[path_column]]) %>%
+  filter(!is.na(source_path)) %>%
   mutate(
-    tmp_copy_path=str_remove(tmp_copy_path, "/$"),
-    filename=sanitize_name(tmp_copy_path),
+    source_path=str_remove(source_path, "/+$"),
+    remote_tomo_path=remote_tomo_path_from_source(source_path),
+    filename=dataset_name_from_path(remote_tomo_path),
     shortname=filename,
+    tmp_copy_path=file.path(copy_dest_root, filename),
     tomo_path=file.path(tmp_copy_path, "recon_111_1", "tomo"),
     omezarr_path=file.path(tmp_copy_path, filename),
     req_mem=32
   ) %>%
-  distinct(tmp_copy_path, .keep_all=TRUE) %>%
-  select(filename, shortname, tmp_copy_path, tomo_path, omezarr_path, req_mem, everything())
+  distinct(remote_tomo_path, .keep_all=TRUE) %>%
+  select(filename, shortname, source_path, remote_tomo_path, tmp_copy_path, tomo_path, omezarr_path, req_mem, everything())
 
 to_run <- all_images
 if (as.logical(dryrun)) {

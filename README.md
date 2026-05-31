@@ -4,6 +4,7 @@ This repository contains workflow code for preparing, processing, converting, an
 
 - `tem/`: Transmission electron microscopy (TEM) discovery, preprocessing, QC, OME-Zarr conversion, S3 upload, and collection-table generation.
 - `sem/`: Scanning electron microscopy (SEM) TIFF discovery, metadata extraction, OME-Zarr conversion, S3 upload, and collection-table generation.
+- `hitt/`: Table-driven large-image conversion workflow for HITT image directories, OME-Zarr conversion, and S3 upload.
 - `container/`: Singularity/Apptainer definition files for the tool environments used by the workflows.
 
 The `microsam/` folder is currently treated as a separate area and is not covered by this README.
@@ -23,6 +24,12 @@ The `microsam/` folder is currently treated as a separate area and is not covere
 |   +-- nextflow.config
 |   +-- select_images.R
 |   +-- extract_metadata.py
+|   +-- make_collection_table.R
++-- hitt/
+|   +-- wfHITT.nf
+|   +-- hitt_main.sh
+|   +-- nextflow.config
+|   +-- select_images.R
 |   +-- make_collection_table.R
 +-- tem/
     +-- wfTEM.nf
@@ -78,6 +85,34 @@ RESUME=FALSE ./main.sh interactive
 - `all`: run the full workflow including S3 upload and collection-table generation.
 
 See `tem/README.md` for more detailed TEM-specific usage notes.
+
+## HITT Workflow
+
+The HITT workflow is defined in `hitt/wfHITT.nf`, configured by `hitt/nextflow.config`, and launched through `hitt/hitt_main.sh`.
+
+Unlike the TEM and SEM workflows, HITT does not discover files by scanning a raw image directory. It reads a Google Sheet or local table with a remote `source_path` column and processes exactly those listed image directories.
+
+For each remote source path, the default scratch input is:
+
+```text
+/scratch/rheinnec/tmp_hitt/<dataset_name>/recon_111_1/tomo
+```
+
+and the default OME-Zarr output is:
+
+```text
+/scratch/rheinnec/tmp_hitt/<dataset_name>/<dataset_name>
+```
+
+Useful entry points:
+
+```bash
+cd hitt
+bash ./hitt_main.sh interactive --sheet_mode google --workflow_stage process
+bash ./hitt_main.sh cluster --sheet_mode google --workflow_stage all
+```
+
+Before conversion, HITT incrementally copies each listed remote stack into scratch, then stages a renamed copy of each `tomo/slice_*.tif` stack in the Nextflow work directory so it starts at `Z0001.tif`. Staged images are converted to `uint16` by default, with an option to preserve the original dtype. Stack-wide gray-value display limits are calculated from the staged TIFFs. In `all` mode, converted OME-Zarr datasets are uploaded by default to `s3embl/hitttest/<image_name>/` without an extra folder level, and the `hitt_collection_table` Google Sheet is updated.
 
 ## SEM Workflow
 

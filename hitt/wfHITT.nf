@@ -23,6 +23,11 @@ params.convert_uint16 = params.convert_uint16 ?: "TRUE"
 params.uint16_lower_percentile = params.uint16_lower_percentile ?: 0.1
 params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
 params.uint16_sample_values = params.uint16_sample_values ?: 2000000
+params.copy_data = params.copy_data ?: "TRUE"
+params.copy_dest_root = params.copy_dest_root ?: "/scratch/rheinnec/tmp_hitt"
+params.remote_user = params.remote_user ?: "p3l-yschwab"
+params.remote_host = params.remote_host ?: "cerberus.embl-hamburg.de"
+params.remote_port = params.remote_port ?: 22443
 
 
 process SELECTHITTIMAGES {
@@ -40,6 +45,7 @@ process SELECTHITTIMAGES {
     val sheet_url
     val sheet_name
     val google_key
+    val copy_dest_root
     val dryrun
     val dryrun_n
 
@@ -55,8 +61,65 @@ process SELECTHITTIMAGES {
       --sheet_url "${sheet_url}" \
       --sheet_name "${sheet_name}" \
       --google_key "${google_key}" \
+      --copy_dest_root "${copy_dest_root}" \
       --dryrun "${dryrun}" \
       --dryrun_n "${dryrun_n}"
+    """
+}
+
+
+process COPYHITTDATA {
+
+    cpus 1
+    memory "1GB"
+    time "4h"
+
+    publishDir "${params.logdir}/copy", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "retry"
+    maxRetries 1
+
+    input:
+    tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem)
+
+    output:
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), emit: copied_images
+    path "${filename}_copy_done.txt"
+
+    script:
+    """
+    set -euo pipefail
+
+    local_tomo_path="${tmp_copy_path}/${params.input_suffix}"
+
+    case "${params.copy_data}" in
+      TRUE|true|1|yes|YES)
+        if [ -z "\${SSHPASS:-}" ]; then
+          echo "SSHPASS is not set. Export SSHPASS before starting the workflow." >&2
+          exit 1
+        fi
+
+        remote_source="${remote_tomo_path}"
+        case "\$remote_source" in
+          *:*) ;;
+          *) remote_source="${params.remote_user}@${params.remote_host}:\$remote_source" ;;
+        esac
+
+        mkdir -p "\$local_tomo_path"
+        sshpass -e rsync -avr \
+          -e "ssh -p ${params.remote_port}" \
+          "\${remote_source%/}/" \
+          "\$local_tomo_path/"
+        ;;
+      *)
+        if [ ! -d "\$local_tomo_path" ]; then
+          echo "Copying is disabled and the local tomo directory does not exist: \$local_tomo_path" >&2
+          exit 1
+        fi
+        ;;
+    esac
+
+    touch "${filename}_copy_done.txt"
     """
 }
 
@@ -278,6 +341,7 @@ workflow {
         params.sheet_url,
         params.sheet_name,
         params.google_key,
+        params.copy_dest_root,
         params.dryrun,
         params.dryrun_n
     )
@@ -286,10 +350,12 @@ workflow {
 
         SELECTHITTIMAGES.out.to_process
             .splitCsv(header:true)
-            .map { row -> tuple(row.filename, row.tmp_copy_path, "${row.tmp_copy_path}/${params.output_name}", row.req_mem) }
-            .set { hitt_batch_ch }
+            .map { row -> tuple(row.filename, row.remote_tomo_path, row.tmp_copy_path, row.omezarr_path, row.req_mem) }
+            .set { hitt_copy_batch_ch }
 
-        NORMALIZEHITTSLICES(hitt_batch_ch)
+        COPYHITTDATA(hitt_copy_batch_ch)
+
+        NORMALIZEHITTSLICES(COPYHITTDATA.out.copied_images)
 
         EUBIHITTCONVERSION(NORMALIZEHITTSLICES.out.normalized_images)
         EXTRACTHITTIMAGESTATS(NORMALIZEHITTSLICES.out.normalized_images)
