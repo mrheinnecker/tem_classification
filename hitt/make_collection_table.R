@@ -62,14 +62,14 @@ col_table <-
   mutate(
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw),
-    uri=file.path("https://s3.embl.de/hitttest", str_remove(s3_raw, "/$"), "slice__zset.zarr/"),
+    uri=file.path("https://s3.embl.de/hitttest", str_remove(s3_raw, "/$"), "Z_zset.zarr/"),
     site=str_extract(name, "^[A-Za-z]+"),
     hitt_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     size_frac=str_extract(name, "\\d+to\\d+"),
     epoch=str_extract(name, "epo_[0-9]+$"),
     grid=site,
-    view=name
+    view=site
   ) %>%
   filter(!is.na(s3_raw), s3_raw != "") %>%
   distinct(uri, .keep_all=TRUE) %>%

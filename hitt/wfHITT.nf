@@ -13,8 +13,9 @@ params.logdir = params.logdir ?: "hitt_logs"
 params.workflow_stage = params.workflow_stage ?: "process"
 params.s3_bucket = params.s3_bucket ?: "s3embl/hitttest"
 params.zarr_format = params.zarr_format ?: 2
-params.x_scale = params.x_scale ?: 100
-params.y_scale = params.y_scale ?: 100
+params.x_scale = params.x_scale ?: 650
+params.y_scale = params.y_scale ?: 650
+params.z_scale = params.z_scale ?: 650
 params.input_suffix = params.input_suffix ?: "recon_111_1/tomo"
 params.output_name = params.output_name ?: "omezarr"
 params.overwrite = params.overwrite ?: "TRUE"
@@ -97,8 +98,10 @@ process EUBIHITTCONVERSION {
       "\$output_path" \
       --x_unit nm \
       --y_unit nm \
+      --z_unit nm \
       --x_scale "${params.x_scale}" \
       --y_scale "${params.y_scale}" \
+      --z_scale "${params.z_scale}" \
       --concatenation_axes z \
       --z_tag "Z" \
       --save_omexml True \
