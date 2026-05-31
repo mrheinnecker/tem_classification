@@ -89,7 +89,7 @@ all_images <- images %>%
     filename=sanitize_name(tmp_copy_path),
     shortname=filename,
     tomo_path=file.path(tmp_copy_path, "recon_111_1", "tomo"),
-    omezarr_path=file.path(tmp_copy_path, "omezarr"),
+    omezarr_path=file.path(tmp_copy_path, filename),
     req_mem=32
   ) %>%
   distinct(tmp_copy_path, .keep_all=TRUE) %>%
