@@ -38,6 +38,8 @@ bash hitt_main.sh interactive --convert_uint16 FALSE
 
 Per-image renaming and intensity-conversion TSV logs are written under the workflow logs.
 
+The workflow also calculates stack-wide `min_gray`, `max_gray`, and `contrast_limits` values from the staged TIFF slices. In `all` mode these display values are added to `hitt_collection_table`; individual TSV files are written under `logs/.../image_stats`.
+
 ## Run examples
 
 ```bash

@@ -154,6 +154,31 @@ process NORMALIZEHITTSLICES {
 }
 
 
+process EXTRACTHITTIMAGESTATS {
+
+    cpus 1
+    memory "2GB"
+    time "20m"
+
+    publishDir "${params.logdir}/image_stats", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    tuple val(filename), path(normalized_tomo), val(omezarr_path), val(req_mem)
+
+    output:
+    path "${filename}_image_stats.tsv", emit: image_stats
+
+    script:
+    """
+    python3 "${params.script_dir}/extract_stack_stats.py" \
+      --input-dir "${normalized_tomo}" \
+      --name "${filename}" \
+      --output "${filename}_image_stats.tsv"
+    """
+}
+
+
 process S3UPLOADHITT {
 
     cpus 1
@@ -220,6 +245,7 @@ process MAKEHITTCOLLECTIONTABLE {
     input:
     path all_s3
     path all_datasets
+    path image_stats
 
     output:
     path "done.tsv"
@@ -230,6 +256,7 @@ process MAKEHITTCOLLECTIONTABLE {
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "${all_s3}" \
       --all_datasets "${all_datasets}" \
+      --image_stats_dir "." \
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
@@ -261,6 +288,7 @@ workflow {
         NORMALIZEHITTSLICES(hitt_batch_ch)
 
         EUBIHITTCONVERSION(NORMALIZEHITTSLICES.out.normalized_images)
+        EXTRACTHITTIMAGESTATS(NORMALIZEHITTSLICES.out.normalized_images)
 
         if (params.workflow_stage == "all") {
             upload_done_ch = S3UPLOADHITT(EUBIHITTCONVERSION.out.omezarr).collect()
@@ -268,7 +296,8 @@ workflow {
 
             MAKEHITTCOLLECTIONTABLE(
                 COLLECTHITTS3FILES.out.all_s3,
-                SELECTHITTIMAGES.out.all_datasets
+                SELECTHITTIMAGES.out.all_datasets,
+                EXTRACTHITTIMAGESTATS.out.image_stats.collect()
             )
         }
     }

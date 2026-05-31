@@ -4,6 +4,7 @@ library(getopt)
 spec <- matrix(c(
   "all_s3", "d", 1, "character",
   "all_datasets", "a", 1, "character",
+  "image_stats_dir", "x", 1, "character",
   "sheet_mode", "m", 1, "character",
   "google_key", "k", 1, "character",
   "collection_table_url", "u", 1, "character",
@@ -30,6 +31,11 @@ if (is.null(collection_table_sheet) || is.na(collection_table_sheet)) {
 local_collection_table <- opt$local_collection_table
 if (is.null(local_collection_table) || is.na(local_collection_table)) {
   local_collection_table <- "hitt_collection_table.tsv"
+}
+
+image_stats_dir <- opt$image_stats_dir
+if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
+  image_stats_dir <- "."
 }
 
 parse_mc_ls_path <- function(line) {
@@ -86,6 +92,27 @@ col_table <- col_table %>%
       ),
     by="name"
   )
+
+image_stats_files <- list.files(
+  image_stats_dir,
+  pattern="_image_stats\\.tsv$",
+  full.names=TRUE
+)
+
+if (length(image_stats_files) > 0) {
+  image_stats <- image_stats_files %>%
+    map_dfr(~read_tsv(.x, col_types=cols(.default=col_character()))) %>%
+    distinct(name, .keep_all=TRUE)
+
+  col_table <- col_table %>%
+    left_join(
+      image_stats %>%
+        select(name, min_gray, max_gray, contrast_limits),
+      by="name"
+    )
+} else {
+  warning("No *_image_stats.tsv files found; collection table was written without contrast limits.")
+}
 
 write_tsv(col_table, file=local_collection_table)
 
