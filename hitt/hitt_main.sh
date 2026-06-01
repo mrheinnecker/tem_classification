@@ -98,7 +98,7 @@ case "$mode" in
     main_dir="${HITT_SCREEN_DIR:-/scratch/rheinnec/hitt_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/hitt_screen/work}"
     profile="interactive"
-    default_workflow_stage="process"
+    default_workflow_stage="all"
     default_sheet_mode="google"
     default_dryrun="FALSE"
     if command -v module >/dev/null 2>&1; then
@@ -546,6 +546,7 @@ nextflow_args=(
   --remote_user "$remote_user"
   --remote_host "$remote_host"
   --remote_port "$remote_port"
+  --password "$password"
   -profile "$profile"
 )
 
