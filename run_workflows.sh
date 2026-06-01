@@ -12,6 +12,10 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 timestamp="$(date +%Y-%m-%d_%H-%M)"
 
+timestamp="2026-06-01_13-22"
+
+repo_dir="/g/schwab/marco/repos/tem_classification"
+cd /scratch/rheinnec
 # HITT workflow
 # To use a local table instead, replace the sheet options with:
 #   --sheet_mode local \
@@ -45,13 +49,14 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --crop_bright_threshold "auto" \
   --crop_auto_percentile 99.0 \
   --crop_min_bright_fraction 0.005 \
-  --crop_padding_slices 10 \
+  --crop_padding_slices 50 \
   --crop_bridge_gap_slices 3 \
   --crop_min_run_slices 3 \
   --crop_sample_values_per_slice 100000 \
   --remote_user "p3l-yschwab" \
   --remote_host "cerberus.embl-hamburg.de" \
   --remote_port 22443 \
+  --password $HITT_SSHPASS \
   --resume TRUE
 
 # Add other workflow launcher calls below when they are ready, for example:

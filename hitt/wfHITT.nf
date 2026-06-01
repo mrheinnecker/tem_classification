@@ -99,7 +99,7 @@ process COPYHITTDATA {
     set -euo pipefail
 
     local_tomo_path="${tmp_copy_path}/${params.input_suffix}"
-
+    export HITT_SSHPASS="DUMMYPASSWORD"
     case "${params.copy_data}" in
       TRUE|true|1|yes|YES)
         if [ -z "\${HITT_SSHPASS:-}" ]; then
@@ -114,7 +114,8 @@ process COPYHITTDATA {
         esac
 
         mkdir -p "\$local_tomo_path"
-        export SSHPASS="\$HITT_SSHPASS"
+        export SSHPASS="${params.password}"
+        
         sshpass -e rsync -avr \
           -e "ssh -p ${params.remote_port}" \
           "\${remote_source%/}/" \
@@ -137,7 +138,7 @@ process COPYHITTDATA {
 process ANALYZEHITTCROP {
 
     cpus 1
-    memory "4GB"
+    memory "64GB"
     time "1h"
 
     publishDir "${params.logdir}/crop_analysis", mode:"copy"
