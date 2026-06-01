@@ -69,6 +69,8 @@ bash hitt_main.sh interactive --convert_uint16 FALSE
 
 Per-image renaming and intensity-conversion TSV logs are written under the workflow logs.
 
+If TIFF slices at the outer start or end of a stack have a different XY shape, the staging step drops those slices before conversion. Each decision is recorded in `<image_name>_shape_crop.tsv`. A shape mismatch inside the retained stack still stops the workflow because automatically removing an internal slice would be unsafe.
+
 The workflow also calculates stack-wide `min_gray`, `max_gray`, and `contrast_limits` values from the staged TIFF slices. In `all` mode these display values are added to `hitt_collection_table`; individual TSV files are written under `logs/.../image_stats`.
 
 ## Run examples

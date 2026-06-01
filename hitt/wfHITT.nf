@@ -304,6 +304,7 @@ process NORMALIZEHITTSLICES {
     tuple val(filename), path("${filename}_normalized_tomo"), val(omezarr_path), val(req_mem), emit: normalized_images
     path "${filename}_slice_renaming.tsv"
     path "${filename}_uint16_metrics.tsv"
+    path "${filename}_shape_crop.tsv"
 
     script:
     """
@@ -313,6 +314,7 @@ process NORMALIZEHITTSLICES {
     normalized_path="${filename}_normalized_tomo"
     log_file="${filename}_slice_renaming.tsv"
     metrics_file="${filename}_uint16_metrics.tsv"
+    shape_crop_file="${filename}_shape_crop.tsv"
 
     if [ ! -d "\$input_path" ]; then
       echo "Expected tomo directory does not exist: \$input_path" >&2
@@ -324,6 +326,7 @@ process NORMALIZEHITTSLICES {
       --output-dir "\$normalized_path" \
       --rename-log "\$log_file" \
       --metrics "\$metrics_file" \
+      --shape-crop-log "\$shape_crop_file" \
       --crop-plan "${crop_plan}" \
       --convert-uint16 "${params.convert_uint16}" \
       --lower-percentile "${params.uint16_lower_percentile}" \

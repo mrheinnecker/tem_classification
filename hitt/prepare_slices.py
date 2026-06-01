@@ -58,27 +58,73 @@ def sample_stack(files, max_values):
     return np.concatenate(samples)
 
 
-def validate_slice_shapes(files):
-    shape_groups = {}
-    for path in files:
-        with tifffile.TiffFile(path) as tif:
-            shape = tuple(tif.series[0].shape)
-        shape_groups.setdefault(shape, []).append(path.name)
-
-    if len(shape_groups) <= 1:
-        return next(iter(shape_groups))
-
+def summarize_shape_groups(shape_groups):
     details = []
     for shape, names in sorted(shape_groups.items(), key=lambda item: (-len(item[1]), item[0])):
         preview = ", ".join(names[:5])
         if len(names) > 5:
             preview += f", ... ({len(names)} slices total)"
         details.append(f"  shape={shape}: {preview}")
-    raise ValueError(
-        "TIFF slices do not all have the same dimensions. "
-        "EuBI-Bridge cannot concatenate them along Z.\n"
-        + "\n".join(details)
-    )
+    return details
+
+
+def trim_outer_shape_mismatches(files):
+    shape_groups = {}
+    slice_shapes = []
+    for path in files:
+        with tifffile.TiffFile(path) as tif:
+            shape = tuple(tif.series[0].shape)
+        shape_groups.setdefault(shape, []).append(path.name)
+        slice_shapes.append(shape)
+
+    if len(shape_groups) <= 1:
+        return files, [], next(iter(shape_groups))
+
+    target_shape = max(shape_groups, key=lambda shape: len(shape_groups[shape]))
+    matching_indices = [
+        index for index, shape in enumerate(slice_shapes) if shape == target_shape
+    ]
+    first_keep = matching_indices[0]
+    last_keep = matching_indices[-1]
+
+    internal_mismatches = [
+        files[index].name
+        for index in range(first_keep, last_keep + 1)
+        if slice_shapes[index] != target_shape
+    ]
+    if internal_mismatches:
+        preview = ", ".join(internal_mismatches[:10])
+        if len(internal_mismatches) > 10:
+            preview += f", ... ({len(internal_mismatches)} internal mismatches total)"
+        raise ValueError(
+            "TIFF slices do not all have the same dimensions and mismatching slices "
+            "occur inside the stack, so automatic outer-slice trimming is unsafe.\n"
+            f"  dominant_shape={target_shape}\n"
+            f"  internal_mismatches={preview}\n"
+            + "\n".join(summarize_shape_groups(shape_groups))
+        )
+
+    kept_files = files[first_keep : last_keep + 1]
+    dropped_rows = []
+    for index, (path, shape) in enumerate(zip(files, slice_shapes)):
+        if index < first_keep:
+            position = "start"
+        elif index > last_keep:
+            position = "end"
+        else:
+            continue
+        dropped_rows.append(
+            {
+                "filename": path.name,
+                "action": "drop",
+                "reason": "outer_xy_shape_mismatch",
+                "position": position,
+                "shape": "x".join(map(str, shape)),
+                "retained_shape": "x".join(map(str, target_shape)),
+            }
+        )
+
+    return kept_files, dropped_rows, target_shape
 
 
 def write_metrics(path, rows):
@@ -96,6 +142,7 @@ def main():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--rename-log", required=True)
     parser.add_argument("--metrics", required=True)
+    parser.add_argument("--shape-crop-log", required=True)
     parser.add_argument("--crop-plan")
     parser.add_argument("--convert-uint16", default="TRUE")
     parser.add_argument("--lower-percentile", type=float, default=0.1)
@@ -116,7 +163,26 @@ def main():
     if args.lower_percentile >= args.upper_percentile:
         raise ValueError("Lower percentile must be smaller than upper percentile")
 
-    validate_slice_shapes(files)
+    original_slice_count = len(files)
+    files, shape_crop_rows, retained_shape = trim_outer_shape_mismatches(files)
+    if shape_crop_rows:
+        write_metrics(Path(args.shape_crop_log), shape_crop_rows)
+    else:
+        write_metrics(
+            Path(args.shape_crop_log),
+            [
+                {
+                    "filename": "",
+                    "action": "none",
+                    "reason": "all_slices_match",
+                    "position": "",
+                    "shape": "x".join(map(str, retained_shape)),
+                    "retained_shape": "x".join(map(str, retained_shape)),
+                }
+            ],
+        )
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     lower_limit = None
@@ -164,6 +230,9 @@ def main():
             {
                 "mode": "uint16" if convert_uint16 else "original_dtype",
                 "slice_count": len(files),
+                "slice_count_before_shape_trim": original_slice_count,
+                "outer_shape_mismatch_slices_dropped": len(shape_crop_rows),
+                "retained_shape": "x".join(map(str, retained_shape)),
                 "lower_percentile": args.lower_percentile if convert_uint16 else "",
                 "upper_percentile": args.upper_percentile if convert_uint16 else "",
                 "lower_limit": lower_limit if convert_uint16 else "",
