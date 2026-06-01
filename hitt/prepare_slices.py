@@ -58,6 +58,29 @@ def sample_stack(files, max_values):
     return np.concatenate(samples)
 
 
+def validate_slice_shapes(files):
+    shape_groups = {}
+    for path in files:
+        with tifffile.TiffFile(path) as tif:
+            shape = tuple(tif.series[0].shape)
+        shape_groups.setdefault(shape, []).append(path.name)
+
+    if len(shape_groups) <= 1:
+        return next(iter(shape_groups))
+
+    details = []
+    for shape, names in sorted(shape_groups.items(), key=lambda item: (-len(item[1]), item[0])):
+        preview = ", ".join(names[:5])
+        if len(names) > 5:
+            preview += f", ... ({len(names)} slices total)"
+        details.append(f"  shape={shape}: {preview}")
+    raise ValueError(
+        "TIFF slices do not all have the same dimensions. "
+        "EuBI-Bridge cannot concatenate them along Z.\n"
+        + "\n".join(details)
+    )
+
+
 def write_metrics(path, rows):
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), delimiter="\t")
@@ -93,6 +116,7 @@ def main():
     if args.lower_percentile >= args.upper_percentile:
         raise ValueError("Lower percentile must be smaller than upper percentile")
 
+    validate_slice_shapes(files)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     lower_limit = None
