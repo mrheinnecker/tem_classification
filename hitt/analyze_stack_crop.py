@@ -1,6 +1,8 @@
 import argparse
 import csv
 import re
+import struct
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -76,6 +78,42 @@ def write_tsv(path, rows):
         writer.writerows(rows)
 
 
+def save_qc_png(source, output):
+    image = np.squeeze(np.asarray(tifffile.imread(source)))
+    if image.ndim != 2:
+        raise ValueError(f"Expected a 2D TIFF slice for QC rendering: {source}")
+    finite = image[np.isfinite(image)]
+    if finite.size == 0:
+        raise ValueError(f"Cannot render QC PNG without finite values: {source}")
+    lower, upper = np.percentile(finite, [0.5, 99.5])
+    if not upper > lower:
+        lower = float(np.min(finite))
+        upper = float(np.max(finite))
+    if upper > lower:
+        image = np.clip((image.astype(np.float32) - lower) / (upper - lower), 0.0, 1.0)
+        image = np.rint(image * 255.0).astype(np.uint8)
+    else:
+        image = np.zeros(image.shape, dtype=np.uint8)
+
+    def png_chunk(chunk_type, data):
+        return (
+            struct.pack(">I", len(data))
+            + chunk_type
+            + data
+            + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+        )
+
+    height, width = image.shape
+    scanlines = b"".join(b"\x00" + row.tobytes() for row in image)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+        + png_chunk(b"IDAT", zlib.compress(scanlines))
+        + png_chunk(b"IEND", b"")
+    )
+    Path(output).write_bytes(png)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Detect a conservative sample-bearing Z range in a HITT TIFF stack."
@@ -83,6 +121,7 @@ def main():
     parser.add_argument("--input-dir", required=True)
     parser.add_argument("--output-plan", required=True)
     parser.add_argument("--metrics", required=True)
+    parser.add_argument("--qc-prefix")
     parser.add_argument("--enabled", default="TRUE")
     parser.add_argument("--bright-threshold", default="auto")
     parser.add_argument("--auto-percentile", type=float, default=99.0)
@@ -142,6 +181,17 @@ def main():
         crop_start = max(0, sample_start - args.padding_slices)
         crop_end = min(len(files) - 1, sample_end + args.padding_slices)
 
+    low_qc_filename = ""
+    high_qc_filename = ""
+    if args.qc_prefix and crop_start > 0:
+        low_qc = Path(f"{args.qc_prefix}_low_z_last_excluded.png")
+        save_qc_png(files[crop_start - 1], low_qc)
+        low_qc_filename = low_qc.name
+    if args.qc_prefix and crop_end < len(files) - 1:
+        high_qc = Path(f"{args.qc_prefix}_high_z_first_excluded.png")
+        save_qc_png(files[crop_end + 1], high_qc)
+        high_qc_filename = high_qc.name
+
     plan_rows = []
     for index, (path, sample, bright_fraction) in enumerate(
         zip(files, samples, bright_fractions), start=1
@@ -176,6 +226,8 @@ def main():
             "bridge_gap_slices": args.bridge_gap_slices,
             "min_run_slices": args.min_run_slices,
             "fallback_reason": fallback_reason,
+            "low_z_last_excluded_qc_png": low_qc_filename,
+            "high_z_first_excluded_qc_png": high_qc_filename,
         }
     ]
     write_tsv(args.output_plan, plan_rows)

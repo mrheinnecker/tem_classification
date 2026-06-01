@@ -149,6 +149,7 @@ process ANALYZEHITTCROP {
     output:
     tuple val(filename), val(tmp_copy_path), path("${filename}_crop_plan.tsv"), val(omezarr_path), val(req_mem), emit: crop_plans
     path "${filename}_crop_metrics.tsv"
+    path "${filename}_crop_boundary_*.png", optional:true
 
     script:
     """
@@ -165,6 +166,7 @@ process ANALYZEHITTCROP {
       --input-dir "\$input_path" \
       --output-plan "${filename}_crop_plan.tsv" \
       --metrics "${filename}_crop_metrics.tsv" \
+      --qc-prefix "${filename}_crop_boundary" \
       --enabled "${params.crop_stack}" \
       --bright-threshold "${params.crop_bright_threshold}" \
       --auto-percentile "${params.crop_auto_percentile}" \

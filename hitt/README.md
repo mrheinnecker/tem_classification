@@ -40,7 +40,7 @@ Use `--copy_data FALSE` to process data that is already present in scratch witho
 
 After copying, the workflow samples every TIFF slice and detects a conservative sample-bearing Z range before conversion. By default, a bright-voxel threshold is calculated from the stack-wide `99.0` percentile. A slice is considered sample-bearing when at least `0.5%` of its sampled pixels meet that threshold. Short gaps are bridged, the largest detected run is selected, and ten padding slices are retained on each side.
 
-The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions and a crop summary are written under `logs/.../crop_analysis`. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
+The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and up to two boundary QC PNGs are written under `logs/.../crop_analysis`. The PNGs show the last excluded slice on the low-Z side and the first excluded slice on the high-Z side. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
 
 Useful crop overrides:
 
