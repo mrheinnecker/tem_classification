@@ -224,6 +224,7 @@ process EUBIHITTCONVERSION {
       --concatenation_axes z \
       --z_tag "Z" \
       --save_omexml True \
+      --autochunk True \
       --n_layers 11 \
       --zar_format "${params.zarr_format}" \
       --max_workers 1
