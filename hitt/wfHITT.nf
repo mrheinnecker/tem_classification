@@ -25,6 +25,14 @@ params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
 params.uint16_sample_values = params.uint16_sample_values ?: 2000000
 params.copy_data = params.copy_data ?: "TRUE"
 params.copy_dest_root = params.copy_dest_root ?: "/scratch/rheinnec/tmp_hitt"
+params.crop_stack = params.crop_stack ?: "TRUE"
+params.crop_bright_threshold = params.crop_bright_threshold ?: "auto"
+params.crop_auto_percentile = params.crop_auto_percentile ?: 99.0
+params.crop_min_bright_fraction = params.crop_min_bright_fraction ?: 0.005
+params.crop_padding_slices = params.crop_padding_slices ?: 10
+params.crop_bridge_gap_slices = params.crop_bridge_gap_slices ?: 3
+params.crop_min_run_slices = params.crop_min_run_slices ?: 3
+params.crop_sample_values_per_slice = params.crop_sample_values_per_slice ?: 100000
 params.remote_user = params.remote_user ?: "p3l-yschwab"
 params.remote_host = params.remote_host ?: "cerberus.embl-hamburg.de"
 params.remote_port = params.remote_port ?: 22443
@@ -126,6 +134,49 @@ process COPYHITTDATA {
 }
 
 
+process ANALYZEHITTCROP {
+
+    cpus 1
+    memory "4GB"
+    time "1h"
+
+    publishDir "${params.logdir}/crop_analysis", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem)
+
+    output:
+    tuple val(filename), val(tmp_copy_path), path("${filename}_crop_plan.tsv"), val(omezarr_path), val(req_mem), emit: crop_plans
+    path "${filename}_crop_metrics.tsv"
+
+    script:
+    """
+    set -euo pipefail
+
+    input_path="${tmp_copy_path}/${params.input_suffix}"
+
+    if [ ! -d "\$input_path" ]; then
+      echo "Expected tomo directory does not exist: \$input_path" >&2
+      exit 1
+    fi
+
+    python3 "${params.script_dir}/analyze_stack_crop.py" \
+      --input-dir "\$input_path" \
+      --output-plan "${filename}_crop_plan.tsv" \
+      --metrics "${filename}_crop_metrics.tsv" \
+      --enabled "${params.crop_stack}" \
+      --bright-threshold "${params.crop_bright_threshold}" \
+      --auto-percentile "${params.crop_auto_percentile}" \
+      --min-bright-fraction "${params.crop_min_bright_fraction}" \
+      --padding-slices "${params.crop_padding_slices}" \
+      --bridge-gap-slices "${params.crop_bridge_gap_slices}" \
+      --min-run-slices "${params.crop_min_run_slices}" \
+      --sample-values-per-slice "${params.crop_sample_values_per_slice}"
+    """
+}
+
+
 process EUBIHITTCONVERSION {
 
     cpus 1
@@ -189,7 +240,7 @@ process NORMALIZEHITTSLICES {
     containerOptions "--bind /g --bind /scratch --bind /home"
 
     input:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem)
+    tuple val(filename), val(tmp_copy_path), path(crop_plan), val(omezarr_path), val(req_mem)
 
     output:
     tuple val(filename), path("${filename}_normalized_tomo"), val(omezarr_path), val(req_mem), emit: normalized_images
@@ -215,6 +266,7 @@ process NORMALIZEHITTSLICES {
       --output-dir "\$normalized_path" \
       --rename-log "\$log_file" \
       --metrics "\$metrics_file" \
+      --crop-plan "${crop_plan}" \
       --convert-uint16 "${params.convert_uint16}" \
       --lower-percentile "${params.uint16_lower_percentile}" \
       --upper-percentile "${params.uint16_upper_percentile}" \
@@ -357,7 +409,9 @@ workflow {
 
         COPYHITTDATA(hitt_copy_batch_ch)
 
-        NORMALIZEHITTSLICES(COPYHITTDATA.out.copied_images)
+        ANALYZEHITTCROP(COPYHITTDATA.out.copied_images)
+
+        NORMALIZEHITTSLICES(ANALYZEHITTCROP.out.crop_plans)
 
         EUBIHITTCONVERSION(NORMALIZEHITTSLICES.out.normalized_images)
         EXTRACTHITTIMAGESTATS(NORMALIZEHITTSLICES.out.normalized_images)

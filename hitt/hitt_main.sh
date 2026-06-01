@@ -40,6 +40,14 @@ Options:
   --uint16_sample_values N         Approximate sampled pixels per stack, default 2000000.
   --copy_data TRUE|FALSE           Copy remote tomo stacks into scratch before processing.
   --copy_dest_root PATH            Local scratch destination, default /scratch/rheinnec/tmp_hitt.
+  --crop_stack TRUE|FALSE          Detect and keep a conservative sample-bearing Z range.
+  --crop_bright_threshold VALUE    Bright voxel threshold or auto, default auto.
+  --crop_auto_percentile VALUE     Stack percentile used as auto threshold, default 99.
+  --crop_min_bright_fraction VALUE Minimum bright sampled-pixel fraction per slice, default 0.005.
+  --crop_padding_slices N          Extra slices retained on each side, default 10.
+  --crop_bridge_gap_slices N       Fill short detection gaps up to this size, default 3.
+  --crop_min_run_slices N          Minimum detected run size, default 3.
+  --crop_sample_values_per_slice N Approximate sampled pixels per slice, default 100000.
   --remote_user VALUE              SSH username, default p3l-yschwab.
   --remote_host VALUE              SSH host, default cerberus.embl-hamburg.de.
   --remote_port VALUE              SSH port, default 22443.
@@ -141,6 +149,14 @@ uint16_upper_percentile="${UINT16_UPPER_PERCENTILE:-99.9}"
 uint16_sample_values="${UINT16_SAMPLE_VALUES:-2000000}"
 copy_data="$(to_upper_bool "${COPY_DATA:-TRUE}")"
 copy_dest_root="${COPY_DEST_ROOT:-/scratch/rheinnec/tmp_hitt}"
+crop_stack="$(to_upper_bool "${CROP_STACK:-TRUE}")"
+crop_bright_threshold="${CROP_BRIGHT_THRESHOLD:-auto}"
+crop_auto_percentile="${CROP_AUTO_PERCENTILE:-99.0}"
+crop_min_bright_fraction="${CROP_MIN_BRIGHT_FRACTION:-0.005}"
+crop_padding_slices="${CROP_PADDING_SLICES:-10}"
+crop_bridge_gap_slices="${CROP_BRIDGE_GAP_SLICES:-3}"
+crop_min_run_slices="${CROP_MIN_RUN_SLICES:-3}"
+crop_sample_values_per_slice="${CROP_SAMPLE_VALUES_PER_SLICE:-100000}"
 remote_user="${REMOTE_USER:-p3l-yschwab}"
 remote_host="${REMOTE_HOST:-cerberus.embl-hamburg.de}"
 remote_port="${REMOTE_PORT:-22443}"
@@ -378,6 +394,70 @@ while [[ $# -gt 0 ]]; do
       copy_dest_root="${1#*=}"
       shift
       ;;
+    --crop_stack|--crop-stack)
+      crop_stack="$(to_upper_bool "${2:?--crop_stack requires TRUE or FALSE}")"
+      shift 2
+      ;;
+    --crop_stack=*|--crop-stack=*)
+      crop_stack="$(to_upper_bool "${1#*=}")"
+      shift
+      ;;
+    --crop_bright_threshold|--crop-bright-threshold)
+      crop_bright_threshold="${2:?--crop_bright_threshold requires a value}"
+      shift 2
+      ;;
+    --crop_bright_threshold=*|--crop-bright-threshold=*)
+      crop_bright_threshold="${1#*=}"
+      shift
+      ;;
+    --crop_auto_percentile|--crop-auto-percentile)
+      crop_auto_percentile="${2:?--crop_auto_percentile requires a value}"
+      shift 2
+      ;;
+    --crop_auto_percentile=*|--crop-auto-percentile=*)
+      crop_auto_percentile="${1#*=}"
+      shift
+      ;;
+    --crop_min_bright_fraction|--crop-min-bright-fraction)
+      crop_min_bright_fraction="${2:?--crop_min_bright_fraction requires a value}"
+      shift 2
+      ;;
+    --crop_min_bright_fraction=*|--crop-min-bright-fraction=*)
+      crop_min_bright_fraction="${1#*=}"
+      shift
+      ;;
+    --crop_padding_slices|--crop-padding-slices)
+      crop_padding_slices="${2:?--crop_padding_slices requires a value}"
+      shift 2
+      ;;
+    --crop_padding_slices=*|--crop-padding-slices=*)
+      crop_padding_slices="${1#*=}"
+      shift
+      ;;
+    --crop_bridge_gap_slices|--crop-bridge-gap-slices)
+      crop_bridge_gap_slices="${2:?--crop_bridge_gap_slices requires a value}"
+      shift 2
+      ;;
+    --crop_bridge_gap_slices=*|--crop-bridge-gap-slices=*)
+      crop_bridge_gap_slices="${1#*=}"
+      shift
+      ;;
+    --crop_min_run_slices|--crop-min-run-slices)
+      crop_min_run_slices="${2:?--crop_min_run_slices requires a value}"
+      shift 2
+      ;;
+    --crop_min_run_slices=*|--crop-min-run-slices=*)
+      crop_min_run_slices="${1#*=}"
+      shift
+      ;;
+    --crop_sample_values_per_slice|--crop-sample-values-per-slice)
+      crop_sample_values_per_slice="${2:?--crop_sample_values_per_slice requires a value}"
+      shift 2
+      ;;
+    --crop_sample_values_per_slice=*|--crop-sample-values-per-slice=*)
+      crop_sample_values_per_slice="${1#*=}"
+      shift
+      ;;
     --remote_user|--remote-user)
       remote_user="${2:?--remote_user requires a value}"
       shift 2
@@ -455,6 +535,14 @@ nextflow_args=(
   --uint16_sample_values "$uint16_sample_values"
   --copy_data "$copy_data"
   --copy_dest_root "$copy_dest_root"
+  --crop_stack "$crop_stack"
+  --crop_bright_threshold "$crop_bright_threshold"
+  --crop_auto_percentile "$crop_auto_percentile"
+  --crop_min_bright_fraction "$crop_min_bright_fraction"
+  --crop_padding_slices "$crop_padding_slices"
+  --crop_bridge_gap_slices "$crop_bridge_gap_slices"
+  --crop_min_run_slices "$crop_min_run_slices"
+  --crop_sample_values_per_slice "$crop_sample_values_per_slice"
   --remote_user "$remote_user"
   --remote_host "$remote_host"
   --remote_port "$remote_port"

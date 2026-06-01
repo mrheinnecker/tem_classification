@@ -41,6 +41,14 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --uint16_sample_values 2000000 \
   --copy_data TRUE \
   --copy_dest_root "/scratch/rheinnec/tmp_hitt" \
+  --crop_stack TRUE \
+  --crop_bright_threshold "auto" \
+  --crop_auto_percentile 99.0 \
+  --crop_min_bright_fraction 0.005 \
+  --crop_padding_slices 10 \
+  --crop_bridge_gap_slices 3 \
+  --crop_min_run_slices 3 \
+  --crop_sample_values_per_slice 100000 \
   --remote_user "p3l-yschwab" \
   --remote_host "cerberus.embl-hamburg.de" \
   --remote_port 22443 \

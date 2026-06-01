@@ -38,6 +38,23 @@ For each row, `rsync` copies the stack incrementally into:
 
 Use `--copy_data FALSE` to process data that is already present in scratch without contacting the remote server.
 
+After copying, the workflow samples every TIFF slice and detects a conservative sample-bearing Z range before conversion. By default, a bright-voxel threshold is calculated from the stack-wide `99.0` percentile. A slice is considered sample-bearing when at least `0.5%` of its sampled pixels meet that threshold. Short gaps are bridged, the largest detected run is selected, and ten padding slices are retained on each side.
+
+The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions and a crop summary are written under `logs/.../crop_analysis`. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
+
+Useful crop overrides:
+
+```bash
+bash hitt_main.sh interactive \
+  --crop_stack TRUE \
+  --crop_bright_threshold auto \
+  --crop_auto_percentile 99.0 \
+  --crop_min_bright_fraction 0.005 \
+  --crop_padding_slices 10
+```
+
+Use a numeric `--crop_bright_threshold` when a stable reconstructed gray-value cutoff is known. Use `--crop_stack FALSE` to retain the complete Z-stack while still writing crop-analysis logs.
+
 Before conversion, the workflow stages a renamed copy of `slice_*.tif` / `slice_*.tiff` files in the Nextflow work directory so the stack starts at `Z0001.tif` and increments by one. The scratch `tomo` directory is left untouched. Previously normalized `Z*.tif` stacks are also accepted for development recovery.
 
 By default, staged images are converted from `float32` to `uint16` using stack-wide `0.1` and `99.9` percentiles. Disable this when original reconstructed values are needed:
@@ -82,8 +99,8 @@ bash hitt_main.sh interactive \
 `workflow_stage` supports:
 
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
-- `process`: copy remote stacks, renumber staged slice files, and convert listed images to OME-Zarr.
-- `all`: copy remote stacks, renumber staged slice files, convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
+- `process`: copy remote stacks, detect a conservative Z crop, renumber staged slice files, and convert listed images to OME-Zarr.
+- `all`: copy remote stacks, detect a conservative Z crop, renumber staged slice files, convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
 
 Uploads copy the contents of each local `omezarr` directory into an S3 prefix named after the original image folder, for example:
 

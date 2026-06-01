@@ -29,6 +29,22 @@ def find_slices(input_dir):
     return sorted(files, key=lambda path: int(re.search(r"\d+", path.stem).group()))
 
 
+def apply_crop_plan(files, crop_plan):
+    if crop_plan is None:
+        return files
+
+    with crop_plan.open(newline="", encoding="utf-8") as handle:
+        keep_names = {
+            row["filename"]
+            for row in csv.DictReader(handle, delimiter="\t")
+            if parse_bool(row["keep"])
+        }
+    selected = [path for path in files if path.name in keep_names]
+    if not selected:
+        raise RuntimeError(f"Crop plan does not select any TIFF slices: {crop_plan}")
+    return selected
+
+
 def sample_stack(files, max_values):
     samples = []
     per_slice = max(1, max_values // len(files))
@@ -57,6 +73,7 @@ def main():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--rename-log", required=True)
     parser.add_argument("--metrics", required=True)
+    parser.add_argument("--crop-plan")
     parser.add_argument("--convert-uint16", default="TRUE")
     parser.add_argument("--lower-percentile", type=float, default=0.1)
     parser.add_argument("--upper-percentile", type=float, default=99.9)
@@ -65,7 +82,10 @@ def main():
 
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
-    files = find_slices(input_dir)
+    files = apply_crop_plan(
+        find_slices(input_dir),
+        Path(args.crop_plan) if args.crop_plan else None,
+    )
     convert_uint16 = parse_bool(args.convert_uint16)
 
     if not files:
