@@ -2,6 +2,10 @@
 
 This workflow copies remote HITT image stacks into scratch, converts them into OME-Zarr, and optionally uploads the outputs to S3.
 
+Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>/Z_zset.zarr/` output contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
+
+For a non-dry-run `all` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset when the S3 client or connection is unavailable. Discovery, process-only, and dry-run modes can continue with an empty S3 listing.
+
 The input table should contain a `source_path` column with the remote dataset path or remote `tomo` directory. For compatibility, `remote_path` and `tmp_copy_path` are also accepted as column names. By default, interactive and cluster runs read this Google Sheet:
 
 ```text

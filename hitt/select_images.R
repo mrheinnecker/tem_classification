@@ -9,7 +9,8 @@ spec <- matrix(c(
   "google_key", "k", 1, "character",
   "copy_dest_root", "c", 1, "character",
   "dryrun", "d", 1, "character",
-  "dryrun_n", "n", 1, "integer"
+  "dryrun_n", "n", 1, "integer",
+  "existing_s3", "e", 1, "character"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
@@ -37,6 +38,34 @@ if (is.null(dryrun_n) || is.na(dryrun_n)) {
 copy_dest_root <- opt$copy_dest_root
 if (is.null(copy_dest_root) || is.na(copy_dest_root)) {
   copy_dest_root <- "/scratch/rheinnec/tmp_hitt"
+}
+
+existing_s3 <- opt$existing_s3
+if (is.null(existing_s3) || is.na(existing_s3)) {
+  existing_s3 <- NULL
+}
+
+parse_mc_ls_path <- function(line) {
+  parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
+  ifelse(
+    is.na(parsed),
+    str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2],
+    parsed
+  )
+}
+
+existing_s3_names <- character()
+if (!is.null(existing_s3) && file.exists(existing_s3)) {
+  existing_s3_paths <- read_lines(existing_s3) %>%
+    parse_mc_ls_path() %>%
+    str_remove("/$") %>%
+    discard(is.na)
+
+  existing_s3_names <- existing_s3_paths %>%
+    str_match("^([^/]+)/Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup)$") %>%
+    .[, 2] %>%
+    discard(is.na) %>%
+    unique()
 }
 
 sanitize_name <- function(x) {
@@ -119,12 +148,15 @@ all_images <- images %>%
     tmp_copy_path=file.path(copy_dest_root, filename),
     tomo_path=file.path(tmp_copy_path, "recon_111_1", "tomo"),
     omezarr_path=file.path(tmp_copy_path, filename),
-    req_mem=32
+    req_mem=32,
+    s3_omezarr_present=filename %in% existing_s3_names,
+    needs_processing=!s3_omezarr_present
   ) %>%
   distinct(remote_tomo_path, .keep_all=TRUE) %>%
   select(filename, shortname, source_path, remote_tomo_path, tmp_copy_path, tomo_path, omezarr_path, req_mem, everything())
 
-to_run <- all_images
+to_run <- all_images %>%
+  filter(needs_processing)
 if (as.logical(dryrun)) {
   to_run <- head(to_run, dryrun_n)
 }

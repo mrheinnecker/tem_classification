@@ -38,6 +38,58 @@ params.remote_host = params.remote_host ?: "cerberus.embl-hamburg.de"
 params.remote_port = params.remote_port ?: 22443
 
 
+process CHECKEXISTINGHITTS3FILES {
+
+    cpus 1
+    memory "1GB"
+    time "10m"
+
+    publishDir "${params.logdir}", mode:"copy"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+
+    input:
+    val s3_bucket
+    val workflow_stage
+    val dryrun
+
+    output:
+    path "existing_s3_entries.txt", emit: existing_s3
+
+    script:
+    """
+    set -euo pipefail
+
+    require_s3="FALSE"
+    dryrun_is_false="FALSE"
+    case "${dryrun}" in
+      FALSE|false|0|no|NO)
+        dryrun_is_false="TRUE"
+        ;;
+    esac
+
+    if [ "${workflow_stage}" = "all" ] && [ "\$dryrun_is_false" = "TRUE" ]; then
+      require_s3="TRUE"
+    fi
+
+    if command -v mc >/dev/null 2>&1; then
+      if ! mc ls --recursive "${s3_bucket}" > "existing_s3_entries.txt"; then
+        if [ "\$require_s3" = "TRUE" ]; then
+          echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
+          exit 1
+        fi
+        : > "existing_s3_entries.txt"
+      fi
+    else
+      if [ "\$require_s3" = "TRUE" ]; then
+        echo "mc command is not available; refusing to continue because this run depends on S3 skip detection." >&2
+        exit 1
+      fi
+      : > "existing_s3_entries.txt"
+    fi
+    """
+}
+
+
 process SELECTHITTIMAGES {
 
     cpus 1
@@ -56,6 +108,7 @@ process SELECTHITTIMAGES {
     val copy_dest_root
     val dryrun
     val dryrun_n
+    path existing_s3
 
     output:
     path "images_to_process.csv", emit: to_process
@@ -71,7 +124,8 @@ process SELECTHITTIMAGES {
       --google_key "${google_key}" \
       --copy_dest_root "${copy_dest_root}" \
       --dryrun "${dryrun}" \
-      --dryrun_n "${dryrun_n}"
+      --dryrun_n "${dryrun_n}" \
+      --existing_s3 "${existing_s3}"
     """
 }
 
@@ -393,6 +447,12 @@ process MAKEHITTCOLLECTIONTABLE {
 
 workflow {
 
+    CHECKEXISTINGHITTS3FILES(
+        params.s3_bucket,
+        params.workflow_stage,
+        params.dryrun
+    )
+
     SELECTHITTIMAGES(
         params.input_table,
         params.sheet_mode,
@@ -401,7 +461,8 @@ workflow {
         params.google_key,
         params.copy_dest_root,
         params.dryrun,
-        params.dryrun_n
+        params.dryrun_n,
+        CHECKEXISTINGHITTS3FILES.out.existing_s3
     )
 
     if (params.workflow_stage != "discover") {
