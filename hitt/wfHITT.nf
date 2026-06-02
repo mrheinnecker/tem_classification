@@ -25,6 +25,7 @@ params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
 params.uint16_sample_values = params.uint16_sample_values ?: 2000000
 params.copy_data = params.copy_data ?: "TRUE"
 params.copy_dest_root = params.copy_dest_root ?: "/scratch/rheinnec/tmp_hitt"
+params.copy_max_forks = params.copy_max_forks ?: 10
 params.crop_stack = params.crop_stack ?: "TRUE"
 params.crop_bright_threshold = params.crop_bright_threshold ?: "auto"
 params.crop_auto_percentile = params.crop_auto_percentile ?: 99.0
@@ -149,6 +150,7 @@ process COPYHITTDATA {
     cpus 1
     memory "1GB"
     time "4h"
+    maxForks params.copy_max_forks as Integer
 
     publishDir "${params.logdir}/copy", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
