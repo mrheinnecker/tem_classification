@@ -40,6 +40,7 @@ Options:
   --uint16_sample_values N         Approximate sampled pixels per stack, default 2000000.
   --copy_data TRUE|FALSE           Copy remote tomo stacks into scratch before processing.
   --copy_dest_root PATH            Local scratch destination, default /scratch/rheinnec/tmp_hitt.
+  --copy_max_forks N               Maximum concurrent remote copy jobs, default 10.
   --crop_stack TRUE|FALSE          Detect and keep a conservative sample-bearing Z range.
   --crop_bright_threshold VALUE    Bright voxel threshold or auto, default auto.
   --crop_auto_percentile VALUE     Stack percentile used as auto threshold, default 99.
@@ -151,6 +152,7 @@ uint16_upper_percentile="${UINT16_UPPER_PERCENTILE:-99.9}"
 uint16_sample_values="${UINT16_SAMPLE_VALUES:-2000000}"
 copy_data="$(to_upper_bool "${COPY_DATA:-TRUE}")"
 copy_dest_root="${COPY_DEST_ROOT:-/scratch/rheinnec/tmp_hitt}"
+copy_max_forks="${COPY_MAX_FORKS:-10}"
 crop_stack="$(to_upper_bool "${CROP_STACK:-TRUE}")"
 crop_bright_threshold="${CROP_BRIGHT_THRESHOLD:-auto}"
 crop_auto_percentile="${CROP_AUTO_PERCENTILE:-99.0}"
@@ -398,6 +400,14 @@ while [[ $# -gt 0 ]]; do
       copy_dest_root="${1#*=}"
       shift
       ;;
+    --copy_max_forks|--copy-max-forks)
+      copy_max_forks="${2:?--copy_max_forks requires a value}"
+      shift 2
+      ;;
+    --copy_max_forks=*|--copy-max-forks=*)
+      copy_max_forks="${1#*=}"
+      shift
+      ;;
     --crop_stack|--crop-stack)
       crop_stack="$(to_upper_bool "${2:?--crop_stack requires TRUE or FALSE}")"
       shift 2
@@ -559,6 +569,7 @@ nextflow_args=(
   --uint16_sample_values "$uint16_sample_values"
   --copy_data "$copy_data"
   --copy_dest_root "$copy_dest_root"
+  --copy_max_forks "$copy_max_forks"
   --crop_stack "$crop_stack"
   --crop_bright_threshold "$crop_bright_threshold"
   --crop_auto_percentile "$crop_auto_percentile"

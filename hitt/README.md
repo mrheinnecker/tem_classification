@@ -44,6 +44,12 @@ For each row, `rsync` copies the stack incrementally into:
 
 Use `--copy_data FALSE` to process data that is already present in scratch without contacting the remote server.
 
+Remote copying is limited to ten concurrent `COPYHITTDATA` tasks by default to avoid overloading the external server. Adjust only this process limit with:
+
+```bash
+bash hitt_main.sh cluster --copy_max_forks 10
+```
+
 After copying, the workflow samples every TIFF slice and detects a conservative sample-bearing Z range before conversion. By default, a bright-voxel threshold is calculated from the stack-wide `99.0` percentile. A slice is considered sample-bearing when at least `0.5%` of its sampled pixels meet that threshold. Short gaps are bridged, the largest detected run is selected, and ten padding slices are retained on each side.
 
 The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and a combined boundary QC PNG are written under `logs/.../crop_analysis`. The PNG shows the last excluded slice on the low-Z side on the left and the first excluded slice on the high-Z side on the right. If only one boundary has excluded slices, the PNG contains that available boundary image. If no reliable sample-bearing run is detected, the workflow keeps the full stack.

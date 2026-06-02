@@ -51,6 +51,7 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --uint16_sample_values 2000000 \
   --copy_data TRUE \
   --copy_dest_root "/scratch/rheinnec/tmp_hitt" \
+  --copy_max_forks 10 \
   --crop_stack TRUE \
   --crop_bright_threshold "auto" \
   --crop_auto_percentile 98.0 \
