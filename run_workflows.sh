@@ -49,7 +49,8 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --crop_bright_threshold "auto" \
   --crop_auto_percentile 98.0 \
   --crop_min_bright_fraction 0.0025 \
-  --crop_padding_slices 30 \
+  --crop_padding_low_slices 30 \
+  --crop_padding_high_slices 30 \
   --crop_bridge_gap_slices 3 \
   --crop_min_run_slices 3 \
   --crop_sample_values_per_slice 100000 \

@@ -10,7 +10,13 @@ spec <- matrix(c(
   "copy_dest_root", "c", 1, "character",
   "dryrun", "d", 1, "character",
   "dryrun_n", "n", 1, "integer",
-  "existing_s3", "e", 1, "character"
+  "existing_s3", "e", 1, "character",
+  "default_crop_stack", NA, 1, "character",
+  "default_crop_bright_threshold", NA, 1, "character",
+  "default_crop_auto_percentile", NA, 1, "character",
+  "default_crop_min_bright_fraction", NA, 1, "character",
+  "default_crop_padding_low_slices", NA, 1, "character",
+  "default_crop_padding_high_slices", NA, 1, "character"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
@@ -131,6 +137,25 @@ images <- if (sheet_mode == "google") {
 images <- images %>%
   mutate(across(everything(), ~na_if(.x, "")))
 
+value_or_default <- function(value, default) {
+  if (is.null(value) || is.na(value) || value == "") default else value
+}
+
+crop_defaults <- list(
+  crop_stack=value_or_default(opt$default_crop_stack, "TRUE"),
+  crop_bright_threshold=value_or_default(opt$default_crop_bright_threshold, "auto"),
+  crop_auto_percentile=value_or_default(opt$default_crop_auto_percentile, "99.0"),
+  crop_min_bright_fraction=value_or_default(opt$default_crop_min_bright_fraction, "0.005"),
+  crop_padding_low_slices=value_or_default(opt$default_crop_padding_low_slices, "10"),
+  crop_padding_high_slices=value_or_default(opt$default_crop_padding_high_slices, "10")
+)
+
+for (column in c(names(crop_defaults), "crop_padding_slices")) {
+  if (!column %in% names(images)) {
+    images[[column]] <- NA_character_
+  }
+}
+
 path_column <- intersect(c("source_path", "remote_path", "tmp_copy_path"), names(images))
 if (length(path_column) == 0) {
   stop("Input table must contain a source_path, remote_path, or tmp_copy_path column")
@@ -149,6 +174,12 @@ all_images <- images %>%
     tomo_path=file.path(tmp_copy_path, "recon_111_1", "tomo"),
     omezarr_path=file.path(tmp_copy_path, filename),
     req_mem=32,
+    crop_stack=coalesce(crop_stack, crop_defaults$crop_stack),
+    crop_bright_threshold=coalesce(crop_bright_threshold, crop_defaults$crop_bright_threshold),
+    crop_auto_percentile=coalesce(crop_auto_percentile, crop_defaults$crop_auto_percentile),
+    crop_min_bright_fraction=coalesce(crop_min_bright_fraction, crop_defaults$crop_min_bright_fraction),
+    crop_padding_low_slices=coalesce(crop_padding_low_slices, crop_padding_slices, crop_defaults$crop_padding_low_slices),
+    crop_padding_high_slices=coalesce(crop_padding_high_slices, crop_padding_slices, crop_defaults$crop_padding_high_slices),
     s3_omezarr_present=filename %in% existing_s3_names,
     needs_processing=!s3_omezarr_present
   ) %>%

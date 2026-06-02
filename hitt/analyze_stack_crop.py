@@ -78,7 +78,7 @@ def write_tsv(path, rows):
         writer.writerows(rows)
 
 
-def save_qc_png(source, output):
+def render_qc_image(source):
     image = np.squeeze(np.asarray(tifffile.imread(source)))
     if image.ndim != 2:
         raise ValueError(f"Expected a 2D TIFF slice for QC rendering: {source}")
@@ -94,7 +94,10 @@ def save_qc_png(source, output):
         image = np.rint(image * 255.0).astype(np.uint8)
     else:
         image = np.zeros(image.shape, dtype=np.uint8)
+    return image
 
+
+def save_qc_png(image, output):
     def png_chunk(chunk_type, data):
         return (
             struct.pack(">I", len(data))
@@ -114,6 +117,34 @@ def save_qc_png(source, output):
     Path(output).write_bytes(png)
 
 
+def save_combined_qc_png(low_source, high_source, output):
+    images = [
+        render_qc_image(source)
+        for source in (low_source, high_source)
+        if source is not None
+    ]
+    if not images:
+        return False
+
+    if len(images) == 1:
+        combined = images[0]
+    else:
+        separator_width = 10
+        height = max(image.shape[0] for image in images)
+        width = sum(image.shape[1] for image in images) + separator_width
+        combined = np.zeros((height, width), dtype=np.uint8)
+        combined[:, images[0].shape[1] : images[0].shape[1] + separator_width] = 255
+
+        x_offset = 0
+        for image in images:
+            y_offset = (height - image.shape[0]) // 2
+            combined[y_offset : y_offset + image.shape[0], x_offset : x_offset + image.shape[1]] = image
+            x_offset += image.shape[1] + separator_width
+
+    save_qc_png(combined, output)
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Detect a conservative sample-bearing Z range in a HITT TIFF stack."
@@ -126,7 +157,9 @@ def main():
     parser.add_argument("--bright-threshold", default="auto")
     parser.add_argument("--auto-percentile", type=float, default=99.0)
     parser.add_argument("--min-bright-fraction", type=float, default=0.005)
-    parser.add_argument("--padding-slices", type=int, default=10)
+    parser.add_argument("--padding-slices", type=int)
+    parser.add_argument("--padding-low-slices", type=int)
+    parser.add_argument("--padding-high-slices", type=int)
     parser.add_argument("--bridge-gap-slices", type=int, default=3)
     parser.add_argument("--min-run-slices", type=int, default=3)
     parser.add_argument("--sample-values-per-slice", type=int, default=100_000)
@@ -141,6 +174,18 @@ def main():
         raise ValueError("--min-bright-fraction must be between 0 and 1")
     if args.sample_values_per_slice < 1:
         raise ValueError("--sample-values-per-slice must be positive")
+    padding_low_slices = (
+        args.padding_low_slices
+        if args.padding_low_slices is not None
+        else args.padding_slices if args.padding_slices is not None else 10
+    )
+    padding_high_slices = (
+        args.padding_high_slices
+        if args.padding_high_slices is not None
+        else args.padding_slices if args.padding_slices is not None else 10
+    )
+    if padding_low_slices < 0 or padding_high_slices < 0:
+        raise ValueError("Padding slices must not be negative")
 
     samples = [sample_image(path, args.sample_values_per_slice) for path in files]
     if any(sample.size == 0 for sample in samples):
@@ -178,19 +223,16 @@ def main():
         fallback_reason = "no_sample_run_detected"
     else:
         sample_start, sample_end = max(runs, key=lambda run: run[1] - run[0] + 1)
-        crop_start = max(0, sample_start - args.padding_slices)
-        crop_end = min(len(files) - 1, sample_end + args.padding_slices)
+        crop_start = max(0, sample_start - padding_low_slices)
+        crop_end = min(len(files) - 1, sample_end + padding_high_slices)
 
-    low_qc_filename = ""
-    high_qc_filename = ""
-    if args.qc_prefix and crop_start > 0:
-        low_qc = Path(f"{args.qc_prefix}_low_z_last_excluded.png")
-        save_qc_png(files[crop_start - 1], low_qc)
-        low_qc_filename = low_qc.name
-    if args.qc_prefix and crop_end < len(files) - 1:
-        high_qc = Path(f"{args.qc_prefix}_high_z_first_excluded.png")
-        save_qc_png(files[crop_end + 1], high_qc)
-        high_qc_filename = high_qc.name
+    low_qc_source = files[crop_start - 1] if crop_start > 0 else None
+    high_qc_source = files[crop_end + 1] if crop_end < len(files) - 1 else None
+    boundary_qc_filename = ""
+    if args.qc_prefix:
+        boundary_qc = Path(f"{args.qc_prefix}_excluded_edges.png")
+        if save_combined_qc_png(low_qc_source, high_qc_source, boundary_qc):
+            boundary_qc_filename = boundary_qc.name
 
     plan_rows = []
     for index, (path, sample, bright_fraction) in enumerate(
@@ -222,12 +264,14 @@ def main():
             "threshold_sample_count": threshold_sample.size,
             "auto_percentile": args.auto_percentile,
             "min_bright_fraction": args.min_bright_fraction,
-            "padding_slices": args.padding_slices,
+            "padding_low_slices": padding_low_slices,
+            "padding_high_slices": padding_high_slices,
             "bridge_gap_slices": args.bridge_gap_slices,
             "min_run_slices": args.min_run_slices,
             "fallback_reason": fallback_reason,
-            "low_z_last_excluded_qc_png": low_qc_filename,
-            "high_z_first_excluded_qc_png": high_qc_filename,
+            "low_z_last_excluded_filename": low_qc_source.name if low_qc_source else "",
+            "high_z_first_excluded_filename": high_qc_source.name if high_qc_source else "",
+            "boundary_qc_png": boundary_qc_filename,
         }
     ]
     write_tsv(args.output_plan, plan_rows)

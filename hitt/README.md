@@ -44,7 +44,20 @@ Use `--copy_data FALSE` to process data that is already present in scratch witho
 
 After copying, the workflow samples every TIFF slice and detects a conservative sample-bearing Z range before conversion. By default, a bright-voxel threshold is calculated from the stack-wide `99.0` percentile. A slice is considered sample-bearing when at least `0.5%` of its sampled pixels meet that threshold. Short gaps are bridged, the largest detected run is selected, and ten padding slices are retained on each side.
 
-The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and up to two boundary QC PNGs are written under `logs/.../crop_analysis`. The PNGs show the last excluded slice on the low-Z side and the first excluded slice on the high-Z side. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
+The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and a combined boundary QC PNG are written under `logs/.../crop_analysis`. The PNG shows the last excluded slice on the low-Z side on the left and the first excluded slice on the high-Z side on the right. If only one boundary has excluded slices, the PNG contains that available boundary image. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
+
+Crop parameters can be set per dataset with columns in the input table:
+
+```text
+crop_stack
+crop_bright_threshold
+crop_auto_percentile
+crop_min_bright_fraction
+crop_padding_low_slices
+crop_padding_high_slices
+```
+
+Blank or missing values fall back to the launcher defaults. During migration, a legacy `crop_padding_slices` table column is also accepted and is applied to both edges unless an edge-specific value is present.
 
 Useful crop overrides:
 
@@ -54,7 +67,8 @@ bash hitt_main.sh interactive \
   --crop_bright_threshold auto \
   --crop_auto_percentile 99.0 \
   --crop_min_bright_fraction 0.005 \
-  --crop_padding_slices 10
+  --crop_padding_low_slices 10 \
+  --crop_padding_high_slices 10
 ```
 
 Use a numeric `--crop_bright_threshold` when a stable reconstructed gray-value cutoff is known. Use `--crop_stack FALSE` to retain the complete Z-stack while still writing crop-analysis logs.

@@ -44,7 +44,9 @@ Options:
   --crop_bright_threshold VALUE    Bright voxel threshold or auto, default auto.
   --crop_auto_percentile VALUE     Stack percentile used as auto threshold, default 99.
   --crop_min_bright_fraction VALUE Minimum bright sampled-pixel fraction per slice, default 0.005.
-  --crop_padding_slices N          Extra slices retained on each side, default 10.
+  --crop_padding_slices N          Compatibility shortcut: set padding on both edges.
+  --crop_padding_low_slices N      Extra slices retained on the low-Z edge, default 10.
+  --crop_padding_high_slices N     Extra slices retained on the high-Z edge, default 10.
   --crop_bridge_gap_slices N       Fill short detection gaps up to this size, default 3.
   --crop_min_run_slices N          Minimum detected run size, default 3.
   --crop_sample_values_per_slice N Approximate sampled pixels per slice, default 100000.
@@ -154,6 +156,8 @@ crop_bright_threshold="${CROP_BRIGHT_THRESHOLD:-auto}"
 crop_auto_percentile="${CROP_AUTO_PERCENTILE:-99.0}"
 crop_min_bright_fraction="${CROP_MIN_BRIGHT_FRACTION:-0.005}"
 crop_padding_slices="${CROP_PADDING_SLICES:-10}"
+crop_padding_low_slices="${CROP_PADDING_LOW_SLICES:-$crop_padding_slices}"
+crop_padding_high_slices="${CROP_PADDING_HIGH_SLICES:-$crop_padding_slices}"
 crop_bridge_gap_slices="${CROP_BRIDGE_GAP_SLICES:-3}"
 crop_min_run_slices="${CROP_MIN_RUN_SLICES:-3}"
 crop_sample_values_per_slice="${CROP_SAMPLE_VALUES_PER_SLICE:-100000}"
@@ -428,10 +432,30 @@ while [[ $# -gt 0 ]]; do
       ;;
     --crop_padding_slices|--crop-padding-slices)
       crop_padding_slices="${2:?--crop_padding_slices requires a value}"
+      crop_padding_low_slices="$crop_padding_slices"
+      crop_padding_high_slices="$crop_padding_slices"
       shift 2
       ;;
     --crop_padding_slices=*|--crop-padding-slices=*)
       crop_padding_slices="${1#*=}"
+      crop_padding_low_slices="$crop_padding_slices"
+      crop_padding_high_slices="$crop_padding_slices"
+      shift
+      ;;
+    --crop_padding_low_slices|--crop-padding-low-slices)
+      crop_padding_low_slices="${2:?--crop_padding_low_slices requires a value}"
+      shift 2
+      ;;
+    --crop_padding_low_slices=*|--crop-padding-low-slices=*)
+      crop_padding_low_slices="${1#*=}"
+      shift
+      ;;
+    --crop_padding_high_slices|--crop-padding-high-slices)
+      crop_padding_high_slices="${2:?--crop_padding_high_slices requires a value}"
+      shift 2
+      ;;
+    --crop_padding_high_slices=*|--crop-padding-high-slices=*)
+      crop_padding_high_slices="${1#*=}"
       shift
       ;;
     --crop_bridge_gap_slices|--crop-bridge-gap-slices)
@@ -540,6 +564,8 @@ nextflow_args=(
   --crop_auto_percentile "$crop_auto_percentile"
   --crop_min_bright_fraction "$crop_min_bright_fraction"
   --crop_padding_slices "$crop_padding_slices"
+  --crop_padding_low_slices "$crop_padding_low_slices"
+  --crop_padding_high_slices "$crop_padding_high_slices"
   --crop_bridge_gap_slices "$crop_bridge_gap_slices"
   --crop_min_run_slices "$crop_min_run_slices"
   --crop_sample_values_per_slice "$crop_sample_values_per_slice"
