@@ -62,7 +62,7 @@ col_table <-
   mutate(
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw),
-    uri=file.path("https://s3.embl.de/hitttest", str_remove(s3_raw, "/$"), "Z_zset.zarr/"),
+    uri=file.path("https://s3.embl.de/imatrec/central_data_processing/hitt", str_remove(s3_raw, "/$"), "Z_zset.zarr/"),
     site=str_extract(name, "^[A-Za-z]+"),
     hitt_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
