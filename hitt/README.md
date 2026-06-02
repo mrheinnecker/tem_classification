@@ -19,6 +19,8 @@ source_path
 /mnt/ximg/2024/p3l-yschwab/RECON/20240414/RAW_DATA/BIL_10to40_20231003_PM_01_epo_03/recon_111_1/tomo
 ```
 
+Only rows with `convert=1` are included in `images_to_process.csv`. Rows with `convert=0`, blank values, or a missing `convert` column remain visible in `all_datasets.tsv` but are not copied, cropped, converted, or uploaded. This allows datasets awaiting manual review to stay in the input table.
+
 Pass the SSH password when starting the workflow:
 
 ```bash

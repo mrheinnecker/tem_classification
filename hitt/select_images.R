@@ -155,6 +155,9 @@ for (column in c(names(crop_defaults), "crop_padding_slices")) {
     images[[column]] <- NA_character_
   }
 }
+if (!"convert" %in% names(images)) {
+  images[["convert"]] <- NA_character_
+}
 
 path_column <- intersect(c("source_path", "remote_path", "tmp_copy_path"), names(images))
 if (length(path_column) == 0) {
@@ -181,7 +184,8 @@ all_images <- images %>%
     crop_padding_low_slices=coalesce(crop_padding_low_slices, crop_padding_slices, crop_defaults$crop_padding_low_slices),
     crop_padding_high_slices=coalesce(crop_padding_high_slices, crop_padding_slices, crop_defaults$crop_padding_high_slices),
     s3_omezarr_present=filename %in% existing_s3_names,
-    needs_processing=!s3_omezarr_present
+    convert_selected=coalesce(convert == "1", FALSE),
+    needs_processing=convert_selected & !s3_omezarr_present
   ) %>%
   distinct(remote_tomo_path, .keep_all=TRUE) %>%
   select(filename, shortname, source_path, remote_tomo_path, tmp_copy_path, tomo_path, omezarr_path, req_mem, everything())
