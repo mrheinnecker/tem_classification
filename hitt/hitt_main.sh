@@ -24,7 +24,7 @@ Options:
   --main_dir PATH                  Base HITT workflow directory.
   --logdir PATH                    Workflow log directory.
   --work_dir PATH                  Nextflow work directory.
-  --workflow_stage VALUE           discover, process, or all.
+  --workflow_stage VALUE           discover, process, all, or collection.
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
   --s3_bucket VALUE                S3 bucket/prefix, default s3embl/hitttest.
@@ -41,6 +41,7 @@ Options:
   --copy_data TRUE|FALSE           Copy remote tomo stacks into scratch before processing.
   --copy_dest_root PATH            Local scratch destination, default /scratch/rheinnec/tmp_hitt.
   --copy_max_forks N               Maximum concurrent remote copy jobs, default 10.
+  --persistent_image_stats_dir PATH Persistent image-statistics directory.
   --crop_stack TRUE|FALSE          Detect and keep a conservative sample-bearing Z range.
   --crop_bright_threshold VALUE    Bright voxel threshold or auto, default auto.
   --crop_auto_percentile VALUE     Stack percentile used as auto threshold, default 99.
@@ -153,6 +154,7 @@ uint16_sample_values="${UINT16_SAMPLE_VALUES:-2000000}"
 copy_data="$(to_upper_bool "${COPY_DATA:-TRUE}")"
 copy_dest_root="${COPY_DEST_ROOT:-/scratch/rheinnec/tmp_hitt}"
 copy_max_forks="${COPY_MAX_FORKS:-10}"
+persistent_image_stats_dir="${PERSISTENT_IMAGE_STATS_DIR:-/g/schwab/marco/central_data_processing/hitt/image_stats}"
 crop_stack="$(to_upper_bool "${CROP_STACK:-TRUE}")"
 crop_bright_threshold="${CROP_BRIGHT_THRESHOLD:-auto}"
 crop_auto_percentile="${CROP_AUTO_PERCENTILE:-99.0}"
@@ -408,6 +410,14 @@ while [[ $# -gt 0 ]]; do
       copy_max_forks="${1#*=}"
       shift
       ;;
+    --persistent_image_stats_dir|--persistent-image-stats-dir)
+      persistent_image_stats_dir="${2:?--persistent_image_stats_dir requires a path}"
+      shift 2
+      ;;
+    --persistent_image_stats_dir=*|--persistent-image-stats-dir=*)
+      persistent_image_stats_dir="${1#*=}"
+      shift
+      ;;
     --crop_stack|--crop-stack)
       crop_stack="$(to_upper_bool "${2:?--crop_stack requires TRUE or FALSE}")"
       shift 2
@@ -570,6 +580,7 @@ nextflow_args=(
   --copy_data "$copy_data"
   --copy_dest_root "$copy_dest_root"
   --copy_max_forks "$copy_max_forks"
+  --persistent_image_stats_dir "$persistent_image_stats_dir"
   --crop_stack "$crop_stack"
   --crop_bright_threshold "$crop_bright_threshold"
   --crop_auto_percentile "$crop_auto_percentile"

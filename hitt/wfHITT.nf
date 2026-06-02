@@ -26,6 +26,7 @@ params.uint16_sample_values = params.uint16_sample_values ?: 2000000
 params.copy_data = params.copy_data ?: "TRUE"
 params.copy_dest_root = params.copy_dest_root ?: "/scratch/rheinnec/tmp_hitt"
 params.copy_max_forks = params.copy_max_forks ?: 10
+params.persistent_image_stats_dir = params.persistent_image_stats_dir ?: "/g/schwab/marco/central_data_processing/hitt/image_stats"
 params.crop_stack = params.crop_stack ?: "TRUE"
 params.crop_bright_threshold = params.crop_bright_threshold ?: "auto"
 params.crop_auto_percentile = params.crop_auto_percentile ?: 99.0
@@ -70,7 +71,7 @@ process CHECKEXISTINGHITTS3FILES {
         ;;
     esac
 
-    if [ "${workflow_stage}" = "all" ] && [ "\$dryrun_is_false" = "TRUE" ]; then
+    if { [ "${workflow_stage}" = "all" ] || [ "${workflow_stage}" = "collection" ]; } && [ "\$dryrun_is_false" = "TRUE" ]; then
       require_s3="TRUE"
     fi
 
@@ -155,7 +156,7 @@ process COPYHITTDATA {
     publishDir "${params.logdir}/copy", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
     errorStrategy "retry"
-    maxRetries 1
+    maxRetries 2
 
     input:
     tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
@@ -213,6 +214,7 @@ process ANALYZEHITTCROP {
 
     publishDir "${params.logdir}/crop_analysis", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
@@ -259,8 +261,7 @@ process EUBIHITTCONVERSION {
 
     publishDir "${params.logdir}/conversion", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
-    errorStrategy "retry"
-    maxRetries 1
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), path(normalized_tomo), val(omezarr_path), val(req_mem)
@@ -313,6 +314,7 @@ process NORMALIZEHITTSLICES {
 
     publishDir "${params.logdir}/slice_renaming", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), val(tmp_copy_path), path(crop_plan), val(omezarr_path), val(req_mem)
@@ -361,6 +363,7 @@ process EXTRACTHITTIMAGESTATS {
 
     publishDir "${params.logdir}/image_stats", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), path(normalized_tomo), val(omezarr_path), val(req_mem)
@@ -374,6 +377,11 @@ process EXTRACTHITTIMAGESTATS {
       --input-dir "${normalized_tomo}" \
       --name "${filename}" \
       --output "${filename}_image_stats.tsv"
+
+    mkdir -p "${params.persistent_image_stats_dir}"
+    persistent_tmp="${params.persistent_image_stats_dir}/${filename}_image_stats.tsv.tmp.\$\$"
+    cp "${filename}_image_stats.tsv" "\$persistent_tmp"
+    mv "\$persistent_tmp" "${params.persistent_image_stats_dir}/${filename}_image_stats.tsv"
     """
 }
 
@@ -386,8 +394,7 @@ process S3UPLOADHITT {
 
     publishDir "${params.logdir}/upload", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
-    errorStrategy "retry"
-    maxRetries 1
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), val(omezarr_path)
@@ -420,7 +427,7 @@ process COLLECTHITTS3FILES {
     containerOptions "--bind /g --bind /scratch --bind /home"
 
     input:
-    path done_files
+    val trigger
 
     output:
     path "all_s3_entries.txt", emit: all_s3
@@ -444,7 +451,8 @@ process MAKEHITTCOLLECTIONTABLE {
     input:
     path all_s3
     path all_datasets
-    path image_stats
+    val image_stats_dir
+    val stats_ready
 
     output:
     path "done.tsv"
@@ -455,7 +463,7 @@ process MAKEHITTCOLLECTIONTABLE {
     Rscript "${params.script_dir}/make_collection_table.R" \
       --all_s3 "${all_s3}" \
       --all_datasets "${all_datasets}" \
-      --image_stats_dir "." \
+      --image_stats_dir "${image_stats_dir}" \
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
@@ -491,7 +499,7 @@ workflow {
         params.crop_padding_high_slices
     )
 
-    if (params.workflow_stage != "discover") {
+    if (params.workflow_stage != "discover" && params.workflow_stage != "collection") {
 
         SELECTHITTIMAGES.out.to_process
             .splitCsv(header:true)
@@ -510,12 +518,25 @@ workflow {
         if (params.workflow_stage == "all") {
             upload_done_ch = S3UPLOADHITT(EUBIHITTCONVERSION.out.omezarr).collect()
             COLLECTHITTS3FILES(upload_done_ch)
+            stats_ready_ch = EXTRACTHITTIMAGESTATS.out.image_stats.collect().map { "new_image_stats_ready" }
 
             MAKEHITTCOLLECTIONTABLE(
                 COLLECTHITTS3FILES.out.all_s3,
                 SELECTHITTIMAGES.out.all_datasets,
-                EXTRACTHITTIMAGESTATS.out.image_stats.collect()
+                params.persistent_image_stats_dir,
+                stats_ready_ch
             )
         }
+    }
+
+    if (params.workflow_stage == "collection") {
+        COLLECTHITTS3FILES(Channel.value("collection_table_only"))
+
+        MAKEHITTCOLLECTIONTABLE(
+            COLLECTHITTS3FILES.out.all_s3,
+            SELECTHITTIMAGES.out.all_datasets,
+            params.persistent_image_stats_dir,
+            Channel.value("stored_image_stats_ready")
+        )
     }
 }

@@ -4,7 +4,7 @@ This workflow copies remote HITT image stacks into scratch, converts them into O
 
 Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>/Z_zset.zarr/` output contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
 
-For a non-dry-run `all` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset when the S3 client or connection is unavailable. Discovery, process-only, and dry-run modes can continue with an empty S3 listing.
+For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when the S3 client or connection is unavailable. Discovery, process-only, and dry-run modes can continue with an empty S3 listing.
 
 The input table should contain a `source_path` column with the remote dataset path or remote `tomo` directory. For compatibility, `remote_path` and `tmp_copy_path` are also accepted as column names. By default, interactive and cluster runs read this Google Sheet:
 
@@ -49,6 +49,8 @@ Remote copying is limited to ten concurrent `COPYHITTDATA` tasks by default to a
 ```bash
 bash hitt_main.sh cluster --copy_max_forks 10
 ```
+
+Copy failures are retried up to two times. Failures in later per-dataset steps are ignored so one problematic dataset does not stop the remaining batch. Global coordination steps, such as S3 listing and collection-table generation, still fail loudly.
 
 After copying, the workflow samples every TIFF slice and detects a conservative sample-bearing Z range before conversion. By default, a bright-voxel threshold is calculated from the stack-wide `99.0` percentile. A slice is considered sample-bearing when at least `0.5%` of its sampled pixels meet that threshold. Short gaps are bridged, the largest detected run is selected, and ten padding slices are retained on each side.
 
@@ -95,6 +97,18 @@ If TIFF slices at the outer start or end of a stack have a different XY shape, t
 
 The workflow also calculates stack-wide `min_gray`, `max_gray`, and `contrast_limits` values from the staged TIFF slices. In `all` mode these display values are added to `hitt_collection_table`; individual TSV files are written under `logs/.../image_stats`.
 
+Image-statistics TSV files are also persisted under:
+
+```text
+/g/schwab/marco/central_data_processing/hitt/image_stats
+```
+
+This allows the collection table to be rebuilt without repeating image processing:
+
+```bash
+bash hitt_main.sh cluster --workflow_stage collection
+```
+
 ## Run examples
 
 ```bash
@@ -129,6 +143,7 @@ bash hitt_main.sh interactive \
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
 - `process`: copy remote stacks, detect a conservative Z crop, renumber staged slice files, and convert listed images to OME-Zarr.
 - `all`: copy remote stacks, detect a conservative Z crop, renumber staged slice files, convert, upload to S3, collect the S3 listing, and write `hitt_collection_table`.
+- `collection`: query S3 and rebuild `hitt_collection_table` from the input table and persistent image statistics without processing images.
 
 Uploads copy the contents of each local `omezarr` directory into an S3 prefix named after the original image folder, for example:
 
