@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=wfHITT
-#SBATCH --output=wfHITT_%j.out
-#SBATCH --error=wfHITT_%j.err
+#SBATCH --output=/scratch/rheinnec/hitt_screen/wfHITT_%j.out
+#SBATCH --error=/scratch/rheinnec/hitt_screen/wfHITT_%j.err
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=64G
+#SBATCH --mem=16G
 #SBATCH --time=24:00:00
 set -euo pipefail
 
@@ -18,10 +18,10 @@ set -euo pipefail
 #repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 timestamp="$(date +%Y-%m-%d_%H-%M)"
 
-timestamp="2026-06-01_20-54"
+#timestamp="2026-06-01_20-54"
 
 repo_dir="/g/schwab/marco/repos/tem_classification"
-cd /scratch/rheinnec
+cd /scratch/rheinnec/hitt_screen
 # HITT workflow
 # To use a local table instead, replace the sheet options with:
 #   --sheet_mode local \
@@ -29,7 +29,7 @@ cd /scratch/rheinnec
 bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0" \
-  --sheet_name "all_hitt" \
+  --sheet_name "hitt_input_table" \
   --google_key "${repo_dir}/hitt/trec-tem-screen-e98a2e03f58b.json" \
   --collection_table_url "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1062275333#gid=1062275333" \
   --collection_table_sheet "hitt_collection_table" \
@@ -65,7 +65,7 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --remote_host "cerberus.embl-hamburg.de" \
   --remote_port 22443 \
   --password $HITT_SSHPASS \
-  --resume TRUE
+  --resume FALSE
 
 # Add other workflow launcher calls below when they are ready, for example:
 #
