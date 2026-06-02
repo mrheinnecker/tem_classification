@@ -123,6 +123,7 @@ col_table <-
     size_frac=str_extract(name, "\\d+to\\d+"),
     grid=site,
     view=site,
+    exclusive=TRUE
   ) %>%
   filter(!is.na(s3_raw), str_detect(s3_raw, "zarr/?$")) %>%
   distinct(uri, .keep_all=TRUE) %>%

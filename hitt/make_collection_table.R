@@ -69,7 +69,8 @@ col_table <-
     size_frac=str_extract(name, "\\d+to\\d+"),
     epoch=str_extract(name, "epo_[0-9]+$"),
     grid=site,
-    view=site
+    view=site,
+    exclusive=TRUE
   ) %>%
   filter(!is.na(s3_raw), s3_raw != "") %>%
   distinct(uri, .keep_all=TRUE) %>%

@@ -100,6 +100,7 @@ col_table <-
     name=paste0(str_split(source_name, cell_id) %>% map_chr(.,1), cell_id),
     view=site,
     grid=site,
+    exclusive=TRUE
     #zarr_root=str_extract(s3_raw, ".*?(_coarse_mask\\.ome\\.zarr|\\.ome\\.zarr|\\.zarr)(?=/|$)")
   ) %>%
   filter(source_name %in% expected_omezarr_names) %>%
