@@ -64,7 +64,7 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --remote_user "p3l-yschwab" \
   --remote_host "cerberus.embl-hamburg.de" \
   --remote_port 22443 \
-  --password "ZLCEE" \
+  --password $HITT_SSHPASS \
   --resume TRUE
 
 # Add other workflow launcher calls below when they are ready, for example:
