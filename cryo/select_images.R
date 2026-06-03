@@ -18,6 +18,26 @@ spec <- matrix(c(
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
+# Local debug inputs:
+# Uncomment this block when running the script manually, and keep it commented
+# when Nextflow is passing the real command-line options.
+#
+# opt <- list(
+#   input_table = "C:/projects/cryo_screen/cryo_images.tsv",
+#   sheet_mode = "local",
+#   sheet_url = "",
+#   sheet_name = "",
+#   google_key = "C:/repos/tem_classification/cryo/trec-tem-screen-e98a2e03f58b.json",
+#   outdir = "C:/projects/cryo_screen/processed",
+#   dryrun = "TRUE",
+#   dryrun_n = 2L,
+#   existing_s3 = "C:/projects/cryo_screen/existing_s3_entries.txt",
+#   default_x_scale = "",
+#   default_y_scale = "",
+#   default_z_scale = "",
+#   scale_unit = "nm"
+# )
+
 value_or_default <- function(value, default) {
   if (is.null(value) || is.na(value) || value == "") default else value
 }
