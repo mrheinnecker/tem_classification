@@ -276,10 +276,18 @@ process S3UPLOADCRYO {
 
     image_zarr="${omezarr}"
     if [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
-      inner_zarr=\$(find "\${image_zarr}" -mindepth 1 -maxdepth 3 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' \\) | head -n 1)
-      if [ -n "\${inner_zarr}" ]; then
-        image_zarr="\${inner_zarr}"
-      fi
+      for candidate in "\${image_zarr}"/*.zarr "\${image_zarr}"/*.ome.zarr "\${image_zarr}"/*/*.zarr "\${image_zarr}"/*/*.ome.zarr "\${image_zarr}"/*/*/*.zarr "\${image_zarr}"/*/*/*.ome.zarr; do
+        if [ -d "\$candidate" ]; then
+          image_zarr="\$candidate"
+          break
+        fi
+      done
+    fi
+
+    if [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
+      echo "Could not find an OME-Zarr root marker under ${omezarr}" >&2
+      ls -la "${omezarr}" >&2 || true
+      exit 1
     fi
 
     mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}/" --recursive
