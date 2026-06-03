@@ -81,7 +81,7 @@ case "$mode" in
     main_dir="${CRYO_SCREEN_DIR:-/scratch/rheinnec/cryo_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/cryo_screen/work}"
     profile="interactive"
-    default_workflow_stage="process"
+    default_workflow_stage="all"
     default_sheet_mode="google"
     default_dryrun="FALSE"
     if command -v module >/dev/null 2>&1; then

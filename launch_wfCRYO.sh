@@ -19,10 +19,10 @@ cd /scratch/rheinnec/cryo_screen
 
 bash "${repo_dir}/cryo/cryo_main.sh" cluster \
   --sheet_mode google \
-  --sheet_url "https://docs.google.com/spreadsheets/d/REPLACE_WITH_CRYO_INPUT_SHEET_ID/edit?gid=0#gid=0" \
-  --sheet_name "cryo_input_table" \
-  --google_key "${repo_dir}/cryo/trec-tem-screen-e98a2e03f58b.json" \
-  --collection_table_url "https://docs.google.com/spreadsheets/d/REPLACE_WITH_COLLECTION_TABLE_SHEET_ID/edit?gid=0#gid=0" \
+  --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503" \
+  --sheet_name "cryo_lm" \
+  --google_key "${repo_dir}/trec-tem-screen-e98a2e03f58b.json" \
+  --collection_table_url "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=199938698#gid=199938698" \
   --collection_table_sheet "cryo_collection_table" \
   --main_dir "/scratch/rheinnec/cryo_screen" \
   --outdir "/scratch/rheinnec/cryo_screen/processed" \
@@ -34,7 +34,7 @@ bash "${repo_dir}/cryo/cryo_main.sh" cluster \
   --s3_bucket "s3embl/imatrec/central_data_processing/cryo" \
   --zarr_format 2 \
   --scale_unit nm \
-  --resume FALSE
+  --resume TRUE
 
 # If CZI metadata is missing or inconsistent, provide fallback physical scales:
 #
