@@ -121,18 +121,23 @@ bash cryo_main.sh cluster --workflow_stage collection
 
 Metadata JSON and pixel-size TSV files are persisted under `--persistent_metadata_dir`, defaulting to `<main_dir>/metadata` from the launcher or the profile-specific central-data path on the cluster.
 
-## CZI container
+## Containers
 
-The CRYO config expects a CZI-capable EuBI container at:
+The CRYO workflow uses two separate containers:
+
+- CZI metadata/preparation: `/g/schwab/marco/container_devel/czi_to_tiff.sif`
+- EuBI-Bridge conversion: `/g/schwab/marco/container_devel/eubibridge.sif`
+
+Build the CZI preparation container from:
 
 ```text
-/g/schwab/marco/container_devel/eubibridge_czi.sif
+container/czi_to_tiff.def
 ```
 
-Build it from:
+For example:
 
-```text
-container/eubibridge_czi.def
+```bash
+singularity build /g/schwab/marco/container_devel/czi_to_tiff.sif container/czi_to_tiff.def
 ```
 
-This container includes EuBI-Bridge plus `bioio-czi` and `aicspylibczi` so both conversion and metadata extraction can read Zeiss `.czi` files.
+This keeps the existing EuBI-Bridge container unchanged and only adds the Zeiss CZI dependencies where they are needed.

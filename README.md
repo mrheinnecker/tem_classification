@@ -15,8 +15,8 @@ The `microsam/` folder is currently treated as a separate area and is not covere
 ```text
 .
 +-- container/
+|   +-- czi_to_tiff.def
 |   +-- eubibridge.def
-|   +-- eubibridge_czi.def
 |   +-- imod.def
 |   +-- py_mrcfile.def
 |   +-- segmentation.def
@@ -162,7 +162,7 @@ For cluster and interactive runs, `/g/schwab/sem_screen` is the default output/l
 
 The CRYO workflow is defined in `cryo/wfCRYO.nf`, configured by `cryo/nextflow.config`, and launched through `cryo/cryo_main.sh`.
 
-It reads raw light-microscopy file paths from a local table or Google Sheet, extracts X/Y pixel size and Z spacing metadata, prepares inputs, converts each listed file to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table. Like HITT, it first lists S3 and skips datasets whose OME-Zarr root markers already exist in the target bucket. Zeiss `.czi` inputs use the CRYO-specific `container/eubibridge_czi.def` environment and are first converted to an intermediate OME-TIFF before EuBI-Bridge creates OME-Zarr.
+It reads raw light-microscopy file paths from a local table or Google Sheet, extracts X/Y pixel size and Z spacing metadata, prepares inputs, converts each listed file to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table. Like HITT, it first lists S3 and skips datasets whose OME-Zarr root markers already exist in the target bucket. Zeiss `.czi` inputs use the CRYO-specific `container/czi_to_tiff.def` environment and are first converted to an intermediate OME-TIFF before the existing EuBI-Bridge container creates OME-Zarr.
 
 Useful entry points:
 
