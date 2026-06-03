@@ -24,12 +24,12 @@ opt <- getopt(spec)
 #
 # opt <- list(
 #   input_table = "C:/projects/cryo_screen/cryo_images.tsv",
-#   sheet_mode = "local",
-#   sheet_url = "",
-#   sheet_name = "",
-#   google_key = "C:/repos/tem_classification/cryo/trec-tem-screen-e98a2e03f58b.json",
-#   outdir = "C:/projects/cryo_screen/processed",
-#   dryrun = "TRUE",
+#   sheet_mode = "google",
+#   sheet_url = "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503",
+#   sheet_name = "cryo_lm",
+#   google_key = "/g/schwab/marco/repos/tem_classification/trec-tem-screen-e98a2e03f58b.json",
+#   outdir = "/scratch/rheinnec/central_data_processing/cryo_screen",
+#   dryrun = "FALSE",
 #   dryrun_n = 2L,
 #   existing_s3 = "C:/projects/cryo_screen/existing_s3_entries.txt",
 #   default_x_scale = "",
@@ -124,18 +124,21 @@ coalesce_column_values <- function(data, candidates, default="") {
   }
 }
 
-images <- if (sheet_mode == "google") {
+images_raw <- if (sheet_mode == "google") {
   read_google_table(opt$sheet_url, sheet_name)
 } else {
   read_local_table(opt$input_table)
 }
 
-images <- images %>%
-  mutate(across(everything(), ~na_if(.x, "")))
+images <- images_raw %>%
+  mutate(across(everything(), ~na_if(.x, ""))) %>%
+  filter(str_detect(`File Name`, "_st_3D")) %>% 
+  filter(str_detect(FilePath, "CryoLM")) %>%
+  .[1:5,]
 
 path_column <- first_existing_column(
   images,
-  c("raw_path", "file_path", "filepath", "file", "source_path", "path")
+  c("FilePath","raw_path", "file_path", "filepath", "file", "source_path", "path")
 )
 if (is.null(path_column)) {
   stop("Input table must contain a raw_path, file_path, filepath, file, source_path, or path column")

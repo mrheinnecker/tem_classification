@@ -257,7 +257,7 @@ process EUBIHITTCONVERSION {
 
     cpus 1
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 128)}GB" }
-    time "2h"
+    time "3h"
 
     publishDir "${params.logdir}/conversion", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"

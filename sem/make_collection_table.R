@@ -127,7 +127,7 @@ col_table <-
   ) %>%
   filter(!is.na(s3_raw), str_detect(s3_raw, "zarr/?$")) %>%
   distinct(uri, .keep_all=TRUE) %>%
-  select(uri, name, view, grid, site, sem_date, sampling_time, size_frac, s3_raw)
+  select(uri, name, view, grid, site, sem_date, sampling_time, size_frac, s3_raw, exclusive)
 
 if (nrow(col_table) == 0) {
   stop("No SEM OME-Zarr datasets found in S3 listing.")

@@ -106,7 +106,7 @@ col_table <-
   filter(source_name %in% expected_omezarr_names) %>%
   select(
     uri, name, view, grid,
-    site, cell_id, size_frac, sampling_time, source_name, 
+    site, cell_id, size_frac, sampling_time, source_name, exclusive
   )
   #%>%
   # filter(
