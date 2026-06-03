@@ -74,7 +74,7 @@ col_table <-
   ) %>%
   filter(!is.na(s3_raw), s3_raw != "") %>%
   distinct(uri, .keep_all=TRUE) %>%
-  select(uri, name, view, grid, site, hitt_date, sampling_time, size_frac, epoch, s3_raw)
+  select(uri, name, view, grid, site, hitt_date, sampling_time, size_frac, epoch, s3_raw, exclusive)
 
 if (nrow(col_table) == 0) {
   stop("No HITT OME-Zarr datasets found in S3 listing.")

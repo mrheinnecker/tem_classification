@@ -30,7 +30,7 @@ bash "${repo_dir}/hitt/hitt_main.sh" cluster \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=0#gid=0" \
   --sheet_name "hitt_input_table" \
-  --google_key "${repo_dir}/hitt/trec-tem-screen-e98a2e03f58b.json" \
+  --google_key "${repo_dir}/trec-tem-screen-e98a2e03f58b.json" \
   --collection_table_url "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1062275333#gid=1062275333" \
   --collection_table_sheet "hitt_collection_table" \
   --main_dir "/scratch/rheinnec/hitt_screen" \
