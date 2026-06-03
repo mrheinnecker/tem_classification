@@ -162,6 +162,37 @@ process EXTRACTCRYOMETADATA {
 }
 
 
+process PREPARECRYOINPUT {
+
+    cpus 1
+    memory { "${Math.min(Math.max((req_mem as Integer), 16), 128)}GB" }
+    time "2h"
+
+    publishDir "${params.logdir}/prepared_inputs", mode:"copy", pattern:"*_prepared_input.tsv"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
+
+    input:
+    tuple val(filename), val(raw_path), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
+
+    output:
+    tuple val(filename), path("prepared_input"), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem), emit: prepared
+    path "${filename}_prepared_input.tsv"
+
+    script:
+    """
+    set -euo pipefail
+
+    python3 "${params.script_dir}/prepare_input.py" \
+      --input "${raw_path}" \
+      --name "${filename}" \
+      --output-dir "prepared_input" \
+      --metadata-json "${metadata_json}" \
+      --prepared-log "${filename}_prepared_input.tsv"
+    """
+}
+
+
 process EUBICRYOCONVERSION {
 
     cpus 1
@@ -173,7 +204,7 @@ process EUBICRYOCONVERSION {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(raw_path), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
+    tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
 
     output:
     tuple val(filename), path("${filename}_omezarr"), emit: omezarr
@@ -182,6 +213,12 @@ process EUBICRYOCONVERSION {
     script:
     """
     set -euo pipefail
+
+    input_path=\$(find "${prepared_input}" -mindepth 1 -maxdepth 1 -type f | sort | head -n 1)
+    if [ -z "\$input_path" ]; then
+      echo "Prepared input directory is empty for ${filename}: ${prepared_input}" >&2
+      exit 1
+    fi
 
     pixel_scale_x=\$(awk 'NR==2 {print \$1}' "${pixel_size_tsv}")
     pixel_scale_y=\$(awk 'NR==2 {print \$2}' "${pixel_size_tsv}")
@@ -195,7 +232,7 @@ process EUBICRYOCONVERSION {
     rm -rf "${filename}_omezarr"
 
     eubi to_zarr \
-      "${raw_path}" \
+      "\$input_path" \
       "${filename}_omezarr" \
       --x_unit nm \
       --y_unit nm \
@@ -340,7 +377,9 @@ workflow {
 
         EXTRACTCRYOMETADATA(cryo_batch_ch)
 
-        EUBICRYOCONVERSION(EXTRACTCRYOMETADATA.out.metadata)
+        PREPARECRYOINPUT(EXTRACTCRYOMETADATA.out.metadata)
+
+        EUBICRYOCONVERSION(PREPARECRYOINPUT.out.prepared)
 
         if (params.workflow_stage == "all") {
             upload_done_ch = S3UPLOADCRYO(EUBICRYOCONVERSION.out.omezarr).collect()

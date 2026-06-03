@@ -1,6 +1,6 @@
 # CRYO table-driven workflow
 
-This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, converts each raw file to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
+This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
 
 Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
 
@@ -63,6 +63,12 @@ bash cryo_main.sh interactive \
   --scale_unit nm
 ```
 
+## CZI preparation
+
+Zeiss `.czi` files are not sent directly to EuBI-Bridge. The workflow first runs `prepare_input.py`, which converts each CZI into an intermediate OME-TIFF inside the Nextflow work directory. EuBI-Bridge then converts that OME-TIFF to OME-Zarr.
+
+Non-CZI inputs are linked or copied into the same prepared-input directory and then passed to EuBI-Bridge unchanged. The original raw files are not modified.
+
 ## Run examples
 
 Discover selected rows without conversion:
@@ -109,8 +115,8 @@ bash cryo_main.sh cluster --workflow_stage collection
 ## Workflow stages
 
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
-- `process`: extract metadata and convert listed raw files to OME-Zarr.
-- `all`: extract metadata, convert, upload to S3, and write the collection table.
+- `process`: extract metadata, prepare inputs, and convert listed raw files to OME-Zarr.
+- `all`: extract metadata, prepare inputs, convert, upload to S3, and write the collection table.
 - `collection`: query S3 and rebuild the collection table from the input table plus persisted metadata.
 
 Metadata JSON and pixel-size TSV files are persisted under `--persistent_metadata_dir`, defaulting to `<main_dir>/metadata` from the launcher or the profile-specific central-data path on the cluster.
