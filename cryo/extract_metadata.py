@@ -39,7 +39,7 @@ METER_TO_NM = 1_000_000_000.0
 
 def parse_optional_float(value):
     value = "" if value is None else str(value).strip()
-    if value == "":
+    if value == "" or value.lower() in {"true", "false", "na", "nan", "none", "null"}:
         return None
     return float(value)
 
@@ -140,7 +140,12 @@ def first_text(element, names):
 
 
 def czi_scaling_from_xml(xml_text):
-    root = ET.fromstring(xml_text)
+    if isinstance(xml_text, ET.Element):
+        root = xml_text
+    else:
+        if isinstance(xml_text, bytes):
+            xml_text = xml_text.decode("utf-8", errors="replace")
+        root = ET.fromstring(xml_text)
     values = {}
 
     for distance in root.findall(".//Distance"):
@@ -162,9 +167,7 @@ def extract_czi_metadata(path):
     czi = CziFile(path)
     metadata = {}
     xml_text = czi.meta
-    if isinstance(xml_text, bytes):
-        xml_text = xml_text.decode("utf-8", errors="replace")
-    if xml_text:
+    if xml_text is not None:
         metadata.update(czi_scaling_from_xml(xml_text))
     try:
         metadata["dims_shape"] = czi.dims_shape()
