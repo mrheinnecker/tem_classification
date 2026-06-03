@@ -214,9 +214,10 @@ process EUBICRYOCONVERSION {
     """
     set -euo pipefail
 
-    input_path=\$(find "${prepared_input}" -mindepth 1 -maxdepth 1 -type f | sort | head -n 1)
+    input_path=\$(find -L "${prepared_input}" -mindepth 1 -maxdepth 1 -type f | sort | head -n 1)
     if [ -z "\$input_path" ]; then
       echo "Prepared input directory is empty for ${filename}: ${prepared_input}" >&2
+      ls -la "${prepared_input}" >&2 || true
       exit 1
     fi
 
