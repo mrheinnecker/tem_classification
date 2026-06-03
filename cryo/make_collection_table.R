@@ -69,14 +69,15 @@ s3_root_markers <- read_lines(opt$all_s3) %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
     s3_raw=str_remove(s3_raw, "/$"),
-    name=str_match(s3_raw, "^([^/]+)/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$")[, 2]
+    s3_prefix=str_match(s3_raw, "^([^/]+(?:\\.zarr)?)/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$")[, 2],
+    name=str_remove(s3_prefix, "\\.zarr$")
   ) %>%
   filter(!is.na(name), name != "") %>%
   distinct(name, .keep_all=TRUE) %>%
   mutate(
-    uri=file.path(s3_public_prefix(s3_bucket), name, "/")
+    uri=file.path(s3_public_prefix(s3_bucket), s3_prefix, "/")
   ) %>%
-  select(uri, name, s3_raw)
+  select(uri, name, s3_prefix, s3_raw)
 
 if (nrow(s3_root_markers) == 0) {
   stop("No CRYO OME-Zarr datasets found in S3 listing.")

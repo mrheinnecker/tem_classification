@@ -2,7 +2,7 @@
 
 This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
 
-Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
+Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>.zarr/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
 
 For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when S3 is unavailable.
 
@@ -120,6 +120,14 @@ bash cryo_main.sh cluster --workflow_stage collection
 - `collection`: query S3 and rebuild the collection table from the input table plus persisted metadata.
 
 Metadata JSON and pixel-size TSV files are persisted under `--persistent_metadata_dir`, defaulting to `<main_dir>/metadata` from the launcher or the profile-specific central-data path on the cluster.
+
+Uploaded datasets are written to S3 as:
+
+```text
+<s3_bucket>/<dataset_name>.zarr/
+```
+
+The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.zarr` prefix.
 
 ## Containers
 

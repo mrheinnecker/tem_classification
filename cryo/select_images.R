@@ -69,7 +69,7 @@ if (!is.null(opt$existing_s3) && !is.na(opt$existing_s3) && file.exists(opt$exis
     discard(is.na)
 
   existing_s3_names <- existing_s3_paths %>%
-    str_match("^([^/]+)/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$") %>%
+    str_match("^([^/]+?)(?:\\.zarr)?/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$") %>%
     .[, 2] %>%
     discard(is.na) %>%
     unique()

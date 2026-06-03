@@ -290,7 +290,7 @@ process S3UPLOADCRYO {
       exit 1
     fi
 
-    mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}/" --recursive
+    mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}.zarr/" --recursive
     touch "${filename}_s3_upload_done.txt"
     """
 }
