@@ -86,14 +86,18 @@ dataset_name_from_path <- function(x) {
     str_remove("^[^:]+:") %>%
     str_remove("/+$")
 
-  dataset_root <- str_remove(path, "/recon_111_1/tomo$")
+  dataset_root <- if_else(
+    str_detect(path, "/tomo$"),
+    dirname(dirname(path)),
+    path
+  )
   sanitize_name(dataset_root)
 }
 
 remote_tomo_path_from_source <- function(x) {
   path <- str_remove(x, "/+$")
   if_else(
-    str_detect(path, "/recon_111_1/tomo$"),
+    str_detect(path, "/tomo$"),
     path,
     file.path(path, "recon_111_1", "tomo")
   )
