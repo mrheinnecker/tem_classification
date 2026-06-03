@@ -5,6 +5,7 @@ This repository contains workflow code for preparing, processing, converting, an
 - `tem/`: Transmission electron microscopy (TEM) discovery, preprocessing, QC, OME-Zarr conversion, S3 upload, and collection-table generation.
 - `sem/`: Scanning electron microscopy (SEM) TIFF discovery, metadata extraction, OME-Zarr conversion, S3 upload, and collection-table generation.
 - `hitt/`: Table-driven large-image conversion workflow for HITT image directories, OME-Zarr conversion, and S3 upload.
+- `cryo/`: Table-driven light-microscopy Z-stack conversion workflow with metadata extraction, OME-Zarr conversion, S3 upload, and collection-table generation.
 - `container/`: Singularity/Apptainer definition files for the tool environments used by the workflows.
 
 The `microsam/` folder is currently treated as a separate area and is not covered by this README.
@@ -15,6 +16,7 @@ The `microsam/` folder is currently treated as a separate area and is not covere
 .
 +-- container/
 |   +-- eubibridge.def
+|   +-- eubibridge_czi.def
 |   +-- imod.def
 |   +-- py_mrcfile.def
 |   +-- segmentation.def
@@ -30,6 +32,13 @@ The `microsam/` folder is currently treated as a separate area and is not covere
 |   +-- hitt_main.sh
 |   +-- nextflow.config
 |   +-- select_images.R
+|   +-- make_collection_table.R
++-- cryo/
+|   +-- wfCRYO.nf
+|   +-- cryo_main.sh
+|   +-- nextflow.config
+|   +-- select_images.R
+|   +-- extract_metadata.py
 |   +-- make_collection_table.R
 +-- tem/
     +-- wfTEM.nf
@@ -148,6 +157,24 @@ bash ./sem_main.sh \
 ```
 
 For cluster and interactive runs, `/g/schwab/sem_screen` is the default output/log base and `/scratch/rheinnec/sem_screen/work` is the default Nextflow work directory. You can still override the same values with `SEM_SCREEN_DIR`, `WORK_DIR`, `OUTDIR`, `LOGDIR`, and `RAWDIR`.
+
+## CRYO Workflow
+
+The CRYO workflow is defined in `cryo/wfCRYO.nf`, configured by `cryo/nextflow.config`, and launched through `cryo/cryo_main.sh`.
+
+It reads raw light-microscopy file paths from a local table or Google Sheet, extracts X/Y pixel size and Z spacing metadata, converts each listed file to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table. Like HITT, it first lists S3 and skips datasets whose OME-Zarr root markers already exist in the target bucket. Zeiss `.czi` inputs use the CRYO-specific `container/eubibridge_czi.def` environment, which adds CZI reader dependencies.
+
+Useful entry points:
+
+```bash
+cd cryo
+bash ./cryo_main.sh local --workflow_stage discover
+bash ./cryo_main.sh interactive --sheet_mode google --workflow_stage process
+bash ./cryo_main.sh cluster --sheet_mode google --workflow_stage all
+bash ./cryo_main.sh cluster --workflow_stage collection
+```
+
+The input table should contain one of `raw_path`, `file_path`, `filepath`, `file`, `source_path`, or `path`. Optional scale columns such as `x_scale`, `y_scale`, and `z_scale` can override file metadata; otherwise the workflow reads OME/ImageJ/TIFF metadata where available.
 
 ## Run Modes
 
