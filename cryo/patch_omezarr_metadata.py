@@ -123,19 +123,7 @@ def build_omero_channels(metadata):
 
 
 def compact_cryo_metadata(metadata):
-    keys = [
-        "name",
-        "raw_path",
-        "source_suffix",
-        "x_scale_nm",
-        "y_scale_nm",
-        "z_scale_nm",
-        "size_c",
-        "channels",
-        "channel_stats",
-        "prepared_input_mode",
-    ]
-    compact = {key: metadata[key] for key in keys if key in metadata}
+    compact = dict(metadata)
     if "channels" in compact:
         compact["channels"] = real_channels_only(metadata)
         compact["size_c"] = len(compact["channels"])

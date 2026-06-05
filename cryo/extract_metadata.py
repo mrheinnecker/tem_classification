@@ -60,10 +60,33 @@ def parse_optional_float(value):
     return float(value)
 
 
+def parse_first_number(value):
+    value = "" if value is None else str(value).strip()
+    if value == "":
+        return None
+    match = re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", value)
+    if not match:
+        return None
+    return float(match.group(0))
+
+
+def parse_wavelength_nm(value, unit="nm"):
+    parsed = parse_first_number(value)
+    if parsed is None:
+        return None
+    return to_nm(parsed, unit)
+
+
 def to_nm(value, unit):
     if value is None:
         return None
-    normalized = (unit or "nm").strip().lower()
+    normalized = (
+        (unit or "nm")
+        .strip()
+        .lower()
+        .replace("\u00b5", "u")
+        .replace("\u03bc", "u")
+    )
     if normalized not in UNIT_TO_NM:
         raise ValueError(f"Unsupported scale unit: {unit}")
     return float(value) * UNIT_TO_NM[normalized]
@@ -158,6 +181,15 @@ def parse_ome_xml(description):
                 "label": label,
                 "display": sanitize_channel_label(label, index),
                 "color": color_for_channel(label, None, index),
+                "fluor": channel.attrib.get("Fluor"),
+                "excitation_wavelength_nm": parse_wavelength_nm(
+                    channel.attrib.get("ExcitationWavelength"),
+                    channel.attrib.get("ExcitationWavelengthUnit", "nm"),
+                ),
+                "emission_wavelength_nm": parse_wavelength_nm(
+                    channel.attrib.get("EmissionWavelength"),
+                    channel.attrib.get("EmissionWavelengthUnit", "nm"),
+                ),
             }
         )
     if channels:
@@ -178,6 +210,24 @@ def find_first_text_by_local_name(element, names):
     for child in element.iter():
         if local_name(child) in wanted and child.text and child.text.strip():
             return child.text.strip()
+    return None
+
+
+def find_first_wavelength_nm(element, names):
+    for name in names:
+        for child in element.iter():
+            if local_name(child) != name:
+                continue
+            raw_value = child.attrib.get("Value") or child.text
+            unit = (
+                child.attrib.get("Unit")
+                or child.attrib.get(f"{name}Unit")
+                or child.attrib.get("DefaultUnit")
+                or "nm"
+            )
+            parsed = parse_wavelength_nm(raw_value, unit)
+            if parsed is not None:
+                return parsed
     return None
 
 
@@ -290,6 +340,26 @@ def czi_channels_from_xml(xml_text, max_channels=None):
             element.attrib.get("Color")
             or find_first_text_by_local_name(element, ["Color", "ColorRGBA"])
         )
+        excitation_wavelength = (
+            parse_wavelength_nm(
+                element.attrib.get("ExcitationWavelength"),
+                element.attrib.get("ExcitationWavelengthUnit", "nm"),
+            )
+            or find_first_wavelength_nm(
+                element,
+                ["ExcitationWavelength", "ExcitationWavelengthMicron", "ExcitationWavelengthUm"],
+            )
+        )
+        emission_wavelength = (
+            parse_wavelength_nm(
+                element.attrib.get("EmissionWavelength"),
+                element.attrib.get("EmissionWavelengthUnit", "nm"),
+            )
+            or find_first_wavelength_nm(
+                element,
+                ["EmissionWavelength", "EmissionWavelengthMicron", "EmissionWavelengthUm"],
+            )
+        )
         key = sanitize_channel_label(label, len(channels)).lower()
         if key in seen:
             continue
@@ -302,6 +372,9 @@ def czi_channels_from_xml(xml_text, max_channels=None):
                 "label": str(label),
                 "display": sanitize_channel_label(label, index),
                 "color": color_for_channel(label, raw_color, index),
+                "fluor": str(dye) if dye else None,
+                "excitation_wavelength_nm": excitation_wavelength,
+                "emission_wavelength_nm": emission_wavelength,
             }
         )
         if max_channels is not None and len(channels) >= max_channels:
