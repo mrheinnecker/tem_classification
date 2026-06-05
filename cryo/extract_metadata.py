@@ -300,6 +300,40 @@ def czi_channel_count_from_dims_shape(dims_shape):
     return None
 
 
+def normalized_channel_key(value):
+    value = "" if value is None else str(value).strip()
+    if value == "":
+        return None
+    match = re.search(r"channel[:_\s-]*(\d+)", value, flags=re.IGNORECASE)
+    if match:
+        return f"channel_{int(match.group(1))}"
+    return sanitize_channel_label(value, 0).lower()
+
+
+def channel_element_keys(element):
+    keys = []
+    for attr_name in ("Name", "Id", "ID"):
+        key = normalized_channel_key(element.attrib.get(attr_name))
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def matching_channel_text(channel_elements, label, names):
+    wanted_keys = set()
+    for value in (label,):
+        key = normalized_channel_key(value)
+        if key:
+            wanted_keys.add(key)
+    for element in channel_elements:
+        if not wanted_keys.intersection(channel_element_keys(element)):
+            continue
+        value = find_first_text_by_local_name(element, names)
+        if value:
+            return value
+    return None
+
+
 def czi_channels_from_xml(xml_text, max_channels=None):
     if isinstance(xml_text, ET.Element):
         root = xml_text
@@ -334,6 +368,12 @@ def czi_channels_from_xml(xml_text, max_channels=None):
             or element.attrib.get("ID")
         )
         dye = find_first_text_by_local_name(element, ["DyeName", "Fluor", "Fluorophore"])
+        if not dye:
+            dye = matching_channel_text(
+                channel_elements,
+                label or element.attrib.get("Id") or element.attrib.get("ID"),
+                ["DyeName", "Fluor", "Fluorophore"],
+            )
         if dye and (not label or re.fullmatch(r"ch(?:annel)?_?\d+", str(label), flags=re.IGNORECASE)):
             label = dye
         raw_color = (
@@ -347,7 +387,12 @@ def czi_channels_from_xml(xml_text, max_channels=None):
             )
             or find_first_wavelength_nm(
                 element,
-                ["ExcitationWavelength", "ExcitationWavelengthMicron", "ExcitationWavelengthUm"],
+                [
+                    "ExcitationWavelength",
+                    "ExcitationWavelengthMicron",
+                    "ExcitationWavelengthUm",
+                    "DyeMaxExcitation",
+                ],
             )
         )
         emission_wavelength = (
@@ -357,7 +402,12 @@ def czi_channels_from_xml(xml_text, max_channels=None):
             )
             or find_first_wavelength_nm(
                 element,
-                ["EmissionWavelength", "EmissionWavelengthMicron", "EmissionWavelengthUm"],
+                [
+                    "EmissionWavelength",
+                    "EmissionWavelengthMicron",
+                    "EmissionWavelengthUm",
+                    "DyeMaxEmission",
+                ],
             )
         )
         key = sanitize_channel_label(label, len(channels)).lower()
