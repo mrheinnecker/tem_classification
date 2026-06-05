@@ -68,12 +68,12 @@ def ome_tiff_metadata(metadata):
         fluor = [channel.get("fluor") for channel in channels]
         excitation = [channel.get("excitation_wavelength_nm") for channel in channels]
         emission = [channel.get("emission_wavelength_nm") for channel in channels]
-        if any(value is not None for value in fluor):
+        if all(value is not None for value in fluor):
             channel_metadata["Fluor"] = fluor
-        if any(value is not None for value in excitation):
+        if all(value is not None for value in excitation):
             channel_metadata["ExcitationWavelength"] = excitation
             channel_metadata["ExcitationWavelengthUnit"] = ["nm"] * len(channels)
-        if any(value is not None for value in emission):
+        if all(value is not None for value in emission):
             channel_metadata["EmissionWavelength"] = emission
             channel_metadata["EmissionWavelengthUnit"] = ["nm"] * len(channels)
         ome_metadata["Channel"] = channel_metadata

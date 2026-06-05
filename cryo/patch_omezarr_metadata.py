@@ -1,5 +1,6 @@
 import argparse
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -130,6 +131,81 @@ def compact_cryo_metadata(metadata):
     return compact
 
 
+def xml_local_name(element):
+    return str(element.tag).split("}", 1)[-1]
+
+
+def format_ome_float(value):
+    return f"{float(value):g}"
+
+
+def patch_channel_attribute(element, attribute, value):
+    if value is None:
+        element.attrib.pop(attribute, None)
+        return
+    element.set(attribute, format_ome_float(value))
+
+
+def patch_ome_xml_file(path, metadata):
+    try:
+        tree = ET.parse(path)
+    except ET.ParseError:
+        return False
+
+    root = tree.getroot()
+    namespace = ""
+    if root.tag.startswith("{"):
+        namespace = root.tag.split("}", 1)[0][1:]
+        ET.register_namespace("", namespace)
+
+    channels = real_channels_only(metadata)
+    if not channels:
+        return False
+
+    channel_elements = [
+        element
+        for element in root.iter()
+        if xml_local_name(element) == "Channel"
+    ]
+    if not channel_elements:
+        return False
+
+    for index, element in enumerate(channel_elements[: len(channels)]):
+        channel = channels[index]
+        label = channel.get("display") or channel.get("label")
+        fluor = channel.get("fluor")
+        if label:
+            element.set("Name", str(label))
+        if fluor:
+            element.set("Fluor", str(fluor))
+        else:
+            element.attrib.pop("Fluor", None)
+
+        excitation = channel.get("excitation_wavelength_nm")
+        emission = channel.get("emission_wavelength_nm")
+        patch_channel_attribute(element, "ExcitationWavelength", excitation)
+        patch_channel_attribute(element, "EmissionWavelength", emission)
+        if excitation is None:
+            element.attrib.pop("ExcitationWavelengthUnit", None)
+        else:
+            element.set("ExcitationWavelengthUnit", "nm")
+        if emission is None:
+            element.attrib.pop("EmissionWavelengthUnit", None)
+        else:
+            element.set("EmissionWavelengthUnit", "nm")
+
+    tree.write(path, encoding="utf-8", xml_declaration=True)
+    return True
+
+
+def patch_ome_xml_files(zarr_root, metadata):
+    patched = []
+    for path in sorted(zarr_root.rglob("*.ome.xml")):
+        if patch_ome_xml_file(path, metadata):
+            patched.append(str(path))
+    return patched
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Patch extracted CRYO/CZI metadata into an OME-Zarr .zattrs file."
@@ -155,10 +231,14 @@ def main():
 
     attrs["cryo_metadata"] = compact_cryo_metadata(metadata)
     zattrs_path.write_text(json.dumps(attrs, indent=2, sort_keys=True), encoding="utf-8")
+    patched_ome_xmls = patch_ome_xml_files(zarr_root, metadata)
 
     with Path(args.log).open("w", encoding="utf-8") as handle:
-        handle.write("omezarr\tmetadata_json\tpatched_zattrs\tchannels\n")
-        handle.write(f"{zarr_root}\t{args.metadata_json}\t{zattrs_path}\t{len(omero_channels)}\n")
+        handle.write("omezarr\tmetadata_json\tpatched_zattrs\tchannels\tpatched_ome_xmls\n")
+        handle.write(
+            f"{zarr_root}\t{args.metadata_json}\t{zattrs_path}\t"
+            f"{len(omero_channels)}\t{len(patched_ome_xmls)}\n"
+        )
 
 
 if __name__ == "__main__":
