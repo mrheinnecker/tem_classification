@@ -227,7 +227,22 @@ def zeiss_color_to_mobie(value):
     return f"r({red})-g({green})-b({blue})-a({alpha})"
 
 
-def czi_channels_from_xml(xml_text):
+def czi_channel_count_from_dims_shape(dims_shape):
+    if isinstance(dims_shape, dict):
+        value = dims_shape.get("C")
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            return int(value[1] - value[0])
+        if isinstance(value, int):
+            return int(value)
+    if isinstance(dims_shape, list):
+        for item in dims_shape:
+            count = czi_channel_count_from_dims_shape(item)
+            if count is not None:
+                return count
+    return None
+
+
+def czi_channels_from_xml(xml_text, max_channels=None):
     if isinstance(xml_text, ET.Element):
         root = xml_text
     else:
@@ -235,11 +250,22 @@ def czi_channels_from_xml(xml_text):
             xml_text = xml_text.decode("utf-8", errors="replace")
         root = ET.fromstring(xml_text)
 
-    channel_elements = [
+    channels_parents = [
         element
         for element in root.iter()
-        if local_name(element) == "Channel"
+        if local_name(element) == "Channels"
     ]
+    channel_elements = []
+    for parent in channels_parents:
+        direct_channels = find_children_by_local_name(parent, "Channel")
+        if direct_channels:
+            channel_elements.extend(direct_channels)
+    if not channel_elements:
+        channel_elements = [
+            element
+            for element in root.iter()
+            if local_name(element) == "Channel"
+        ]
     channels = []
     seen = set()
     for element in channel_elements:
@@ -256,12 +282,7 @@ def czi_channels_from_xml(xml_text):
             element.attrib.get("Color")
             or find_first_text_by_local_name(element, ["Color", "ColorRGBA"])
         )
-        key = (
-            element.attrib.get("Id")
-            or element.attrib.get("ID")
-            or label
-            or str(len(channels))
-        )
+        key = sanitize_channel_label(label, len(channels)).lower()
         if key in seen:
             continue
         seen.add(key)
@@ -275,6 +296,8 @@ def czi_channels_from_xml(xml_text):
                 "color": color_for_channel(label, raw_color, index),
             }
         )
+        if max_channels is not None and len(channels) >= max_channels:
+            break
     return channels
 
 
@@ -306,16 +329,20 @@ def extract_czi_metadata(path):
     czi = CziFile(path)
     metadata = {}
     xml_text = czi.meta
-    if xml_text is not None:
-        metadata.update(czi_scaling_from_xml(xml_text))
-        channels = czi_channels_from_xml(xml_text)
-        if channels:
-            metadata["channels"] = channels
-            metadata["size_c"] = len(channels)
+    dims_shape = None
     try:
-        metadata["dims_shape"] = czi.dims_shape()
+        dims_shape = czi.dims_shape()
+        metadata["dims_shape"] = dims_shape
     except Exception:
         metadata["dims_shape"] = None
+    channel_count = czi_channel_count_from_dims_shape(dims_shape)
+    if channel_count is not None:
+        metadata["size_c"] = channel_count
+    if xml_text is not None:
+        metadata.update(czi_scaling_from_xml(xml_text))
+        channels = czi_channels_from_xml(xml_text, max_channels=channel_count)
+        if channels:
+            metadata["channels"] = channels
     return metadata
 
 

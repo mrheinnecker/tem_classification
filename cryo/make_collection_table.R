@@ -54,6 +54,7 @@ metadata_row <- function(path) {
     axes=metadata$axes %||% "",
     page_count=metadata$page_count %||% NA_integer_,
     source_suffix=metadata$source_suffix %||% "",
+    size_c=metadata$size_c %||% NA_integer_,
     channels=list(metadata$channels %||% list())
   )
 }
@@ -100,6 +101,7 @@ metadata_table <- tibble(
   axes=character(),
   page_count=integer(),
   source_suffix=character(),
+  size_c=integer(),
   channels=list()
 )
 if (length(metadata_files) > 0) {
@@ -111,6 +113,7 @@ if (length(metadata_files) > 0) {
 }
 
 default_channel_colors <- c("red", "green", "yellow", "blue", "magenta", "cyan", "white")
+preferred_channel_order <- c("GFP", "PE", "ChloA", "TL", "DAPI")
 
 sanitize_channel_display <- function(value, index) {
   value <- value %||% paste0("channel_", index)
@@ -119,12 +122,12 @@ sanitize_channel_display <- function(value, index) {
   ifelse(value == "", paste0("channel_", index), value)
 }
 
-normalize_channels <- function(channels) {
+normalize_channels <- function(channels, size_c=NA_integer_) {
   if (is.null(channels) || length(channels) == 0) {
     return(list(list(index=0L, label="channel_0", display="channel_0", color=default_channel_colors[[1]])))
   }
 
-  map(seq_along(channels), function(i) {
+  normalized <- map(seq_along(channels), function(i) {
     channel <- channels[[i]]
     index <- as.integer(channel$index %||% (i - 1L))
     label <- channel$label %||% paste0("channel_", index)
@@ -137,6 +140,35 @@ normalize_channels <- function(channels) {
       color=as.character(color)
     )
   })
+
+  normalized <- normalized[!duplicated(map_chr(normalized, ~tolower(.x$display)))]
+  if (length(normalized) > length(preferred_channel_order)) {
+    preferred <- list()
+    for (term in preferred_channel_order) {
+      matches <- keep(
+        normalized,
+        ~str_detect(tolower(.x$display), fixed(tolower(term))) ||
+          str_detect(tolower(.x$label), fixed(tolower(term)))
+      )
+      if (length(matches) > 0) {
+        match <- matches[[1]]
+        match$display <- term
+        match$label <- term
+        preferred[[length(preferred) + 1L]] <- match
+      }
+    }
+    if (length(preferred) > 0) {
+      normalized <- preferred
+    }
+  }
+  if (!is.na(size_c) && size_c > 0) {
+    normalized <- normalized[seq_len(min(length(normalized), size_c))]
+  }
+  normalized <- imap(normalized, function(channel, index) {
+    channel$index <- index - 1L
+    channel
+  })
+  normalized
 }
 
 base_table <- s3_root_markers %>%
@@ -150,9 +182,7 @@ base_table <- s3_root_markers %>%
         req_mem,
         sheet_x_scale=x_scale,
         sheet_y_scale=y_scale,
-        sheet_z_scale=z_scale,
-        sheet_scale_unit=scale_unit,
-        everything()
+        sheet_z_scale=z_scale
       ),
     by="name"
   ) %>%
@@ -167,7 +197,7 @@ base_table <- s3_root_markers %>%
     grid=coalesce(site, "cryo"),
     grid_index=row_number() - 1L,
     grid_position=paste0("(", grid_index %% 5L, ",", grid_index %/% 5L, ")"),
-    channels=map(channels, normalize_channels),
+    channels=map2(channels, size_c, normalize_channels),
     exclusive=FALSE,
     blend="sum",
     format="OmeZarr",
@@ -187,27 +217,14 @@ col_table <- base_table %>%
   select(
     uri,
     name,
-    source_name,
     view,
     grid,
     grid_position,
     channel,
-    channel_label,
     display,
     color,
     blend,
-    format,
-    type,
-    raw_path,
-    x_scale_nm,
-    y_scale_nm,
-    z_scale_nm,
-    shape,
-    axes,
-    page_count,
-    source_suffix,
-    exclusive,
-    everything()
+    format
   )
 
 write_tsv(col_table, file=local_collection_table)
