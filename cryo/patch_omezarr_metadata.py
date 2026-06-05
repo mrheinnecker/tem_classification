@@ -14,6 +14,46 @@ COLOR_TO_HEX = {
     "gray": "FFFFFF",
     "grey": "FFFFFF",
 }
+REAL_CHANNELS = [
+    ("GFP", "cyan"),
+    ("PE", "yellow"),
+    ("ChloA", "magenta"),
+    ("TL", "white"),
+]
+
+
+def compact_label(value):
+    return "".join(char for char in str(value or "").lower() if char.isalnum())
+
+
+def channel_matches(channel, label):
+    label_compact = compact_label(label)
+    display = compact_label(channel.get("display"))
+    channel_label = compact_label(channel.get("label"))
+    return label_compact in display or label_compact in channel_label
+
+
+def real_channels_only(metadata):
+    channels = metadata.get("channels", [])
+    selected = []
+    used = set()
+    for display, color in REAL_CHANNELS:
+        for channel in channels:
+            if id(channel) in used:
+                continue
+            if channel_matches(channel, display):
+                normalized = dict(channel)
+                normalized["display"] = display
+                normalized["label"] = display
+                normalized["color"] = color
+                selected.append(normalized)
+                used.add(id(channel))
+                break
+    if selected:
+        for index, channel in enumerate(selected):
+            channel["index"] = index
+        return selected
+    return channels
 
 
 def find_zarr_root(path):
@@ -48,7 +88,7 @@ def channel_color(channel):
 
 def build_omero_channels(metadata):
     channels = []
-    for index, channel in enumerate(metadata.get("channels", [])):
+    for index, channel in enumerate(real_channels_only(metadata)):
         min_value = channel.get("min")
         max_value = channel.get("max")
         if min_value is None or max_value is None:
@@ -95,7 +135,11 @@ def compact_cryo_metadata(metadata):
         "channel_stats",
         "prepared_input_mode",
     ]
-    return {key: metadata[key] for key in keys if key in metadata}
+    compact = {key: metadata[key] for key in keys if key in metadata}
+    if "channels" in compact:
+        compact["channels"] = real_channels_only(metadata)
+        compact["size_c"] = len(compact["channels"])
+    return compact
 
 
 def main():
