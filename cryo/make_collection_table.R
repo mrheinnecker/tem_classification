@@ -44,6 +44,20 @@ s3_public_prefix <- function(bucket) {
 
 metadata_row <- function(path) {
   metadata <- fromJSON(path, simplifyVector=FALSE)
+  channels <- metadata$channels %||% list()
+  channel_stats <- metadata$channel_stats %||% list()
+  if (length(channels) > 0 && length(channel_stats) > 0) {
+    stats_by_index <- set_names(channel_stats, map_chr(channel_stats, ~as.character(.x$index %||% "")))
+    channels <- map(channels, function(channel) {
+      stats <- stats_by_index[[as.character(channel$index %||% "")]]
+      if (!is.null(stats)) {
+        channel$min <- channel$min %||% stats$min
+        channel$max <- channel$max %||% stats$max
+        channel$contrast_limits <- channel$contrast_limits %||% stats$contrast_limits
+      }
+      channel
+    })
+  }
   tibble(
     name=metadata$name,
     metadata_raw_path=metadata$raw_path %||% "",
@@ -55,7 +69,7 @@ metadata_row <- function(path) {
     page_count=metadata$page_count %||% NA_integer_,
     source_suffix=metadata$source_suffix %||% "",
     size_c=metadata$size_c %||% NA_integer_,
-    channels=list(metadata$channels %||% list())
+    channels=list(channels)
   )
 }
 

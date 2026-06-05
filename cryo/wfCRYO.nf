@@ -189,6 +189,11 @@ process PREPARECRYOINPUT {
       --output-dir "prepared_input" \
       --metadata-json "${metadata_json}" \
       --prepared-log "${filename}_prepared_input.tsv"
+
+    mkdir -p "${params.persistent_metadata_dir}"
+    metadata_tmp="${params.persistent_metadata_dir}/${filename}_metadata.json.tmp.\$\$"
+    cp "${metadata_json}" "\$metadata_tmp"
+    mv "\$metadata_tmp" "${params.persistent_metadata_dir}/${filename}_metadata.json"
     """
 }
 
