@@ -138,6 +138,8 @@ sample_c1_GFP
 
 The table also writes `channel`, `channel_label`, `display`, `color`, `blend=sum`, `format=OmeZarr`, `grid`, and `grid_position`. Channels from the same image share the same `grid_position`, and `display` is channel-specific so MoBIE keeps independent display controls for DAPI/GFP/etc.
 
+During CZI preparation, the workflow computes per-channel min/max values from the `TCZYX` image data and stores them as `contrast_limits` in the collection table.
+
 ## Containers
 
 The CRYO workflow uses two separate containers:

@@ -19,6 +19,29 @@ def load_bioimage(path):
     return np.asarray(data)
 
 
+def channel_stats_from_tczyx(data):
+    stats = []
+    if data.ndim != 5:
+        return stats
+
+    for channel_index in range(data.shape[1]):
+        channel = data[:, channel_index, :, :, :]
+        finite = channel[np.isfinite(channel)]
+        if finite.size == 0:
+            continue
+        min_value = float(finite.min())
+        max_value = float(finite.max())
+        stats.append(
+            {
+                "index": channel_index,
+                "min": min_value,
+                "max": max_value,
+                "contrast_limits": f"({min_value:.6g},{max_value:.6g})",
+            }
+        )
+    return stats
+
+
 def write_czi_as_ome_tiff(input_path, output_path):
     try:
         import tifffile
@@ -26,6 +49,7 @@ def write_czi_as_ome_tiff(input_path, output_path):
         raise RuntimeError("tifffile is required to write intermediate OME-TIFF") from exc
 
     data = load_bioimage(input_path)
+    channel_stats = channel_stats_from_tczyx(data)
     tifffile.imwrite(
         output_path,
         data,
@@ -34,6 +58,7 @@ def write_czi_as_ome_tiff(input_path, output_path):
         photometric="minisblack",
         metadata={"axes": "TCZYX"},
     )
+    return channel_stats
 
 
 def link_or_copy(source, target):
@@ -64,11 +89,12 @@ def main():
 
     if suffix == ".czi":
         prepared_path = output_dir / f"{args.name}.ome.tif"
-        write_czi_as_ome_tiff(input_path, prepared_path)
+        channel_stats = write_czi_as_ome_tiff(input_path, prepared_path)
         mode = "czi_to_ome_tiff"
     else:
         prepared_path = output_dir / input_path.name
         link_or_copy(input_path, prepared_path)
+        channel_stats = []
         mode = "link_or_copy_original"
 
     metadata = {}
@@ -77,6 +103,15 @@ def main():
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     metadata["prepared_input_path"] = str(prepared_path)
     metadata["prepared_input_mode"] = mode
+    if channel_stats:
+        metadata["channel_stats"] = channel_stats
+        stats_by_index = {row["index"]: row for row in channel_stats}
+        for channel in metadata.get("channels", []):
+            stats = stats_by_index.get(channel.get("index"))
+            if stats is not None:
+                channel["min"] = stats["min"]
+                channel["max"] = stats["max"]
+                channel["contrast_limits"] = stats["contrast_limits"]
     metadata_path.write_text(
         json.dumps(metadata, indent=2, sort_keys=True),
         encoding="utf-8",

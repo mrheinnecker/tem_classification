@@ -144,12 +144,14 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
     label <- channel$label %||% paste0("channel_", index)
     display <- channel$display %||% sanitize_channel_display(label, index)
     color <- channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]]
+    contrast_limits <- channel$contrast_limits %||% ""
     display <- sanitize_channel_display(display, index)
     list(
       index=index,
       label=as.character(label),
       display=display,
-      color=as.character(color_for_display(display, color))
+      color=as.character(color_for_display(display, color)),
+      contrast_limits=as.character(contrast_limits)
     )
   })
 
@@ -224,6 +226,7 @@ col_table <- base_table %>%
     channel_label=map_chr(channels, "label"),
     display=map_chr(channels, "display"),
     color=map_chr(channels, "color"),
+    contrast_limits=map_chr(channels, "contrast_limits"),
     name=paste0(source_name, "_c", channel, "_", display)
   ) %>%
   select(-channels) %>%
@@ -236,6 +239,7 @@ col_table <- base_table %>%
     channel,
     display,
     color,
+    contrast_limits,
     blend,
     format
   )
