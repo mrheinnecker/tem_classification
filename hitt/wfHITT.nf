@@ -155,8 +155,7 @@ process COPYHITTDATA {
 
     publishDir "${params.logdir}/copy", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
-    errorStrategy "retry"
-    maxRetries 2
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
