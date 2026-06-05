@@ -212,7 +212,7 @@ process EUBICRYOCONVERSION {
     tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
 
     output:
-    tuple val(filename), path("${filename}_omezarr"), emit: omezarr
+    tuple val(filename), path("${filename}_omezarr"), path(metadata_json), emit: omezarr
     path "${filename}_conversion_done.txt"
 
     script:
@@ -255,6 +255,35 @@ process EUBICRYOCONVERSION {
       --max_workers 1
 
     touch "${filename}_conversion_done.txt"
+    """
+}
+
+
+process PATCHCRYOOMEZARRMETADATA {
+
+    cpus 1
+    memory "1GB"
+    time "10m"
+
+    publishDir "${params.logdir}/omezarr_metadata", mode:"copy", pattern:"*_omezarr_metadata.tsv"
+    containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
+
+    input:
+    tuple val(filename), path(omezarr), path(metadata_json)
+
+    output:
+    tuple val(filename), path(omezarr), emit: patched_omezarr
+    path "${filename}_omezarr_metadata.tsv"
+
+    script:
+    """
+    set -euo pipefail
+
+    python3 "${params.script_dir}/patch_omezarr_metadata.py" \
+      --omezarr "${omezarr}" \
+      --metadata-json "${metadata_json}" \
+      --log "${filename}_omezarr_metadata.tsv"
     """
 }
 
@@ -394,9 +423,10 @@ workflow {
         PREPARECRYOINPUT(EXTRACTCRYOMETADATA.out.metadata)
 
         EUBICRYOCONVERSION(PREPARECRYOINPUT.out.prepared)
+        PATCHCRYOOMEZARRMETADATA(EUBICRYOCONVERSION.out.omezarr)
 
         if (params.workflow_stage == "all") {
-            upload_done_ch = S3UPLOADCRYO(EUBICRYOCONVERSION.out.omezarr).collect()
+            upload_done_ch = S3UPLOADCRYO(PATCHCRYOOMEZARRMETADATA.out.patched_omezarr).collect()
             COLLECTCRYOS3FILES(upload_done_ch)
 
             metadata_jsons_ch = EXTRACTCRYOMETADATA.out.metadata_json.collect()

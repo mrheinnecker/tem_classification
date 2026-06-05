@@ -44,7 +44,31 @@ def channel_stats_from_tczyx(data):
     return stats
 
 
-def write_czi_as_ome_tiff(input_path, output_path):
+def ome_tiff_metadata(metadata):
+    ome_metadata = {"axes": "TCZYX"}
+    scale_keys = {
+        "PhysicalSizeX": "x_scale_nm",
+        "PhysicalSizeY": "y_scale_nm",
+        "PhysicalSizeZ": "z_scale_nm",
+    }
+    for ome_key, metadata_key in scale_keys.items():
+        value = metadata.get(metadata_key)
+        if value is not None:
+            ome_metadata[ome_key] = float(value)
+            ome_metadata[f"{ome_key}Unit"] = "nm"
+
+    channels = metadata.get("channels", [])
+    if channels:
+        ome_metadata["Channel"] = {
+            "Name": [
+                channel.get("display") or channel.get("label") or f"channel_{index}"
+                for index, channel in enumerate(channels)
+            ]
+        }
+    return ome_metadata
+
+
+def write_czi_as_ome_tiff(input_path, output_path, metadata):
     try:
         import tifffile
     except ImportError as exc:
@@ -58,7 +82,7 @@ def write_czi_as_ome_tiff(input_path, output_path):
         bigtiff=True,
         ome=True,
         photometric="minisblack",
-        metadata={"axes": "TCZYX"},
+        metadata=ome_tiff_metadata(metadata),
     )
     return channel_stats
 
@@ -88,10 +112,14 @@ def main():
 
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = input_path.suffix.lower()
+    metadata = {}
+    metadata_path = Path(args.metadata_json)
+    if metadata_path.exists():
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
     if suffix == ".czi":
         prepared_path = output_dir / f"{args.name}.ome.tif"
-        channel_stats = write_czi_as_ome_tiff(input_path, prepared_path)
+        channel_stats = write_czi_as_ome_tiff(input_path, prepared_path, metadata)
         mode = "czi_to_ome_tiff"
     else:
         prepared_path = output_dir / input_path.name
@@ -99,10 +127,6 @@ def main():
         channel_stats = []
         mode = "link_or_copy_original"
 
-    metadata = {}
-    metadata_path = Path(args.metadata_json)
-    if metadata_path.exists():
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     metadata["prepared_input_path"] = str(prepared_path)
     metadata["prepared_input_mode"] = mode
     if channel_stats:

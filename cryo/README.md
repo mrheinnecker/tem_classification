@@ -69,6 +69,8 @@ Zeiss `.czi` files are not sent directly to EuBI-Bridge. The workflow first runs
 
 Non-CZI inputs are linked or copied into the same prepared-input directory and then passed to EuBI-Bridge unchanged. The original raw files are not modified.
 
+The intermediate OME-TIFF stores the image axes, physical X/Y/Z pixel sizes, and channel names where available. After EuBI-Bridge conversion, `patch_omezarr_metadata.py` updates the final OME-Zarr root `.zattrs` with `omero.channels` display metadata and a compact `cryo_metadata` block derived from the original CZI metadata JSON.
+
 ## Run examples
 
 Discover selected rows without conversion:
