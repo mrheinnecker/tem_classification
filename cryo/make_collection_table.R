@@ -125,9 +125,9 @@ near_square_columns <- function(n) {
 color_for_display <- function(display, fallback) {
   compact <- str_replace_all(tolower(display %||% ""), "[^a-z0-9]+", "")
   case_when(
-    str_detect(compact, "gfp") ~ "green",
+    str_detect(compact, "gfp") ~ "cyan",
     str_detect(compact, "tl") ~ "white",
-    str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "red",
+    str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "magenta",
     str_detect(compact, "pe") ~ "yellow",
     TRUE ~ fallback
   )

@@ -45,10 +45,10 @@ DEFAULT_CHANNEL_COLORS = [
     "white",
 ]
 CHANNEL_COLOR_OVERRIDES = {
-    "gfp": "green",
+    "gfp": "cyan",
     "tl": "white",
-    "chloa": "red",
-    "chlorophyll": "red",
+    "chloa": "magenta",
+    "chlorophyll": "magenta",
     "pe": "yellow",
 }
 
@@ -206,9 +206,9 @@ def color_for_channel(label, raw_color, index):
     if "dapi" in label_lower or "hoechst" in label_lower:
         return "blue"
     if "gfp" in label_lower or "fitc" in label_lower or "488" in label_lower:
-        return "green"
+        return "cyan"
     if "rfp" in label_lower or "tritc" in label_lower or "mcherry" in label_lower or "561" in label_lower:
-        return "red"
+        return "magenta"
     if "cy5" in label_lower or "647" in label_lower or "farred" in label_lower:
         return "magenta"
     return DEFAULT_CHANNEL_COLORS[index % len(DEFAULT_CHANNEL_COLORS)]

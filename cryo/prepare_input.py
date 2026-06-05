@@ -20,6 +20,8 @@ def load_bioimage(path):
 
 
 def channel_stats_from_tczyx(data):
+    import numpy as np
+
     stats = []
     if data.ndim != 5:
         return stats
