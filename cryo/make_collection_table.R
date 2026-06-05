@@ -115,6 +115,13 @@ if (length(metadata_files) > 0) {
 default_channel_colors <- c("red", "green", "yellow", "blue", "magenta", "cyan", "white")
 preferred_channel_order <- c("GFP", "PE", "ChloA", "TL", "DAPI")
 
+near_square_columns <- function(n) {
+  if (n <= 1) {
+    return(1L)
+  }
+  as.integer(ceiling(sqrt(n)))
+}
+
 color_for_display <- function(display, fallback) {
   compact <- str_replace_all(tolower(display %||% ""), "[^a-z0-9]+", "")
   case_when(
@@ -211,13 +218,19 @@ base_table <- s3_root_markers %>%
     view=coalesce(site, "cryo"),
     grid=coalesce(site, "cryo"),
     grid_index=row_number() - 1L,
-    grid_position=paste0("(", grid_index %% 5L, ",", grid_index %/% 5L, ")"),
     channels=map2(channels, size_c, normalize_channels),
     exclusive=FALSE,
     blend="sum",
     format="OmeZarr",
     type="intensities"
-  )
+  ) %>%
+  group_by(grid) %>%
+  mutate(
+    grid_columns=near_square_columns(n()),
+    grid_position=paste0("(", grid_index %% grid_columns, ",", grid_index %/% grid_columns, ")")
+  ) %>%
+  ungroup() %>%
+  select(-grid_columns)
 
 col_table <- base_table %>%
   unnest_longer(channels) %>%
