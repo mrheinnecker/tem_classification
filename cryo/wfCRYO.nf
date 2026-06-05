@@ -134,7 +134,7 @@ process EXTRACTCRYOMETADATA {
     tuple val(filename), val(raw_path), val(output_path), val(x_scale_override), val(y_scale_override), val(z_scale_override), val(scale_unit), val(req_mem)
 
     output:
-    tuple val(filename), val(raw_path), val(output_path), path("${filename}_metadata.json"), path("${filename}_pixel_size.tsv"), val(req_mem), emit: metadata
+    tuple val(filename), val(raw_path), val(output_path), path("${filename}_metadata.json"), path("${filename}_pixel_size.tsv"), path("${filename}_czi_metadata.xml"), val(req_mem), emit: metadata
     path "${filename}_metadata.json", emit: metadata_json
 
     script:
@@ -146,6 +146,7 @@ process EXTRACTCRYOMETADATA {
       --name "${filename}" \
       --metadata-json "${filename}_metadata.json" \
       --pixel-size-tsv "${filename}_pixel_size.tsv" \
+      --czi-metadata-xml "${filename}_czi_metadata.xml" \
       --x-scale "${x_scale_override}" \
       --y-scale "${y_scale_override}" \
       --z-scale "${z_scale_override}" \
@@ -154,10 +155,13 @@ process EXTRACTCRYOMETADATA {
     mkdir -p "${params.persistent_metadata_dir}"
     metadata_tmp="${params.persistent_metadata_dir}/${filename}_metadata.json.tmp.\$\$"
     pixel_tmp="${params.persistent_metadata_dir}/${filename}_pixel_size.tsv.tmp.\$\$"
+    czi_xml_tmp="${params.persistent_metadata_dir}/${filename}_czi_metadata.xml.tmp.\$\$"
     cp "${filename}_metadata.json" "\$metadata_tmp"
     cp "${filename}_pixel_size.tsv" "\$pixel_tmp"
+    cp "${filename}_czi_metadata.xml" "\$czi_xml_tmp"
     mv "\$metadata_tmp" "${params.persistent_metadata_dir}/${filename}_metadata.json"
     mv "\$pixel_tmp" "${params.persistent_metadata_dir}/${filename}_pixel_size.tsv"
+    mv "\$czi_xml_tmp" "${params.persistent_metadata_dir}/${filename}_czi_metadata.xml"
     """
 }
 
@@ -173,10 +177,10 @@ process PREPARECRYOINPUT {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(raw_path), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
+    tuple val(filename), val(raw_path), val(output_path), path(metadata_json), path(pixel_size_tsv), path(czi_metadata_xml), val(req_mem)
 
     output:
-    tuple val(filename), path("prepared_input"), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem), emit: prepared
+    tuple val(filename), path("prepared_input"), val(output_path), path(metadata_json), path(pixel_size_tsv), path(czi_metadata_xml), val(req_mem), emit: prepared
     path "${filename}_prepared_input.tsv"
 
     script:
@@ -209,10 +213,10 @@ process EUBICRYOCONVERSION {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), val(req_mem)
+    tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), path(czi_metadata_xml), val(req_mem)
 
     output:
-    tuple val(filename), path("${filename}_omezarr"), path(metadata_json), emit: omezarr
+    tuple val(filename), path("${filename}.ome.zarr"), path(metadata_json), path(czi_metadata_xml), emit: omezarr
     path "${filename}_conversion_done.txt"
 
     script:
@@ -235,11 +239,11 @@ process EUBICRYOCONVERSION {
       exit 1
     fi
 
-    rm -rf "${filename}_omezarr"
+    rm -rf "${filename}.ome.zarr"
 
     eubi to_zarr \
       "\$input_path" \
-      "${filename}_omezarr" \
+      "${filename}.ome.zarr" \
       --x_unit nm \
       --y_unit nm \
       --z_unit nm \
@@ -270,7 +274,7 @@ process PATCHCRYOOMEZARRMETADATA {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), path(omezarr), path(metadata_json)
+    tuple val(filename), path(omezarr), path(metadata_json), path(czi_metadata_xml)
 
     output:
     tuple val(filename), path(omezarr), emit: patched_omezarr
@@ -283,6 +287,7 @@ process PATCHCRYOOMEZARRMETADATA {
     python3 "${params.script_dir}/patch_omezarr_metadata.py" \
       --omezarr "${omezarr}" \
       --metadata-json "${metadata_json}" \
+      --czi-metadata-xml "${czi_metadata_xml}" \
       --log "${filename}_omezarr_metadata.tsv"
     """
 }
@@ -324,7 +329,7 @@ process S3UPLOADCRYO {
       exit 1
     fi
 
-    mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}.zarr/" --recursive
+    mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}.ome.zarr/" --recursive
     touch "${filename}_s3_upload_done.txt"
     """
 }

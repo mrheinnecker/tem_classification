@@ -477,6 +477,20 @@ def extract_czi_metadata(path):
     return metadata
 
 
+def czi_metadata_xml_text(path):
+    if CziFile is None:
+        raise RuntimeError("aicspylibczi is required to read CZI metadata")
+
+    xml_text = CziFile(path).meta
+    if xml_text is None:
+        return ""
+    if isinstance(xml_text, ET.Element):
+        return ET.tostring(xml_text, encoding="unicode")
+    if isinstance(xml_text, bytes):
+        return xml_text.decode("utf-8", errors="replace")
+    return str(xml_text)
+
+
 def extract_tiff_metadata(path):
     if tifffile is None:
         raise RuntimeError("tifffile is required to read TIFF metadata")
@@ -523,6 +537,7 @@ def main():
     parser.add_argument("--name", required=True)
     parser.add_argument("--metadata-json", required=True)
     parser.add_argument("--pixel-size-tsv", required=True)
+    parser.add_argument("--czi-metadata-xml", default="")
     parser.add_argument("--x-scale", default="")
     parser.add_argument("--y-scale", default="")
     parser.add_argument("--z-scale", default="")
@@ -543,15 +558,26 @@ def main():
     if input_path.suffix.lower() == ".czi":
         try:
             metadata.update(extract_czi_metadata(input_path))
+            if args.czi_metadata_xml:
+                Path(args.czi_metadata_xml).write_text(
+                    czi_metadata_xml_text(input_path),
+                    encoding="utf-8",
+                )
         except RuntimeError:
             if not all([args.x_scale, args.y_scale, args.z_scale]):
                 raise
+            if args.czi_metadata_xml:
+                Path(args.czi_metadata_xml).write_text("", encoding="utf-8")
     elif input_path.suffix.lower() in {".tif", ".tiff"} or suffixes[-2:] in [[".ome", ".tif"], [".ome", ".tiff"]]:
         try:
             metadata.update(extract_tiff_metadata(input_path))
         except RuntimeError:
             if not all([args.x_scale, args.y_scale, args.z_scale]):
                 raise
+        if args.czi_metadata_xml:
+            Path(args.czi_metadata_xml).write_text("", encoding="utf-8")
+    elif args.czi_metadata_xml:
+        Path(args.czi_metadata_xml).write_text("", encoding="utf-8")
     metadata = merge_overrides(metadata, args)
 
     missing = [

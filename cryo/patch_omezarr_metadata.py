@@ -1,5 +1,6 @@
 import argparse
 import json
+import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -206,12 +207,27 @@ def patch_ome_xml_files(zarr_root, metadata):
     return patched
 
 
+def copy_czi_metadata_xml(zarr_root, czi_metadata_xml):
+    if not czi_metadata_xml:
+        return None
+    source = Path(czi_metadata_xml)
+    if not source.exists() or source.stat().st_size == 0:
+        return None
+
+    metadata_dir = zarr_root / "czi_metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    target = metadata_dir / "czi_metadata.xml"
+    shutil.copy2(source, target)
+    return target
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Patch extracted CRYO/CZI metadata into an OME-Zarr .zattrs file."
     )
     parser.add_argument("--omezarr", required=True)
     parser.add_argument("--metadata-json", required=True)
+    parser.add_argument("--czi-metadata-xml", default="")
     parser.add_argument("--log", required=True)
     args = parser.parse_args()
 
@@ -232,12 +248,14 @@ def main():
     attrs["cryo_metadata"] = compact_cryo_metadata(metadata)
     zattrs_path.write_text(json.dumps(attrs, indent=2, sort_keys=True), encoding="utf-8")
     patched_ome_xmls = patch_ome_xml_files(zarr_root, metadata)
+    copied_czi_metadata = copy_czi_metadata_xml(zarr_root, args.czi_metadata_xml)
 
     with Path(args.log).open("w", encoding="utf-8") as handle:
-        handle.write("omezarr\tmetadata_json\tpatched_zattrs\tchannels\tpatched_ome_xmls\n")
+        handle.write("omezarr\tmetadata_json\tpatched_zattrs\tchannels\tpatched_ome_xmls\tczi_metadata_xml\n")
         handle.write(
             f"{zarr_root}\t{args.metadata_json}\t{zattrs_path}\t"
-            f"{len(omero_channels)}\t{len(patched_ome_xmls)}\n"
+            f"{len(omero_channels)}\t{len(patched_ome_xmls)}\t"
+            f"{copied_czi_metadata or ''}\n"
         )
 
 

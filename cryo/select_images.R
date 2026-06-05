@@ -69,7 +69,7 @@ if (!is.null(opt$existing_s3) && !is.na(opt$existing_s3) && file.exists(opt$exis
     discard(is.na)
 
   existing_s3_names <- existing_s3_paths %>%
-    str_match("^([^/]+?)(?:\\.zarr)?/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$") %>%
+    str_match("^([^/]+?)(?:\\.ome\\.zarr|\\.zarr)?/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$") %>%
     .[, 2] %>%
     discard(is.na) %>%
     unique()
@@ -179,7 +179,7 @@ all_images <- images %>%
     filename=if ("filename" %in% names(images)) coalesce(filename, sanitize_name(raw_path)) else sanitize_name(raw_path),
     filename=sanitize_name(filename),
     shortname=if ("shortname" %in% names(images)) coalesce(shortname, filename) else filename,
-    output_path=file.path(outdir, filename, paste0(filename, "_omezarr")),
+    output_path=file.path(outdir, filename, paste0(filename, ".ome.zarr")),
     req_mem=if ("req_mem" %in% names(images)) coalesce(req_mem, "32") else "32",
     x_scale=cryo_x_scale,
     y_scale=cryo_y_scale,

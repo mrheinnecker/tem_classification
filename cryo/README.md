@@ -2,7 +2,7 @@
 
 This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
 
-Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>.zarr/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
+Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>.ome.zarr/` or legacy `<dataset_name>.zarr/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
 
 For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when S3 is unavailable.
 
@@ -69,7 +69,7 @@ Zeiss `.czi` files are not sent directly to EuBI-Bridge. The workflow first runs
 
 Non-CZI inputs are linked or copied into the same prepared-input directory and then passed to EuBI-Bridge unchanged. The original raw files are not modified.
 
-The intermediate OME-TIFF stores the image axes, physical X/Y/Z pixel sizes, and channel names where available. After EuBI-Bridge conversion, `patch_omezarr_metadata.py` updates the final OME-Zarr root `.zattrs` with `omero.channels` display metadata and a compact `cryo_metadata` block derived from the original CZI metadata JSON.
+The intermediate OME-TIFF stores the image axes, physical X/Y/Z pixel sizes, and channel names where available. After EuBI-Bridge conversion, `patch_omezarr_metadata.py` updates the final OME-Zarr root `.zattrs` with `omero.channels` display metadata and a compact `cryo_metadata` block derived from the original CZI metadata JSON. For CZI inputs, the full raw Zeiss metadata XML is also copied into the OME-Zarr under `czi_metadata/czi_metadata.xml`.
 
 ## Run examples
 
@@ -126,10 +126,10 @@ Metadata JSON and pixel-size TSV files are persisted under `--persistent_metadat
 Uploaded datasets are written to S3 as:
 
 ```text
-<s3_bucket>/<dataset_name>.zarr/
+<s3_bucket>/<dataset_name>.ome.zarr/
 ```
 
-The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.zarr` prefix.
+The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` uploads are still recognized when checking S3 and rebuilding the collection table.
 
 For multi-channel CZI data, the collection table is expanded to one row per channel. The original dataset name is kept in `source_name`, while `name` becomes channel-specific, for example:
 
