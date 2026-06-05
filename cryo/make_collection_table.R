@@ -115,6 +115,17 @@ if (length(metadata_files) > 0) {
 default_channel_colors <- c("red", "green", "yellow", "blue", "magenta", "cyan", "white")
 preferred_channel_order <- c("GFP", "PE", "ChloA", "TL", "DAPI")
 
+color_for_display <- function(display, fallback) {
+  compact <- str_replace_all(tolower(display %||% ""), "[^a-z0-9]+", "")
+  case_when(
+    str_detect(compact, "gfp") ~ "green",
+    str_detect(compact, "tl") ~ "white",
+    str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "red",
+    str_detect(compact, "pe") ~ "yellow",
+    TRUE ~ fallback
+  )
+}
+
 sanitize_channel_display <- function(value, index) {
   value <- value %||% paste0("channel_", index)
   value <- str_replace_all(as.character(value), "[^A-Za-z0-9]+", "_") %>%
@@ -133,11 +144,12 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
     label <- channel$label %||% paste0("channel_", index)
     display <- channel$display %||% sanitize_channel_display(label, index)
     color <- channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]]
+    display <- sanitize_channel_display(display, index)
     list(
       index=index,
       label=as.character(label),
-      display=sanitize_channel_display(display, index),
-      color=as.character(color)
+      display=display,
+      color=as.character(color_for_display(display, color))
     )
   })
 
@@ -154,6 +166,7 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
         match <- matches[[1]]
         match$display <- term
         match$label <- term
+        match$color <- color_for_display(term, match$color)
         preferred[[length(preferred) + 1L]] <- match
       }
     }

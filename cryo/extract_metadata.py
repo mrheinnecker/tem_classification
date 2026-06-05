@@ -44,6 +44,13 @@ DEFAULT_CHANNEL_COLORS = [
     "cyan",
     "white",
 ]
+CHANNEL_COLOR_OVERRIDES = {
+    "gfp": "green",
+    "tl": "white",
+    "chloa": "red",
+    "chlorophyll": "red",
+    "pe": "yellow",
+}
 
 
 def parse_optional_float(value):
@@ -192,6 +199,10 @@ def sanitize_channel_label(label, index):
 
 def color_for_channel(label, raw_color, index):
     label_lower = str(label or "").lower()
+    compact_label = re.sub(r"[^a-z0-9]+", "", label_lower)
+    for key, color in CHANNEL_COLOR_OVERRIDES.items():
+        if key in compact_label:
+            return color
     if "dapi" in label_lower or "hoechst" in label_lower:
         return "blue"
     if "gfp" in label_lower or "fitc" in label_lower or "488" in label_lower:
@@ -200,9 +211,6 @@ def color_for_channel(label, raw_color, index):
         return "red"
     if "cy5" in label_lower or "647" in label_lower or "farred" in label_lower:
         return "magenta"
-    converted = zeiss_color_to_mobie(raw_color)
-    if converted:
-        return converted
     return DEFAULT_CHANNEL_COLORS[index % len(DEFAULT_CHANNEL_COLORS)]
 
 
