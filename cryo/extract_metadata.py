@@ -35,6 +35,15 @@ UNIT_TO_NM = {
     "millimetres": 1_000_000.0,
 }
 METER_TO_NM = 1_000_000_000.0
+DEFAULT_CHANNEL_COLORS = [
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "white",
+]
 
 
 def parse_optional_float(value):
@@ -128,7 +137,41 @@ def parse_ome_xml(description):
     for axis in ("X", "Y", "Z", "C", "T"):
         raw_value = pixels.attrib.get(f"Size{axis}")
         values[f"size_{axis.lower()}"] = int(raw_value) if raw_value is not None else None
+    channels = []
+    channel_elements = pixels.findall("ome:Channel", ns) if ns else pixels.findall("Channel")
+    for index, channel in enumerate(channel_elements):
+        label = (
+            channel.attrib.get("Name")
+            or channel.attrib.get("ID")
+            or f"channel_{index}"
+        )
+        channels.append(
+            {
+                "index": index,
+                "label": label,
+                "display": sanitize_channel_label(label, index),
+                "color": color_for_channel(label, None, index),
+            }
+        )
+    if channels:
+        values["channels"] = channels
     return values
+
+
+def local_name(element):
+    return str(element.tag).split("}", 1)[-1]
+
+
+def find_children_by_local_name(element, name):
+    return [child for child in list(element) if local_name(child) == name]
+
+
+def find_first_text_by_local_name(element, names):
+    wanted = set(names)
+    for child in element.iter():
+        if local_name(child) in wanted and child.text and child.text.strip():
+            return child.text.strip()
+    return None
 
 
 def first_text(element, names):
@@ -137,6 +180,102 @@ def first_text(element, names):
         if child is not None and child.text:
             return child.text
     return None
+
+
+def sanitize_channel_label(label, index):
+    label = str(label or "").strip()
+    if not label:
+        return f"channel_{index}"
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_")
+    return cleaned or f"channel_{index}"
+
+
+def color_for_channel(label, raw_color, index):
+    label_lower = str(label or "").lower()
+    if "dapi" in label_lower or "hoechst" in label_lower:
+        return "blue"
+    if "gfp" in label_lower or "fitc" in label_lower or "488" in label_lower:
+        return "green"
+    if "rfp" in label_lower or "tritc" in label_lower or "mcherry" in label_lower or "561" in label_lower:
+        return "red"
+    if "cy5" in label_lower or "647" in label_lower or "farred" in label_lower:
+        return "magenta"
+    converted = zeiss_color_to_mobie(raw_color)
+    if converted:
+        return converted
+    return DEFAULT_CHANNEL_COLORS[index % len(DEFAULT_CHANNEL_COLORS)]
+
+
+def zeiss_color_to_mobie(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    match = re.fullmatch(r"#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})", value)
+    if not match:
+        return None
+    hex_color = match.group(1)
+    if len(hex_color) == 8:
+        alpha = int(hex_color[0:2], 16)
+        red = int(hex_color[2:4], 16)
+        green = int(hex_color[4:6], 16)
+        blue = int(hex_color[6:8], 16)
+    else:
+        alpha = 255
+        red = int(hex_color[0:2], 16)
+        green = int(hex_color[2:4], 16)
+        blue = int(hex_color[4:6], 16)
+    return f"r({red})-g({green})-b({blue})-a({alpha})"
+
+
+def czi_channels_from_xml(xml_text):
+    if isinstance(xml_text, ET.Element):
+        root = xml_text
+    else:
+        if isinstance(xml_text, bytes):
+            xml_text = xml_text.decode("utf-8", errors="replace")
+        root = ET.fromstring(xml_text)
+
+    channel_elements = [
+        element
+        for element in root.iter()
+        if local_name(element) == "Channel"
+    ]
+    channels = []
+    seen = set()
+    for element in channel_elements:
+        label = (
+            element.attrib.get("Name")
+            or find_first_text_by_local_name(element, ["Name", "DyeName", "Fluor", "Fluorophore"])
+            or element.attrib.get("Id")
+            or element.attrib.get("ID")
+        )
+        dye = find_first_text_by_local_name(element, ["DyeName", "Fluor", "Fluorophore"])
+        if dye and (not label or re.fullmatch(r"ch(?:annel)?_?\d+", str(label), flags=re.IGNORECASE)):
+            label = dye
+        raw_color = (
+            element.attrib.get("Color")
+            or find_first_text_by_local_name(element, ["Color", "ColorRGBA"])
+        )
+        key = (
+            element.attrib.get("Id")
+            or element.attrib.get("ID")
+            or label
+            or str(len(channels))
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        index = len(channels)
+        label = label or f"channel_{index}"
+        channels.append(
+            {
+                "index": index,
+                "label": str(label),
+                "display": sanitize_channel_label(label, index),
+                "color": color_for_channel(label, raw_color, index),
+            }
+        )
+    return channels
 
 
 def czi_scaling_from_xml(xml_text):
@@ -169,6 +308,10 @@ def extract_czi_metadata(path):
     xml_text = czi.meta
     if xml_text is not None:
         metadata.update(czi_scaling_from_xml(xml_text))
+        channels = czi_channels_from_xml(xml_text)
+        if channels:
+            metadata["channels"] = channels
+            metadata["size_c"] = len(channels)
     try:
         metadata["dims_shape"] = czi.dims_shape()
     except Exception:

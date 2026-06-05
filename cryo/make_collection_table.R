@@ -43,7 +43,7 @@ s3_public_prefix <- function(bucket) {
 }
 
 metadata_row <- function(path) {
-  metadata <- fromJSON(path)
+  metadata <- fromJSON(path, simplifyVector=FALSE)
   tibble(
     name=metadata$name,
     metadata_raw_path=metadata$raw_path %||% "",
@@ -53,7 +53,8 @@ metadata_row <- function(path) {
     shape=if (!is.null(metadata$shape)) paste(metadata$shape, collapse="x") else "",
     axes=metadata$axes %||% "",
     page_count=metadata$page_count %||% NA_integer_,
-    source_suffix=metadata$source_suffix %||% ""
+    source_suffix=metadata$source_suffix %||% "",
+    channels=list(metadata$channels %||% list())
   )
 }
 
@@ -98,7 +99,8 @@ metadata_table <- tibble(
   shape=character(),
   axes=character(),
   page_count=integer(),
-  source_suffix=character()
+  source_suffix=character(),
+  channels=list()
 )
 if (length(metadata_files) > 0) {
   metadata_table <- metadata_files %>%
@@ -108,7 +110,36 @@ if (length(metadata_files) > 0) {
   warning("No *_metadata.json files found; collection table will use sheet metadata only.")
 }
 
-col_table <- s3_root_markers %>%
+default_channel_colors <- c("red", "green", "yellow", "blue", "magenta", "cyan", "white")
+
+sanitize_channel_display <- function(value, index) {
+  value <- value %||% paste0("channel_", index)
+  value <- str_replace_all(as.character(value), "[^A-Za-z0-9]+", "_") %>%
+    str_replace_all("^_|_$", "")
+  ifelse(value == "", paste0("channel_", index), value)
+}
+
+normalize_channels <- function(channels) {
+  if (is.null(channels) || length(channels) == 0) {
+    return(list(list(index=0L, label="channel_0", display="channel_0", color=default_channel_colors[[1]])))
+  }
+
+  map(seq_along(channels), function(i) {
+    channel <- channels[[i]]
+    index <- as.integer(channel$index %||% (i - 1L))
+    label <- channel$label %||% paste0("channel_", index)
+    display <- channel$display %||% sanitize_channel_display(label, index)
+    color <- channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]]
+    list(
+      index=index,
+      label=as.character(label),
+      display=sanitize_channel_display(display, index),
+      color=as.character(color)
+    )
+  })
+}
+
+base_table <- s3_root_markers %>%
   left_join(
     all_datasets %>%
       select(
@@ -130,15 +161,43 @@ col_table <- s3_root_markers %>%
     x_scale_nm=coalesce(as.character(x_scale_nm), sheet_x_scale),
     y_scale_nm=coalesce(as.character(y_scale_nm), sheet_y_scale),
     z_scale_nm=coalesce(as.character(z_scale_nm), sheet_z_scale),
-    view=name,
-    grid=name,
-    exclusive=TRUE
+    source_name=name,
+    site=str_extract(source_name, "^[A-Za-z]+"),
+    view=coalesce(site, "cryo"),
+    grid=coalesce(site, "cryo"),
+    grid_index=row_number() - 1L,
+    grid_position=paste0("(", grid_index %% 5L, ",", grid_index %/% 5L, ")"),
+    channels=map(channels, normalize_channels),
+    exclusive=FALSE,
+    blend="sum",
+    format="OmeZarr",
+    type="intensities"
+  )
+
+col_table <- base_table %>%
+  unnest_longer(channels) %>%
+  mutate(
+    channel=map_int(channels, "index"),
+    channel_label=map_chr(channels, "label"),
+    display=map_chr(channels, "display"),
+    color=map_chr(channels, "color"),
+    name=paste0(source_name, "_c", channel, "_", display)
   ) %>%
+  select(-channels) %>%
   select(
     uri,
     name,
+    source_name,
     view,
     grid,
+    grid_position,
+    channel,
+    channel_label,
+    display,
+    color,
+    blend,
+    format,
+    type,
     raw_path,
     x_scale_nm,
     y_scale_nm,

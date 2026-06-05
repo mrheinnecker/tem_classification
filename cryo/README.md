@@ -129,6 +129,15 @@ Uploaded datasets are written to S3 as:
 
 The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.zarr` prefix.
 
+For multi-channel CZI data, the collection table is expanded to one row per channel. The original dataset name is kept in `source_name`, while `name` becomes channel-specific, for example:
+
+```text
+sample_c0_DAPI
+sample_c1_GFP
+```
+
+The table also writes `channel`, `channel_label`, `display`, `color`, `blend=sum`, `format=OmeZarr`, `grid`, and `grid_position`. Channels from the same image share the same `grid_position`, and `display` is channel-specific so MoBIE keeps independent display controls for DAPI/GFP/etc.
+
 ## Containers
 
 The CRYO workflow uses two separate containers:
