@@ -129,6 +129,7 @@ process EXTRACTCRYOMETADATA {
 
     publishDir "${params.logdir}/metadata", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
+    errorStrategy "ignore"
 
     input:
     tuple val(filename), val(raw_path), val(output_path), val(x_scale_override), val(y_scale_override), val(z_scale_override), val(scale_unit), val(req_mem)

@@ -284,7 +284,8 @@ col_table <- base_table %>%
     display=map_chr(channels, "display"),
     color=map_chr(channels, "color"),
     contrast_limits=map_chr(channels, "contrast_limits"),
-    name=paste0(source_name, "_c", channel, "_", display)
+    name=paste0(source_name, "_c", channel, "_", display),
+    exclusive=T
   ) %>%
   select(-channels) %>%
   select(
@@ -298,7 +299,8 @@ col_table <- base_table %>%
     color,
     contrast_limits,
     blend,
-    format
+    format,
+    exclusive
   )
 
 write_tsv(col_table, file=local_collection_table)
