@@ -17,7 +17,7 @@ timestamp="$(date +%Y-%m-%d_%H-%M)"
 repo_dir="/g/schwab/marco/repos/tem_classification"
 cd /scratch/rheinnec/cryo_screen
 
-bash "${repo_dir}/cryo/cryo_main.sh" cluster \
+bash "${repo_dir}/cryo/cryo_main.sh" interactive \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503" \
   --sheet_name "cryo_lm" \
@@ -34,7 +34,7 @@ bash "${repo_dir}/cryo/cryo_main.sh" cluster \
   --s3_bucket "s3embl/imatrec/central_data_processing/cryo" \
   --zarr_format 2 \
   --scale_unit nm \
-  --resume TRUE
+  --resume FALSE
 
 # If CZI metadata is missing or inconsistent, provide fallback physical scales:
 #

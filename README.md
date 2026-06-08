@@ -1,14 +1,17 @@
-# TEM/SEM Screening Workflows
+# TREC-Biobank / IMATREC central data processing workflows
 
-This repository contains workflow code for preparing, processing, converting, and publishing microscopy screening data. The main active areas are:
+This repository contains code to process all data modalities of the TREC-Biobank / IMATREC project by the Schwab team, CBB unit EMBL Heideberg.
 
-- `tem/`: Transmission electron microscopy (TEM) discovery, preprocessing, QC, OME-Zarr conversion, S3 upload, and collection-table generation.
-- `sem/`: Scanning electron microscopy (SEM) TIFF discovery, metadata extraction, OME-Zarr conversion, S3 upload, and collection-table generation.
-- `hitt/`: Table-driven large-image conversion workflow for HITT image directories, OME-Zarr conversion, and S3 upload.
-- `cryo/`: Table-driven light-microscopy Z-stack conversion workflow with metadata extraction, OME-Zarr conversion, S3 upload, and collection-table generation.
-- `container/`: Singularity/Apptainer definition files for the tool environments used by the workflows.
+The repo is sub-structured according to the various modalities:
 
-The `microsam/` folder is currently treated as a separate area and is not covered by this README.
+
+- `tem/`: Transmission electron microscopy (TEM) 
+- `sem/`: Scanning electron microscopy (SEM) 
+- `hitt/`: High-Throughput Tomography; X-ray scans 
+- `cryo/`: Cryo confocal images of Plunge-frozen grids
+
+Each modality follows the same strategy: Starting from raw data as it arrives from microscopes / input sources and ending in conversion to ome-zarr format, storing everything in s3 storage and creating collection tables to browse the data through MoBie.
+Each workflow is implemented in nextflow and has its dependencies handled via Apptainer/SIngularity container (see definition files in `container/`).
 
 ## Repository Layout
 
