@@ -76,7 +76,7 @@ process CHECKEXISTINGHITTS3FILES {
     fi
 
     if command -v mc >/dev/null 2>&1; then
-      if ! mc ls --recursive "${s3_bucket}" > "existing_s3_entries.txt"; then
+      if ! mc ls "${s3_bucket}" > "existing_s3_entries.txt"; then
         if [ "\$require_s3" = "TRUE" ]; then
           echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
           exit 1

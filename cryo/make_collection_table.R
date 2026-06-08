@@ -85,7 +85,7 @@ s3_root_markers <- read_lines(opt$all_s3) %>%
   mutate(
     s3_raw=parse_mc_ls_path(value),
     s3_raw=str_remove(s3_raw, "/$"),
-    s3_prefix=str_match(s3_raw, "^([^/]+(?:\\.ome\\.zarr|\\.zarr)?)/(?:\\.zattrs|\\.zgroup|Z_zset\\.zarr/(?:\\.zattrs|\\.zgroup))$")[, 2],
+    s3_prefix=str_match(s3_raw, "^([^/]+(?:\\.ome\\.zarr|\\.zarr))$")[, 2],
     name=s3_prefix %>%
       str_remove("\\.ome\\.zarr$") %>%
       str_remove("\\.zarr$")

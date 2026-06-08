@@ -55,7 +55,7 @@ process CHECKEXISTINGCRYOS3FILES {
     fi
 
     if command -v mc >/dev/null 2>&1; then
-      if ! mc ls --recursive "${s3_bucket}" > "existing_s3_entries.txt"; then
+      if ! mc ls "${s3_bucket}" > "existing_s3_entries.txt"; then
         if [ "\$require_s3" = "TRUE" ]; then
           echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
           exit 1
@@ -352,7 +352,7 @@ process COLLECTCRYOS3FILES {
 
     script:
     """
-    mc ls --recursive "${params.s3_bucket}" > all_s3_entries.txt
+    mc ls "${params.s3_bucket}" > all_s3_entries.txt
     """
 }
 

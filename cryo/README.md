@@ -2,7 +2,7 @@
 
 This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
 
-Before selecting datasets, the workflow lists the configured S3 bucket with `mc ls --recursive`. Any dataset whose uploaded `<dataset_name>.ome.zarr/` or legacy `<dataset_name>.zarr/` prefix contains a root `.zattrs` or `.zgroup` marker is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
+Before selecting datasets, the workflow lists only the top level of the configured S3 bucket with `mc ls`. Any dataset with an uploaded `<dataset_name>.ome.zarr/` or legacy `<dataset_name>.zarr/` prefix is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
 
 For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when S3 is unavailable.
 
