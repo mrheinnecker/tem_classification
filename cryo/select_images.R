@@ -134,7 +134,7 @@ images <- images_raw %>%
   mutate(across(everything(), ~na_if(.x, ""))) %>%
   filter(str_detect(`File Name`, "_st_3D")) %>% 
   filter(str_detect(FilePath, "CryoLM")) %>%
-  .[1:5,]
+  .[100:105,]
 
 path_column <- first_existing_column(
   images,
