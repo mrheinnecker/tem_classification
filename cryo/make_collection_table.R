@@ -149,6 +149,34 @@ color_for_display <- function(display, fallback) {
   )
 }
 
+rounded_wavelength <- function(value) {
+  value <- suppressWarnings(as.numeric(value %||% NA_real_))
+  ifelse(is.na(value), NA_real_, round(value))
+}
+
+canonical_channel_display <- function(channel, fallback_display) {
+  text <- paste(
+    channel$display %||% "",
+    channel$label %||% "",
+    channel$fluor %||% "",
+    sep=" "
+  )
+  compact <- str_replace_all(tolower(text), "[^a-z0-9]+", "")
+  excitation <- rounded_wavelength(channel$excitation_wavelength_nm %||% NA_real_)
+  emission <- rounded_wavelength(channel$emission_wavelength_nm %||% NA_real_)
+
+  case_when(
+    str_detect(compact, "tl") & !str_detect(compact, "tpmt") ~ "TL",
+    str_detect(compact, "gfp") | str_detect(compact, "egfp") |
+      excitation == 488 | emission == 509 ~ "GFP",
+    str_detect(compact, "alexafluor555") | str_detect(compact, "af555") |
+      compact %in% c("pe") | excitation == 553 | emission == 568 ~ "PE",
+    str_detect(compact, "chloa") | str_detect(compact, "chlorophylla") |
+      excitation == 655 | emission == 667 ~ "ChloA",
+    TRUE ~ fallback_display
+  )
+}
+
 sanitize_channel_display <- function(value, index) {
   value <- value %||% paste0("channel_", index)
   value <- str_replace_all(as.character(value), "[^A-Za-z0-9]+", "_") %>%
@@ -168,7 +196,7 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
     display <- channel$display %||% sanitize_channel_display(label, index)
     color <- channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]]
     contrast_limits <- channel$contrast_limits %||% ""
-    display <- sanitize_channel_display(display, index)
+    display <- canonical_channel_display(channel, sanitize_channel_display(display, index))
     list(
       index=index,
       label=as.character(label),
@@ -184,8 +212,8 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
     for (term in preferred_channel_order) {
       matches <- keep(
         normalized,
-        ~str_detect(tolower(.x$display), fixed(tolower(term))) ||
-          str_detect(tolower(.x$label), fixed(tolower(term)))
+        ~tolower(.x$display) == tolower(term) ||
+          tolower(.x$label) == tolower(term)
       )
       if (length(matches) > 0) {
         match <- matches[[1]]

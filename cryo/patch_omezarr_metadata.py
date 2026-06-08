@@ -28,10 +28,48 @@ def compact_label(value):
     return "".join(char for char in str(value or "").lower() if char.isalnum())
 
 
+def rounded_wavelength(channel, key):
+    value = channel.get(key)
+    if value is None:
+        return None
+    try:
+        return round(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def channel_matches(channel, label):
     label_compact = compact_label(label)
     display = compact_label(channel.get("display"))
     channel_label = compact_label(channel.get("label"))
+    fluor = compact_label(channel.get("fluor"))
+    excitation = rounded_wavelength(channel, "excitation_wavelength_nm")
+    emission = rounded_wavelength(channel, "emission_wavelength_nm")
+
+    if label == "GFP":
+        return (
+            label_compact in {display, channel_label}
+            or "egfp" in fluor
+            or excitation == 488
+            or emission == 509
+        )
+    if label == "PE":
+        return (
+            label_compact in {display, channel_label}
+            or "alexafluor555" in fluor
+            or "af555" in fluor
+            or excitation == 553
+            or emission == 568
+        )
+    if label == "ChloA":
+        return (
+            label_compact in {display, channel_label}
+            or "chlorophylla" in fluor
+            or excitation == 655
+            or emission == 667
+        )
+    if label == "TL":
+        return label_compact in {display, channel_label}
     return label_compact in display or label_compact in channel_label
 
 

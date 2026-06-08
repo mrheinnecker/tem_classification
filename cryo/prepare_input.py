@@ -19,6 +19,28 @@ def load_bioimage(path):
     return np.asarray(data)
 
 
+def fail_on_multiscene_czi(metadata):
+    scene_count = metadata.get("scene_count")
+    try:
+        scene_count = int(scene_count)
+    except (TypeError, ValueError):
+        scene_count = 0
+    if scene_count <= 1:
+        return
+
+    scenes = metadata.get("scenes", [])
+    scene_labels = []
+    for index, scene in enumerate(scenes):
+        label = scene.get("name") or scene.get("index") or index
+        scene_labels.append(str(label))
+    detail = ", ".join(scene_labels) if scene_labels else f"{scene_count} scenes"
+    raise ValueError(
+        "Multi-scene CZI input detected. This workflow currently expects one "
+        f"image scene per row, but this file contains {scene_count} scenes: {detail}. "
+        "Split the CZI by scene or add explicit scene handling before conversion."
+    )
+
+
 def channel_stats_from_tczyx(data):
     import numpy as np
 
@@ -130,6 +152,7 @@ def main():
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
     if suffix == ".czi":
+        fail_on_multiscene_czi(metadata)
         prepared_path = output_dir / f"{args.name}.ome.tif"
         channel_stats = write_czi_as_ome_tiff(input_path, prepared_path, metadata)
         mode = "czi_to_ome_tiff"

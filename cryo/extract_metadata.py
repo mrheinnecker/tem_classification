@@ -264,6 +264,29 @@ def color_for_channel(label, raw_color, index):
     return DEFAULT_CHANNEL_COLORS[index % len(DEFAULT_CHANNEL_COLORS)]
 
 
+def canonical_channel_display(label, fluor=None, excitation_wavelength=None, emission_wavelength=None):
+    text = " ".join(str(value or "") for value in (label, fluor)).lower()
+    compact = re.sub(r"[^a-z0-9]+", "", text)
+    if "tl" in compact and "tpmt" not in compact:
+        return "TL"
+    if any(term in compact for term in ("gfp", "egfp", "fitc")):
+        return "GFP"
+    if any(term in compact for term in ("pe", "af555", "alexafluor555")):
+        return "PE"
+    if any(term in compact for term in ("chloa", "chlorophylla")):
+        return "ChloA"
+
+    excitation = round(float(excitation_wavelength)) if excitation_wavelength is not None else None
+    emission = round(float(emission_wavelength)) if emission_wavelength is not None else None
+    if excitation == 488 or emission == 509:
+        return "GFP"
+    if excitation == 553 or emission == 568:
+        return "PE"
+    if excitation == 655 or emission == 667:
+        return "ChloA"
+    return None
+
+
 def zeiss_color_to_mobie(value):
     value = str(value or "").strip()
     if not value:
@@ -416,12 +439,18 @@ def czi_channels_from_xml(xml_text, max_channels=None):
         seen.add(key)
         index = len(channels)
         label = label or f"channel_{index}"
+        display = canonical_channel_display(
+            label,
+            dye,
+            excitation_wavelength,
+            emission_wavelength,
+        ) or sanitize_channel_label(label, index)
         channels.append(
             {
                 "index": index,
                 "label": str(label),
-                "display": sanitize_channel_label(label, index),
-                "color": color_for_channel(label, raw_color, index),
+                "display": display,
+                "color": color_for_channel(display, raw_color, index),
                 "fluor": str(dye) if dye else None,
                 "excitation_wavelength_nm": excitation_wavelength,
                 "emission_wavelength_nm": emission_wavelength,
@@ -453,6 +482,51 @@ def czi_scaling_from_xml(xml_text):
     return values
 
 
+def int_or_none(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def czi_dimension_summary_from_xml(xml_text):
+    if isinstance(xml_text, ET.Element):
+        root = xml_text
+    else:
+        if isinstance(xml_text, bytes):
+            xml_text = xml_text.decode("utf-8", errors="replace")
+        root = ET.fromstring(xml_text)
+
+    values = {}
+    for axis in ("X", "Y", "Z", "C", "T", "S", "M"):
+        for element in root.iter():
+            if local_name(element) == f"Size{axis}" and element.text:
+                parsed = int_or_none(element.text)
+                if parsed is not None:
+                    values[f"size_{axis.lower()}"] = parsed
+                break
+
+    scenes = []
+    for parent in root.iter():
+        if local_name(parent) != "Scenes":
+            continue
+        for scene in find_children_by_local_name(parent, "Scene"):
+            scenes.append(
+                {
+                    "index": int_or_none(scene.attrib.get("Index")),
+                    "name": scene.attrib.get("Name"),
+                    "region_id": first_text(scene, ["RegionId"]),
+                    "scan_mode": first_text(scene, ["ScanMode"]),
+                }
+            )
+        if scenes:
+            break
+    if scenes:
+        values["scenes"] = scenes
+        values["scene_count"] = len(scenes)
+    return values
+
+
 def extract_czi_metadata(path):
     if CziFile is None:
         raise RuntimeError("aicspylibczi is required to read CZI metadata")
@@ -470,6 +544,7 @@ def extract_czi_metadata(path):
     if channel_count is not None:
         metadata["size_c"] = channel_count
     if xml_text is not None:
+        metadata.update(czi_dimension_summary_from_xml(xml_text))
         metadata.update(czi_scaling_from_xml(xml_text))
         channels = czi_channels_from_xml(xml_text, max_channels=channel_count)
         if channels:
