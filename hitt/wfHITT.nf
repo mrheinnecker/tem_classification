@@ -208,7 +208,7 @@ process COPYHITTDATA {
 process ANALYZEHITTCROP {
 
     cpus 1
-    memory "64GB"
+    memory "128GB"
     time "1h"
 
     publishDir "${params.logdir}/crop_analysis", mode:"copy"
