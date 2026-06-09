@@ -10,7 +10,8 @@ spec <- matrix(c(
   "collection_table_url", "u", 1, "character",
   "local_collection_table", "l", 1, "character",
   "image_log_url", "i", 1, "character",
-  "local_image_log", "a", 1, "character"
+  "local_image_log", "a", 1, "character",
+  "s3_bucket", "s", 1, "character"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
@@ -56,6 +57,27 @@ site_from_name <- function(name) {
     TRUE ~ str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR|ROS|VIG")
   )
 }
+
+public_s3_base_url <- function(s3_bucket) {
+  bucket <- s3_bucket
+  if (is.null(bucket) || is.na(bucket)) {
+    bucket <- "s3embl/imatrec/central_data_processing/sem"
+  }
+
+  bucket <- bucket %>% str_remove("/+$")
+  if (str_detect(bucket, "^https?://")) {
+    return(bucket)
+  }
+
+  bucket_path <- bucket %>% str_remove("^[^/]+/?")
+  if (bucket_path == "") {
+    "https://s3.embl.de"
+  } else {
+    file.path("https://s3.embl.de", bucket_path)
+  }
+}
+
+s3_public_base <- public_s3_base_url(opt$s3_bucket)
 
 read_metadata_table <- function() {
   metadata_files <- list.files(
@@ -121,7 +143,7 @@ col_table <-
   mutate(
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw) %>% str_remove(".zarr$"),
-    uri=file.path("https://s3.embl.de/semscreen", s3_raw),
+    uri=file.path(s3_public_base, s3_raw),
    
     
     site=site_from_name(name),
