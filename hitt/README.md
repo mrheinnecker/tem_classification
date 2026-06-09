@@ -97,6 +97,8 @@ If TIFF slices at the outer start or end of a stack have a different XY shape, t
 
 The workflow also calculates stack-wide `min_gray`, `max_gray`, and `contrast_limits` values from the staged TIFF slices. In `all` mode these display values are added to `hitt_collection_table`; individual TSV files are written under `logs/.../image_stats`.
 
+Dataset names starting with `Vigo_` are mapped to site code `VIG` in the collection table. Existing three-letter prefixes such as `ROS`, `ATH`, `BIL`, and `POR` are kept as uppercase site codes.
+
 Image-statistics TSV files are also persisted under:
 
 ```text

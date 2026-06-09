@@ -23,6 +23,9 @@ Each workflow is implemented in nextflow and has its dependencies handled via Ap
 |   +-- imod.def
 |   +-- py_mrcfile.def
 |   +-- segmentation.def
++-- launch_wfSEM.sh
++-- launch_wfHITT.sh
++-- launch_wfCRYO.sh
 +-- sem/
 |   +-- wfSEM.nf
 |   +-- sem_main.sh
@@ -160,6 +163,12 @@ bash ./sem_main.sh \
 ```
 
 For cluster and interactive runs, `/g/schwab/sem_screen` is the default output/log base and `/scratch/rheinnec/sem_screen/work` is the default Nextflow work directory. You can still override the same values with `SEM_SCREEN_DIR`, `WORK_DIR`, `OUTDIR`, `LOGDIR`, and `RAWDIR`.
+
+To submit the full SEM driver as one Slurm job, edit the run settings in `launch_wfSEM.sh` and submit:
+
+```bash
+sbatch launch_wfSEM.sh
+```
 
 ## CRYO Workflow
 
