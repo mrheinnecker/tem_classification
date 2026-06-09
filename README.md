@@ -13,6 +13,18 @@ The repo is sub-structured according to the various modalities:
 Each modality follows the same strategy: Starting from raw data as it arrives from microscopes / input sources and ending in conversion to ome-zarr format, storing everything in s3 storage and creating collection tables to browse the data through MoBie.
 Each workflow is implemented in nextflow and has its dependencies handled via Apptainer/SIngularity container (see definition files in `container/`).
 
+## Usage instructions
+
+Current implementation is optimaized for EMBL slurm HPC environment. Each workflow can be run in two different modes: `cluster` or `interactive`. 
+In cluster mode, each nextflow process is submitted as a single batch job to slurm (except some light-weight guardrail or file collection scripts). In interactive mode, all processes run in the local terminal. 
+The following settings are recommened for each workflow:
+
+- `wfTEM`: Heavy; run always in cluster mode; submit launcher through: `sbatch /path/to/repo/launch_wfTEM.sh` with at least 12 hours of runtime
+- `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfTEM.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
+- `wfSEM`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
+- `wfCRYO`: lightweight: allocate a cluster node (`srun -p htc --time=0-04:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
+
+
 ## Repository Layout
 
 ```text
