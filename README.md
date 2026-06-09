@@ -20,7 +20,7 @@ In cluster mode, each nextflow process is submitted as a single batch job to slu
 The following settings are recommened for each workflow:
 
 - `wfTEM`: Heavy; run always in cluster mode; submit launcher through: `sbatch /path/to/repo/launch_wfTEM.sh` with at least 12 hours of runtime
-- `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfTEM.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
+- `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfHITT.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
 - `wfSEM`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
 - `wfCRYO`: lightweight: allocate a cluster node (`srun -p htc --time=0-04:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
 
