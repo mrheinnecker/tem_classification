@@ -50,6 +50,13 @@ source_name_from_s3 <- function(path) {
     str_remove("_omezarr$")
 }
 
+site_from_name <- function(name) {
+  case_when(
+    str_detect(str_to_lower(name), "^cellbloom(?:_|$)") ~ "VIG",
+    TRUE ~ str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR|ROS|VIG")
+  )
+}
+
 read_metadata_table <- function() {
   metadata_files <- list.files(
     metadata_dir,
@@ -117,7 +124,7 @@ col_table <-
     uri=file.path("https://s3.embl.de/semscreen", s3_raw),
    
     
-    site=str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR|ROS"),
+    site=site_from_name(name),
     sem_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     size_frac=str_extract(name, "\\d+to\\d+"),

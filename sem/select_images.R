@@ -44,6 +44,13 @@ sanitize_name <- function(x) {
     str_replace_all("^_|_$", "")
 }
 
+site_from_name <- function(name) {
+  case_when(
+    str_detect(str_to_lower(basename(name)), "^cellbloom(?:_|$)") ~ "VIG",
+    TRUE ~ str_extract(name, "ATH|BAR|KRI|TAL|NAP|BIL|POR|ROS|VIG")
+  )
+}
+
 all_files_raw <-
   tibble(file=list.files(
     raw_dir,
@@ -54,7 +61,7 @@ all_files_raw <-
   mutate(
     filename=sanitize_name(basename(file)),
     shortname=filename,
-    site=str_extract(file, "ATH|BAR|KRI|TAL|NAP|BIL|POR"),
+    site=site_from_name(file),
     sem_date=str_extract(file, "20[0-9]{6}"),
     sampling_time=str_extract(file, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     size_frac=str_extract(file, "\\d+to\\d+"),
