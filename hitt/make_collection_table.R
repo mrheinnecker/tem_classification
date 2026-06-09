@@ -53,6 +53,13 @@ source_name_from_s3 <- function(path) {
     basename()
 }
 
+site_from_name <- function(name) {
+  case_when(
+    str_detect(str_to_lower(name), "^vigo(?:_|$)") ~ "VIG",
+    TRUE ~ str_extract(name, "^[A-Za-z]+") %>% str_to_upper()
+  )
+}
+
 all_datasets <- read_tsv(opt$all_datasets, col_types=cols(.default=col_character())) %>%
   distinct(filename, .keep_all=TRUE)
 
@@ -63,7 +70,7 @@ col_table <-
     s3_raw=parse_mc_ls_path(value),
     name=source_name_from_s3(s3_raw),
     uri=file.path("https://s3.embl.de/imatrec/central_data_processing/hitt", str_remove(s3_raw, "/$"), "Z_zset.zarr/"),
-    site=str_extract(name, "^[A-Za-z]+"),
+    site=site_from_name(name),
     hitt_date=str_extract(name, "20[0-9]{6}"),
     sampling_time=str_extract(name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
     size_frac=str_extract(name, "\\d+to\\d+"),
