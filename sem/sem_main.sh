@@ -77,6 +77,7 @@ local_log="${LOCAL_LOG:-}"
 s3_bucket="${S3_BUCKET:-s3embl/semscreen}"
 sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/1jcpyMkSR4npSxST3D5cFzkAIi9UPmwbPvzAdr2ws55U/edit?gid=2132397683#gid=2132397683}"
 collection_table_url="${COLLECTION_TABLE_URL:-https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951}"
+google_key="${GOOGLE_KEY:-${script_dir}/trec-tem-screen-e98a2e03f58b.json}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -114,6 +115,30 @@ while [[ $# -gt 0 ]]; do
       ;;
     --sheet_mode=*|--sheet-mode=*|--sheete_mode=*)
       sheet_mode="${1#*=}"
+      shift
+      ;;
+    --sheet_url|--sheet-url)
+      sheet_url="${2:?--sheet_url requires a value}"
+      shift 2
+      ;;
+    --sheet_url=*|--sheet-url=*)
+      sheet_url="${1#*=}"
+      shift
+      ;;
+    --collection_table_url|--collection-table-url)
+      collection_table_url="${2:?--collection_table_url requires a value}"
+      shift 2
+      ;;
+    --collection_table_url=*|--collection-table-url=*)
+      collection_table_url="${1#*=}"
+      shift
+      ;;
+    --google_key|--google-key)
+      google_key="${2:?--google_key requires a path}"
+      shift 2
+      ;;
+    --google_key=*|--google-key=*)
+      google_key="${1#*=}"
       shift
       ;;
     --workflow_stage|--workflow-stage)
@@ -213,6 +238,7 @@ nextflow_args=(
   --local_log "$local_log"
   --sheet_mode "$sheet_mode"
   --sheet_url "$sheet_url"
+  --google_key "$google_key"
   --collection_table_url "$collection_table_url"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
