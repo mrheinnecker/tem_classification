@@ -6,6 +6,8 @@ Before selecting datasets, the workflow lists only the top level of the configur
 
 For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when the S3 client or connection is unavailable. Discovery, process-only, and dry-run modes can continue with an empty S3 listing.
 
+Use `--overwrite` to reprocess all rows with `convert=1`, even when a matching S3 prefix already exists. In `all` mode, the upload step removes the existing `s3_bucket/<dataset_name>/` prefix before uploading the rebuilt OME-Zarr.
+
 The input table should contain a `source_path` column with the remote dataset path or remote `tomo` directory. For compatibility, `remote_path` and `tmp_copy_path` are also accepted as column names. By default, interactive and cluster runs read this Google Sheet:
 
 ```text

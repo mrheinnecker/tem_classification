@@ -33,7 +33,7 @@ Options:
   --z_scale VALUE                  Z pixel scale in nm, default 650.
   --input_suffix PATH              Path below tmp_copy_path, default recon_111_1/tomo.
   --output_name NAME               Output folder below tmp_copy_path, default omezarr.
-  --overwrite TRUE|FALSE           Kept for compatibility; conversion currently always rebuilds output.
+  --overwrite [TRUE|FALSE]         Reprocess convert=1 rows and replace matching S3 prefixes.
   --convert_uint16 TRUE|FALSE      Stage uint16 TIFFs when TRUE; preserve original dtype when FALSE.
   --uint16_lower_percentile VALUE  Lower stack-wide clipping percentile, default 0.1.
   --uint16_upper_percentile VALUE  Upper stack-wide clipping percentile, default 99.9.
@@ -146,7 +146,7 @@ y_scale="${Y_SCALE:-650}"
 z_scale="${Z_SCALE:-650}"
 input_suffix="${INPUT_SUFFIX:-recon_111_1/tomo}"
 output_name="${OUTPUT_NAME:-omezarr}"
-overwrite="$(to_upper_bool "${OVERWRITE:-TRUE}")"
+overwrite="$(to_upper_bool "${OVERWRITE:-FALSE}")"
 convert_uint16="$(to_upper_bool "${CONVERT_UINT16:-TRUE}")"
 uint16_lower_percentile="${UINT16_LOWER_PERCENTILE:-0.1}"
 uint16_upper_percentile="${UINT16_UPPER_PERCENTILE:-99.9}"
@@ -347,8 +347,13 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --overwrite)
-      overwrite="$(to_upper_bool "${2:?--overwrite requires TRUE or FALSE}")"
-      shift 2
+      if [[ $# -gt 1 && "${2:-}" != --* ]]; then
+        overwrite="$(to_upper_bool "$2")"
+        shift 2
+      else
+        overwrite="TRUE"
+        shift
+      fi
       ;;
     --overwrite=*)
       overwrite="$(to_upper_bool "${1#*=}")"

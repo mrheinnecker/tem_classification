@@ -18,7 +18,7 @@ params.y_scale = params.y_scale ?: 650
 params.z_scale = params.z_scale ?: 650
 params.input_suffix = params.input_suffix ?: "recon_111_1/tomo"
 params.output_name = params.output_name ?: "omezarr"
-params.overwrite = params.overwrite ?: "TRUE"
+params.overwrite = params.overwrite ?: "FALSE"
 params.convert_uint16 = params.convert_uint16 ?: "TRUE"
 params.uint16_lower_percentile = params.uint16_lower_percentile ?: 0.1
 params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
@@ -113,6 +113,7 @@ process SELECTHITTIMAGES {
     val dryrun
     val dryrun_n
     path existing_s3
+    val overwrite
     val default_crop_stack
     val default_crop_bright_threshold
     val default_crop_auto_percentile
@@ -136,6 +137,7 @@ process SELECTHITTIMAGES {
       --dryrun "${dryrun}" \
       --dryrun_n "${dryrun_n}" \
       --existing_s3 "${existing_s3}" \
+      --overwrite "${overwrite}" \
       --default_crop_stack "${default_crop_stack}" \
       --default_crop_bright_threshold "${default_crop_bright_threshold}" \
       --default_crop_auto_percentile "${default_crop_auto_percentile}" \
@@ -412,6 +414,12 @@ process S3UPLOADHITT {
       exit 1
     fi
 
+    case "${params.overwrite}" in
+      TRUE|true|1|yes|YES)
+        mc rm --recursive --force "${params.s3_bucket}/${filename}/"
+        ;;
+    esac
+
     mc cp "${omezarr_path}/" "${params.s3_bucket}/${filename}/" --recursive
     touch "${filename}_s3_upload_done.txt"
     """
@@ -492,6 +500,7 @@ workflow {
         params.dryrun,
         params.dryrun_n,
         CHECKEXISTINGHITTS3FILES.out.existing_s3,
+        params.overwrite,
         params.crop_stack,
         params.crop_bright_threshold,
         params.crop_auto_percentile,
