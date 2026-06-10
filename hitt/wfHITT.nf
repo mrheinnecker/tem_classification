@@ -158,10 +158,10 @@ process COPYHITTDATA {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
+    tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end)
 
     output:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), emit: copied_images
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end), emit: copied_images
     path "${filename}_copy_done.txt"
 
     script:
@@ -216,7 +216,7 @@ process ANALYZEHITTCROP {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end)
 
     output:
     tuple val(filename), val(tmp_copy_path), path("${filename}_crop_plan.tsv"), val(omezarr_path), val(req_mem), emit: crop_plans
@@ -245,6 +245,8 @@ process ANALYZEHITTCROP {
       --min-bright-fraction "${crop_min_bright_fraction}" \
       --padding-low-slices "${crop_padding_low_slices}" \
       --padding-high-slices "${crop_padding_high_slices}" \
+      --manual-crop-start "${crop_start}" \
+      --manual-crop-end "${crop_end}" \
       --bridge-gap-slices "${params.crop_bridge_gap_slices}" \
       --min-run-slices "${params.crop_min_run_slices}" \
       --sample-values-per-slice "${params.crop_sample_values_per_slice}"
@@ -502,7 +504,7 @@ workflow {
 
         SELECTHITTIMAGES.out.to_process
             .splitCsv(header:true)
-            .map { row -> tuple(row.filename, row.remote_tomo_path, row.tmp_copy_path, row.omezarr_path, row.req_mem, row.crop_stack, row.crop_bright_threshold, row.crop_auto_percentile, row.crop_min_bright_fraction, row.crop_padding_low_slices, row.crop_padding_high_slices) }
+            .map { row -> tuple(row.filename, row.remote_tomo_path, row.tmp_copy_path, row.omezarr_path, row.req_mem, row.crop_stack, row.crop_bright_threshold, row.crop_auto_percentile, row.crop_min_bright_fraction, row.crop_padding_low_slices, row.crop_padding_high_slices, row.crop_start, row.crop_end) }
             .set { hitt_copy_batch_ch }
 
         COPYHITTDATA(hitt_copy_batch_ch)

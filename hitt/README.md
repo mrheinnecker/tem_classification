@@ -65,9 +65,13 @@ crop_auto_percentile
 crop_min_bright_fraction
 crop_padding_low_slices
 crop_padding_high_slices
+crop_start
+crop_end
 ```
 
 Blank or missing values fall back to the launcher defaults. During migration, a legacy `crop_padding_slices` table column is also accepted and is applied to both edges unless an edge-specific value is present.
+
+If both `crop_start` and `crop_end` are set for a dataset, they override automatic crop detection. The range is 1-based and inclusive: `crop_start=500` and `crop_end=1500` keeps slices 500 through 1500 and removes everything outside that range. If `crop_end` is larger than the stack length, the workflow uses the last available slice.
 
 Useful crop overrides:
 

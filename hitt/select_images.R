@@ -154,7 +154,7 @@ crop_defaults <- list(
   crop_padding_high_slices=value_or_default(opt$default_crop_padding_high_slices, "10")
 )
 
-for (column in c(names(crop_defaults), "crop_padding_slices")) {
+for (column in c(names(crop_defaults), "crop_padding_slices", "crop_start", "crop_end")) {
   if (!column %in% names(images)) {
     images[[column]] <- NA_character_
   }
@@ -187,6 +187,8 @@ all_images <- images %>%
     crop_min_bright_fraction=coalesce(crop_min_bright_fraction, crop_defaults$crop_min_bright_fraction),
     crop_padding_low_slices=coalesce(crop_padding_low_slices, crop_padding_slices, crop_defaults$crop_padding_low_slices),
     crop_padding_high_slices=coalesce(crop_padding_high_slices, crop_padding_slices, crop_defaults$crop_padding_high_slices),
+    crop_start=coalesce(crop_start, ""),
+    crop_end=coalesce(crop_end, ""),
     s3_omezarr_present=filename %in% existing_s3_names,
     convert_selected=coalesce(convert == "1", FALSE),
     needs_processing=convert_selected & !s3_omezarr_present
