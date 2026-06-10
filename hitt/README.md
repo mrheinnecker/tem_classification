@@ -58,6 +58,16 @@ After copying, the workflow samples every TIFF slice and detects a conservative 
 
 The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and a combined boundary QC PNG are written under `logs/.../crop_analysis`. The PNG shows the last excluded slice on the low-Z side on the left and the first excluded slice on the high-Z side on the right. If only one boundary has excluded slices, the PNG contains that available boundary image. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
 
+To collect crop decisions from multiple workflow runs into one review table:
+
+```bash
+python3 summarize_crop_logs.py \
+  /scratch/rheinnec/hitt_screen/logs \
+  --output /scratch/rheinnec/hitt_screen/hitt_crop_summary.tsv
+```
+
+The summary includes the applied slice range, manual crop values, automatic threshold settings, shape-crop decisions, uint16 scaling limits, and paths to the boundary QC PNGs.
+
 Crop parameters can be set per dataset with columns in the input table:
 
 ```text
