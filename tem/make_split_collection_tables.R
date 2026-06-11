@@ -79,6 +79,7 @@ if (is.null(local_image_log) || is.na(local_image_log)) {
 people <- c("marco", "chandni", "karel", "yannick")
 
 freeze_first_column <- function(ss, sheet_name) {
+  spreadsheet_id <- as.character(googlesheets4::as_sheets_id(ss))
   sheet_id <- googlesheets4::sheet_properties(ss) %>%
     filter(name == sheet_name) %>%
     pull(id)
@@ -88,9 +89,12 @@ freeze_first_column <- function(ss, sheet_name) {
     return(invisible(NULL))
   }
 
-  request <- googlesheets4::request_generate(
-    "sheets.spreadsheets.batchUpdate",
-    params=list(spreadsheetId=as.character(googlesheets4::as_sheets_id(ss))),
+  response <- httr::POST(
+    url=sprintf(
+      "https://sheets.googleapis.com/v4/spreadsheets/%s:batchUpdate",
+      spreadsheet_id
+    ),
+    config=googlesheets4::gs4_token(),
     body=list(
       requests=list(
         list(
@@ -103,10 +107,11 @@ freeze_first_column <- function(ss, sheet_name) {
           )
         )
       )
-    )
+    ),
+    encode="json"
   )
 
-  googlesheets4::request_make(request)
+  httr::stop_for_status(response)
   invisible(NULL)
 }
 
