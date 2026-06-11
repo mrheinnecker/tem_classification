@@ -209,11 +209,14 @@ add_image_log <- function(col_table) {
 write_split_tables <- function(col_table) {
   split_tables <- col_table %>%
     arrange(site, name) %>%
-    mutate(split_sheet=people[((row_number() - 1) %% length(people)) + 1]) %>%
+    mutate(
+      split_index=pmin(ceiling(row_number() / ceiling(n() / length(people))), length(people)),
+      split_sheet=factor(people[split_index], levels=people)
+    ) %>%
     group_split(split_sheet)
 
   names(split_tables) <- map_chr(split_tables, ~unique(.x$split_sheet))
-  split_tables <- map(split_tables, ~select(.x, -split_sheet))
+  split_tables <- map(split_tables, ~select(.x, -split_index, -split_sheet))
 
   if (sheet_mode == "google") {
     library(googlesheets4)
