@@ -64,7 +64,7 @@ if (is.null(annotations_sheet) || is.na(annotations_sheet)) {
 
 assignees <- opt$assignees
 if (is.null(assignees) || is.na(assignees)) {
-  assignees <- "marco,chandni,yannick,karel"
+  assignees <- "marco,chandni,yannick,karel,viktoria"
 }
 people <- str_split(assignees, ",")[[1]] %>%
   str_trim() %>%
@@ -230,6 +230,33 @@ standardize_annotation_table <- function(df) {
   df
 }
 
+last_non_blank <- function(x) {
+  x <- as.character(x)
+  keep <- !is_blank(x)
+  if (any(keep)) {
+    tail(x[keep], 1)
+  } else {
+    NA_character_
+  }
+}
+
+merge_annotation_rows <- function(df) {
+  if (nrow(df) == 0) {
+    return(empty_annotations())
+  }
+
+  df %>%
+    arrange(.priority) %>%
+    group_by(source_name) %>%
+    summarise(
+      across(
+        -any_of(c(".priority", ".assignment_sheet")),
+        last_non_blank
+      ),
+      .groups="drop"
+    )
+}
+
 read_current_annotations <- function() {
   if (sheet_mode == "google") {
     library(googlesheets4)
@@ -263,11 +290,7 @@ read_current_annotations <- function() {
     standardize_annotation_table(existing_log) %>% mutate(.priority=1),
     standardize_annotation_table(split_logs) %>% mutate(.priority=2)
   ) %>%
-    arrange(.priority) %>%
-    group_by(source_name) %>%
-    slice_tail(n=1) %>%
-    ungroup() %>%
-    select(-any_of(c(".priority", ".assignment_sheet")))
+    merge_annotation_rows()
 }
 
 backup_annotations <- function(annotations) {
