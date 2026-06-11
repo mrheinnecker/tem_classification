@@ -16,6 +16,24 @@ spec <- matrix(c(
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
+# Debug helper:
+# Uncomment this block when running interactively in R/RStudio and you want to
+# bypass command-line parsing. Keep values as character strings to match getopt.
+#
+# opt <- list(
+#   processed_dir = "/g/schwab/tem_screen/processed",
+#   collection_table_url = "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=1426216525#gid=1426216525",
+#   google_key = "/g/schwab/marco/repos/tem_classification/tem/trec-tem-screen-e98a2e03f58b.json",
+#   sheet_mode = "google",
+#   local_outdir = "split_collection_tables",
+#   annotation_log_dir = "/g/schwab/tem_screen/annotations/log",
+#   annotations_sheet = "annotations_log",
+#   assignees = "marco,chandni,yannick,karel,viktoria",
+#   s3_base_url = "https://s3.embl.de/temscreen",
+#   image_stats_dir = "/g/schwab/tem_screen/processed",
+#   local_annotations_log = "split_collection_tables/annotations_log.tsv"
+# )
+
 arg_file <- commandArgs(FALSE) %>%
   .[str_detect(., "^--file=")] %>%
   str_remove("^--file=") %>%
