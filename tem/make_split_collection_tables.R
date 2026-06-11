@@ -7,11 +7,12 @@ spec <- matrix(c(
   "google_key", "k", 1, "character",
   "sheet_mode", "m", 1, "character",
   "local_outdir", "o", 1, "character",
+  "annotation_log_dir", "a", 1, "character",
+  "annotations_sheet", "n", 1, "character",
+  "assignees", "g", 1, "character",
   "s3_base_url", "b", 1, "character",
   "image_stats_dir", "x", 1, "character",
-  "image_log_url", "i", 1, "character",
-  "image_log_sheet", "s", 1, "character",
-  "local_image_log", "l", 1, "character"
+  "local_annotations_log", "l", 1, "character"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
@@ -51,6 +52,29 @@ if (is.null(local_outdir) || is.na(local_outdir)) {
   local_outdir <- "split_collection_tables"
 }
 
+annotation_log_dir <- opt$annotation_log_dir
+if (is.null(annotation_log_dir) || is.na(annotation_log_dir)) {
+  annotation_log_dir <- "/g/schwab/tem_screen/annotations/log"
+}
+
+annotations_sheet <- opt$annotations_sheet
+if (is.null(annotations_sheet) || is.na(annotations_sheet)) {
+  annotations_sheet <- "annotations_log"
+}
+
+assignees <- opt$assignees
+if (is.null(assignees) || is.na(assignees)) {
+  assignees <- "marco,chandni,yannick,karel"
+}
+people <- str_split(assignees, ",")[[1]] %>%
+  str_trim() %>%
+  str_to_lower() %>%
+  discard(~.x == "")
+
+if (length(people) == 0) {
+  stop("--assignees must contain at least one sheet/person name.")
+}
+
 s3_base_url <- opt$s3_base_url
 if (is.null(s3_base_url) || is.na(s3_base_url)) {
   s3_base_url <- "https://s3.embl.de/temscreen"
@@ -61,22 +85,14 @@ if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
   image_stats_dir <- processed_dir
 }
 
-image_log_url <- opt$image_log_url
-if (is.null(image_log_url) || is.na(image_log_url)) {
-  image_log_url <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
+local_annotations_log <- opt$local_annotations_log
+if (is.null(local_annotations_log) || is.na(local_annotations_log)) {
+  local_annotations_log <- file.path(local_outdir, paste0(annotations_sheet, ".tsv"))
 }
 
-image_log_sheet <- opt$image_log_sheet
-if (is.null(image_log_sheet) || is.na(image_log_sheet)) {
-  image_log_sheet <- "image_log"
+is_blank <- function(x) {
+  is.na(x) | str_trim(as.character(x)) == ""
 }
-
-local_image_log <- opt$local_image_log
-if (is.null(local_image_log) || is.na(local_image_log)) {
-  local_image_log <- file.path(dirname(processed_dir), "image_log_local.tsv")
-}
-
-people <- c("marco", "chandni", "karel", "yannick")
 
 freeze_first_column <- function(ss, sheet_name) {
   spreadsheet_id <- as.character(googlesheets4::as_sheets_id(ss))
@@ -176,47 +192,200 @@ add_image_stats <- function(col_table) {
     )
 }
 
-read_image_log <- function() {
+empty_annotations <- function() {
+  tibble(name=character(), source_name=character())
+}
+
+sheet_exists <- function(ss, sheet_name) {
+  googlesheets4::sheet_properties(ss) %>%
+    pull(name) %>%
+    `%in%`(sheet_name) %>%
+    any()
+}
+
+read_google_sheet_if_exists <- function(ss, sheet_name) {
+  if (!sheet_exists(ss, sheet_name)) {
+    warning("Sheet does not exist yet, treating as empty: ", sheet_name)
+    return(tibble())
+  }
+  googlesheets4::read_sheet(ss, sheet=sheet_name, col_types="c")
+}
+
+standardize_annotation_table <- function(df) {
+  if (nrow(df) == 0 && ncol(df) == 0) {
+    return(empty_annotations())
+  }
+  if (!"name" %in% names(df)) {
+    df$name <- NA_character_
+  }
+  if (!"source_name" %in% names(df)) {
+    df$source_name <- df$name
+  }
+  if (!"annotated_by" %in% names(df)) {
+    df$annotated_by <- NA_character_
+  }
+  if (!"validated_by" %in% names(df)) {
+    df$validated_by <- NA_character_
+  }
+  df
+}
+
+read_current_annotations <- function() {
   if (sheet_mode == "google") {
     library(googlesheets4)
     if (is.null(google_key) || is.na(google_key) || !file.exists(google_key)) {
       stop("--google_key is required and must exist when --sheet_mode google")
     }
     gs4_auth(path=google_key)
-    read_sheet(image_log_url, sheet=image_log_sheet, col_types="c")
-  } else if (file.exists(local_image_log)) {
-    read_tsv(local_image_log, col_types=cols(.default=col_character()))
+    existing_log <- read_google_sheet_if_exists(collection_table_url, annotations_sheet)
+    split_logs <- map_dfr(people, function(person) {
+      read_google_sheet_if_exists(collection_table_url, person) %>%
+        mutate(.assignment_sheet=person)
+    })
   } else {
-    tibble(shortname=character(), site=character())
+    existing_log <- if (file.exists(local_annotations_log)) {
+      read_tsv(local_annotations_log, col_types=cols(.default=col_character()))
+    } else {
+      tibble()
+    }
+    split_logs <- map_dfr(people, function(person) {
+      file <- file.path(local_outdir, paste0(person, ".tsv"))
+      if (file.exists(file)) {
+        read_tsv(file, col_types=cols(.default=col_character())) %>%
+          mutate(.assignment_sheet=person)
+      } else {
+        tibble()
+      }
+    })
   }
+
+  bind_rows(
+    standardize_annotation_table(existing_log) %>% mutate(.priority=1),
+    standardize_annotation_table(split_logs) %>% mutate(.priority=2)
+  ) %>%
+    arrange(.priority) %>%
+    group_by(source_name) %>%
+    slice_tail(n=1) %>%
+    ungroup() %>%
+    select(-any_of(c(".priority", ".assignment_sheet")))
 }
 
-add_image_log <- function(col_table) {
-  image_log <- read_image_log()
+backup_annotations <- function(annotations) {
+  timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+  dir.create(annotation_log_dir, recursive=TRUE, showWarnings=FALSE)
+  backup_file <- file.path(annotation_log_dir, paste0(annotations_sheet, "_", timestamp, ".tsv"))
+  write_tsv(annotations, backup_file)
+  message("Backed up annotations to: ", backup_file)
+  invisible(backup_file)
+}
 
-  if (nrow(image_log) == 0 || !all(c("shortname", "site") %in% names(image_log))) {
-    warning("Image log has no rows or is missing shortname/site columns; tables will not include annotations.")
-    return(col_table)
+write_annotations_log <- function(annotations) {
+  annotations <- annotations %>% arrange(site, name)
+  if (sheet_mode == "google") {
+    googlesheets4::write_sheet(annotations, ss=collection_table_url, sheet=annotations_sheet)
+  } else {
+    dir.create(dirname(local_annotations_log), recursive=TRUE, showWarnings=FALSE)
+    write_tsv(annotations, local_annotations_log)
+  }
+  annotations
+}
+
+add_annotations <- function(col_table, annotations) {
+  annotations <- standardize_annotation_table(annotations)
+  annotation_cols <- setdiff(names(annotations), names(col_table))
+
+  if (length(annotation_cols) == 0) {
+    annotation_cols <- character()
   }
 
-  col_table %>%
+  joined <- col_table %>%
     left_join(
-      image_log %>% distinct(shortname, site, .keep_all=TRUE),
-      by=c("name"="shortname", "site"="site")
+      annotations %>% select(source_name, all_of(annotation_cols)),
+      by="source_name"
     )
+
+  if (!"annotated_by" %in% names(joined)) {
+    joined$annotated_by <- NA_character_
+  }
+  if (!"validated_by" %in% names(joined)) {
+    joined$validated_by <- NA_character_
+  }
+
+  joined
+}
+
+empty_split_tables <- function(template) {
+  set_names(
+    replicate(length(people), template[0, ], simplify=FALSE),
+    people
+  )
+}
+
+split_contiguous <- function(rows, template) {
+  split_tables <- empty_split_tables(template)
+  if (nrow(rows) == 0) {
+    return(split_tables)
+  }
+
+  chunk_size <- ceiling(nrow(rows) / length(people))
+  rows <- rows %>%
+    arrange(site, name) %>%
+    mutate(
+      split_index=pmin(ceiling(row_number() / chunk_size), length(people)),
+      split_sheet=people[split_index]
+    )
+
+  rows %>%
+    group_split(split_sheet) %>%
+    walk(function(sheet_rows) {
+      sheet_name <- unique(sheet_rows$split_sheet)
+      split_tables[[sheet_name]] <<- sheet_rows %>%
+        select(-split_index, -split_sheet)
+    })
+
+  split_tables
+}
+
+assign_annotated_elsewhere <- function(rows, split_tables) {
+  if (nrow(rows) == 0) {
+    return(split_tables)
+  }
+
+  rows <- rows %>% arrange(site, name)
+
+  for (i in seq_len(nrow(rows))) {
+    row <- rows[i, , drop=FALSE]
+    previous_annotator <- str_to_lower(str_trim(as.character(row$annotated_by[[1]])))
+    allowed_people <- if (previous_annotator %in% people) {
+      setdiff(people, previous_annotator)
+    } else {
+      people
+    }
+    if (length(allowed_people) == 0) {
+      allowed_people <- people
+    }
+
+    current_counts <- map_int(split_tables[allowed_people], nrow)
+    target <- allowed_people[which.min(current_counts)]
+    split_tables[[target]] <- bind_rows(split_tables[[target]], row)
+  }
+
+  split_tables
 }
 
 write_split_tables <- function(col_table) {
-  split_tables <- col_table %>%
-    arrange(site, name) %>%
-    mutate(
-      split_index=pmin(ceiling(row_number() / ceiling(n() / length(people))), length(people)),
-      split_sheet=factor(people[split_index], levels=people)
-    ) %>%
-    group_split(split_sheet)
+  col_table <- col_table %>% arrange(site, name)
+  template <- col_table
 
-  names(split_tables) <- map_chr(split_tables, ~unique(.x$split_sheet))
-  split_tables <- map(split_tables, ~select(.x, -split_index, -split_sheet))
+  needs_first_annotation <- col_table %>%
+    filter(is_blank(annotated_by) | !(str_to_lower(str_trim(annotated_by)) %in% people))
+
+  needs_second_annotation <- col_table %>%
+    filter(!is_blank(annotated_by), str_to_lower(str_trim(annotated_by)) %in% people)
+
+  split_tables <- split_contiguous(needs_first_annotation, template)
+  split_tables <- assign_annotated_elsewhere(needs_second_annotation, split_tables)
+  split_tables <- map(split_tables, ~arrange(.x, site, name))
 
   if (sheet_mode == "google") {
     library(googlesheets4)
@@ -239,15 +408,31 @@ write_split_tables <- function(col_table) {
   tibble(sheet=names(split_tables), n_images=map_int(split_tables, nrow))
 }
 
-omezarrs <- find_omezarrs(processed_dir)
-if (nrow(omezarrs) == 0) {
-  stop("No *_omezarr directories found under: ", processed_dir)
+if (sheet_mode == "google") {
+  library(googlesheets4)
+  library(googledrive)
+  gs4_auth(path=google_key)
+  drive_auth(path=google_key)
 }
 
-col_table <- omezarrs %>%
+current_annotations <- read_current_annotations()
+backup_annotations(current_annotations)
+
+omezarrs <- find_omezarrs(processed_dir)
+if (nrow(omezarrs) == 0) {
+  stop("No processed image directories found under: ", processed_dir)
+}
+
+annotated_table <- omezarrs %>%
   make_collection_rows() %>%
   add_image_stats() %>%
-  add_image_log()
+  add_annotations(current_annotations) %>%
+  arrange(site, name)
 
-summary <- write_split_tables(col_table)
+annotated_table <- write_annotations_log(annotated_table)
+
+remaining_table <- annotated_table %>%
+  filter(is_blank(validated_by))
+
+summary <- write_split_tables(remaining_table)
 print(summary)
