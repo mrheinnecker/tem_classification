@@ -83,8 +83,8 @@ find_omezarrs <- function(path) {
     stop("Processed directory does not exist: ", path)
   }
 
-  list.dirs(path, recursive=TRUE, full.names=TRUE) %>%
-    keep(~str_detect(basename(.x), "_omezarr$")) %>%
+  list.dirs(path, recursive=FALSE, full.names=TRUE) %>%
+    #keep(~str_detect(basename(.x), "")) %>%
     tibble(local_path=.) %>%
     mutate(source_name=basename(local_path)) %>%
     distinct(source_name, .keep_all=TRUE)
@@ -119,7 +119,7 @@ add_image_stats <- function(col_table) {
   image_stats_files <- list.files(
     image_stats_dir,
     pattern="_image_stats\\.tsv$",
-    recursive=TRUE,
+    recursive=FALSE,
     full.names=TRUE
   )
 
