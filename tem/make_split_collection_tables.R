@@ -4,6 +4,9 @@ library(getopt)
 spec <- matrix(c(
   "processed_dir", "p", 1, "character",
   "collection_table_url", "u", 1, "character",
+  "source_collection_table_url", "c", 1, "character",
+  "source_collection_sheet", "t", 1, "character",
+  "local_source_collection_table", "f", 1, "character",
   "google_key", "k", 1, "character",
   "sheet_mode", "m", 1, "character",
   "local_outdir", "o", 1, "character",
@@ -23,6 +26,9 @@ opt <- getopt(spec)
 # opt <- list(
 #   processed_dir = "/g/schwab/tem_screen/processed",
 #   collection_table_url = "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=1426216525#gid=1426216525",
+#   source_collection_table_url = "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951",
+#   source_collection_sheet = "tem_collection_table",
+#   local_source_collection_table = "tem_collection_table.tsv",
 #   google_key = "/g/schwab/marco/repos/tem_classification/tem/trec-tem-screen-e98a2e03f58b.json",
 #   sheet_mode = "google",
 #   local_outdir = "split_collection_tables",
@@ -53,6 +59,21 @@ if (is.null(processed_dir) || is.na(processed_dir)) {
 collection_table_url <- opt$collection_table_url
 if (is.null(collection_table_url) || is.na(collection_table_url)) {
   collection_table_url <- "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=1426216525#gid=1426216525"
+}
+
+source_collection_table_url <- opt$source_collection_table_url
+if (is.null(source_collection_table_url) || is.na(source_collection_table_url)) {
+  source_collection_table_url <- "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
+}
+
+source_collection_sheet <- opt$source_collection_sheet
+if (is.null(source_collection_sheet) || is.na(source_collection_sheet)) {
+  source_collection_sheet <- "tem_collection_table"
+}
+
+local_source_collection_table <- opt$local_source_collection_table
+if (is.null(local_source_collection_table) || is.na(local_source_collection_table)) {
+  local_source_collection_table <- "tem_collection_table.tsv"
 }
 
 google_key <- opt$google_key
@@ -186,6 +207,61 @@ make_collection_rows <- function(omezarrs) {
     )
 }
 
+standardize_collection_table <- function(col_table) {
+  if (!"name" %in% names(col_table)) {
+    stop("The source collection table needs a name column.")
+  }
+
+  if (!"source_name" %in% names(col_table)) {
+    if ("uri" %in% names(col_table)) {
+      col_table$source_name <- basename(str_remove(as.character(col_table$uri), "/$"))
+    } else {
+      col_table$source_name <- col_table$name
+    }
+  }
+
+  if (!"site" %in% names(col_table)) {
+    col_table$site <- str_extract(col_table$source_name, "ATH|BAR|KRI|TAL|NAP|BIL|POR")
+  }
+  if (!"cell_id" %in% names(col_table)) {
+    col_table$cell_id <- str_extract(col_table$source_name, "c0\\d+")
+  }
+  if (!"size_frac" %in% names(col_table)) {
+    col_table$size_frac <- str_extract(col_table$source_name, "\\d+to\\d+")
+  }
+  if (!"sampling_time" %in% names(col_table)) {
+    col_table$sampling_time <- str_extract(col_table$source_name, "_(AM|PM|MID|TARA)_") %>%
+      str_remove_all("_")
+  }
+  if (!"exclusive" %in% names(col_table)) {
+    col_table$exclusive <- TRUE
+  }
+
+  preferred_cols <- c(
+    "name", "uri", "view", "grid", "site", "cell_id", "size_frac",
+    "sampling_time", "source_name", "exclusive"
+  )
+  col_table %>%
+    distinct(name, .keep_all=TRUE) %>%
+    arrange(site, name) %>%
+    select(any_of(preferred_cols), everything())
+}
+
+read_source_collection_table <- function() {
+  if (sheet_mode == "google") {
+    library(googlesheets4)
+    if (is.null(google_key) || is.na(google_key) || !file.exists(google_key)) {
+      stop("--google_key is required and must exist when --sheet_mode google")
+    }
+    gs4_auth(path=google_key)
+    read_sheet(source_collection_table_url, sheet=source_collection_sheet, col_types="c")
+  } else if (file.exists(local_source_collection_table)) {
+    read_tsv(local_source_collection_table, col_types=cols(.default=col_character()))
+  } else {
+    stop("Local source collection table does not exist: ", local_source_collection_table)
+  }
+}
+
 add_image_stats <- function(col_table) {
   image_stats_files <- list.files(
     image_stats_dir,
@@ -234,7 +310,7 @@ standardize_annotation_table <- function(df) {
     return(empty_annotations())
   }
   if (!"name" %in% names(df)) {
-    df$name <- NA_character_
+    df$name <- df$source_name
   }
   if (!"source_name" %in% names(df)) {
     df$source_name <- df$name
@@ -265,7 +341,7 @@ merge_annotation_rows <- function(df) {
 
   df %>%
     arrange(.priority) %>%
-    group_by(source_name) %>%
+    group_by(name) %>%
     summarise(
       across(
         -any_of(c(".priority", ".assignment_sheet")),
@@ -341,8 +417,8 @@ add_annotations <- function(col_table, annotations) {
 
   joined <- col_table %>%
     left_join(
-      annotations %>% select(source_name, all_of(annotation_cols)),
-      by="source_name"
+      annotations %>% select(name, all_of(annotation_cols)),
+      by="name"
     )
 
   if (!"annotated_by" %in% names(joined)) {
@@ -459,14 +535,14 @@ if (sheet_mode == "google") {
 current_annotations <- read_current_annotations()
 backup_annotations(current_annotations)
 
-omezarrs <- find_omezarrs(processed_dir)
-if (nrow(omezarrs) == 0) {
-  stop("No processed image directories found under: ", processed_dir)
+source_collection_table <- read_source_collection_table() %>%
+  standardize_collection_table()
+
+if (nrow(source_collection_table) == 0) {
+  stop("No rows found in source collection table: ", source_collection_sheet)
 }
 
-annotated_table <- omezarrs %>%
-  make_collection_rows() %>%
-  add_image_stats() %>%
+annotated_table <- source_collection_table %>%
   add_annotations(current_annotations) %>%
   arrange(site, name)
 
