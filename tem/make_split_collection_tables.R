@@ -78,6 +78,38 @@ if (is.null(local_image_log) || is.na(local_image_log)) {
 
 people <- c("marco", "chandni", "karel", "yannick")
 
+freeze_first_column <- function(ss, sheet_name) {
+  sheet_id <- googlesheets4::sheet_properties(ss) %>%
+    filter(name == sheet_name) %>%
+    pull(id)
+
+  if (length(sheet_id) != 1) {
+    warning("Could not freeze first column for sheet: ", sheet_name)
+    return(invisible(NULL))
+  }
+
+  request <- googlesheets4::request_generate(
+    "sheets.spreadsheets.batchUpdate",
+    params=list(spreadsheetId=as.character(googlesheets4::as_sheets_id(ss))),
+    body=list(
+      requests=list(
+        list(
+          updateSheetProperties=list(
+            properties=list(
+              sheetId=sheet_id,
+              gridProperties=list(frozenColumnCount=1)
+            ),
+            fields="gridProperties.frozenColumnCount"
+          )
+        )
+      )
+    )
+  )
+
+  googlesheets4::request_make(request)
+  invisible(NULL)
+}
+
 find_omezarrs <- function(path) {
   if (!dir.exists(path)) {
     stop("Processed directory does not exist: ", path)
@@ -108,9 +140,9 @@ make_collection_rows <- function(omezarrs) {
       grid=site,
       exclusive=TRUE
     ) %>%
-    arrange(site, source_name) %>%
+    arrange(site, name) %>%
     select(
-      uri, name, view, grid,
+      name, uri, view, grid,
       site, cell_id, size_frac, sampling_time, source_name, exclusive
     )
 }
@@ -171,6 +203,7 @@ add_image_log <- function(col_table) {
 
 write_split_tables <- function(col_table) {
   split_tables <- col_table %>%
+    arrange(site, name) %>%
     mutate(split_sheet=people[((row_number() - 1) %% length(people)) + 1]) %>%
     group_split(split_sheet)
 
@@ -182,7 +215,10 @@ write_split_tables <- function(col_table) {
     library(googledrive)
     gs4_auth(path=google_key)
     drive_auth(path=google_key)
-    walk2(split_tables, names(split_tables), ~write_sheet(.x, ss=collection_table_url, sheet=.y))
+    walk2(split_tables, names(split_tables), function(table, sheet_name) {
+      write_sheet(table, ss=collection_table_url, sheet=sheet_name)
+      freeze_first_column(collection_table_url, sheet_name)
+    })
   } else {
     dir.create(local_outdir, recursive=TRUE, showWarnings=FALSE)
     walk2(
