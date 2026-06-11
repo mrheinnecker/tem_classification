@@ -502,7 +502,14 @@ write_split_tables <- function(col_table) {
 
   split_tables <- split_contiguous(needs_first_annotation, template)
   split_tables <- assign_annotated_elsewhere(needs_second_annotation, split_tables)
-  split_tables <- map(split_tables, ~arrange(.x, site, name))
+  split_tables <- imap(split_tables, function(table, sheet_name) {
+    table %>%
+      mutate(
+        view=sheet_name,
+        grid=sheet_name
+      ) %>%
+      arrange(site, name)
+  })
 
   if (sheet_mode == "google") {
     library(googlesheets4)
