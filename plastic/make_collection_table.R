@@ -141,10 +141,10 @@ near_square_columns <- function(n) {
 color_for_display <- function(display, fallback) {
   compact <- str_replace_all(tolower(display %||% ""), "[^a-z0-9]+", "")
   case_when(
-    compact == "green" ~ "green",
+    compact == "green" ~ "cyan",
     compact %in% c("gray", "grey") ~ "white",
     compact == "yellow" ~ "yellow",
-    compact == "magenta" ~ "magenta",
+    compact %in% c("magenta", "red") ~ "magenta",
     str_detect(compact, "gfp") ~ "cyan",
     str_detect(compact, "tl") ~ "white",
     str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "magenta",
@@ -170,6 +170,7 @@ canonical_channel_display <- function(channel, fallback_display) {
   emission <- rounded_wavelength(channel$emission_wavelength_nm %||% NA_real_)
 
   case_when(
+    compact == "magenta" ~ "Red",
     str_detect(compact, "tl") & !str_detect(compact, "tpmt") ~ "TL",
     str_detect(compact, "gfp") | str_detect(compact, "egfp") |
       excitation == 488 | emission == 509 ~ "GFP",
@@ -206,7 +207,11 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
       label=as.character(label),
       display=display,
       color=as.character(color_for_display(display, color)),
-      contrast_limits=as.character(contrast_limits)
+      contrast_limits=as.character(contrast_limits),
+      excitation_wavelength_nm=as.character(channel$excitation_wavelength_nm %||% ""),
+      emission_wavelength_nm=as.character(channel$emission_wavelength_nm %||% ""),
+      emission_begin_nm=as.character(channel$emission_begin_nm %||% ""),
+      emission_end_nm=as.character(channel$emission_end_nm %||% "")
     )
   })
 
@@ -288,6 +293,10 @@ col_table <- base_table %>%
     display=map_chr(channels, "display"),
     color=map_chr(channels, "color"),
     contrast_limits=map_chr(channels, "contrast_limits"),
+    excitation_wavelength_nm=map_chr(channels, "excitation_wavelength_nm"),
+    emission_wavelength_nm=map_chr(channels, "emission_wavelength_nm"),
+    emission_begin_nm=map_chr(channels, "emission_begin_nm"),
+    emission_end_nm=map_chr(channels, "emission_end_nm"),
     name=paste0(source_name, "_c", channel, "_", display),
     exclusive=T
   ) %>%
@@ -301,6 +310,10 @@ col_table <- base_table %>%
     channel,
     display,
     color,
+    excitation_wavelength_nm,
+    emission_wavelength_nm,
+    emission_begin_nm,
+    emission_end_nm,
     contrast_limits,
     blend,
     format,

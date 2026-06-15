@@ -256,12 +256,12 @@ def color_for_channel(label, raw_color, index):
     label_lower = str(label or "").lower()
     compact_label = re.sub(r"[^a-z0-9]+", "", label_lower)
     if compact_label == "green":
-        return "green"
+        return "cyan"
     if compact_label in {"gray", "grey"}:
         return "white"
     if compact_label == "yellow":
         return "yellow"
-    if compact_label == "magenta":
+    if compact_label in {"magenta", "red"}:
         return "magenta"
     for key, color in CHANNEL_COLOR_OVERRIDES.items():
         if key in compact_label:
@@ -280,6 +280,8 @@ def color_for_channel(label, raw_color, index):
 def canonical_channel_display(label, fluor=None, excitation_wavelength=None, emission_wavelength=None):
     text = " ".join(str(value or "") for value in (label, fluor)).lower()
     compact = re.sub(r"[^a-z0-9]+", "", text)
+    if compact == "magenta":
+        return "Red"
     if "tl" in compact and "tpmt" not in compact:
         return "TL"
     if any(term in compact for term in ("gfp", "egfp", "fitc")):
@@ -660,17 +662,156 @@ def parse_xml_attributes(text):
     }
 
 
-def lifext_channel_descriptions(path):
+def local_name(element):
+    return element.tag.rsplit("}", 1)[-1] if "}" in element.tag else element.tag
+
+
+def find_descendants_by_local_name(element, name):
+    return [child for child in element.iter() if local_name(child) == name]
+
+
+def child_text_by_local_name(element, name):
+    for child in element:
+        if local_name(child) == name:
+            return child.text
+    return None
+
+
+def parse_optional_number(value):
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def channel_properties(element):
+    properties = {}
+    for prop in find_descendants_by_local_name(element, "ChannelProperty"):
+        key = child_text_by_local_name(prop, "Key")
+        value = child_text_by_local_name(prop, "Value")
+        if key:
+            properties[key] = value
+    return properties
+
+
+def beam_route_from_element(element):
+    beam_route = next(
+        (child for child in find_descendants_by_local_name(element, "BeamRoute")),
+        None,
+    )
+    if beam_route is None:
+        return None
+    positions = []
+    for position in find_descendants_by_local_name(beam_route, "BeamPosition"):
+        level = parse_optional_number(position.attrib.get("BeamPositionLevel"))
+        value = position.attrib.get("BeamPosition")
+        if level is not None and value is not None:
+            positions.append((int(level), value))
+    if not positions:
+        return None
+    return ";".join(value for _, value in sorted(positions))
+
+
+def parse_lifext_xml(path):
+    text = decode_text_file(path)
+    if not text:
+        return None
+    try:
+        return ET.fromstring(text)
+    except ET.ParseError:
+        return None
+
+
+def lifext_sidecar_metadata(path):
     for candidate in lifext_candidates(path):
         if not candidate.exists():
             continue
+        root = parse_lifext_xml(candidate)
+        if root is not None:
+            descriptions = []
+            for element in find_descendants_by_local_name(root, "ChannelDescription"):
+                properties = channel_properties(element)
+                row = dict(element.attrib)
+                row["channel_properties"] = properties
+                row["beam_route"] = properties.get("BeamRoute")
+                row["detector"] = properties.get("DetectorName")
+                row["dye_name"] = properties.get("DyeName")
+                descriptions.append(row)
+
+            spectral_bands = []
+            bands_by_route = {}
+            for element in find_descendants_by_local_name(root, "MultiBand"):
+                route = beam_route_from_element(element)
+                row = dict(element.attrib)
+                row["beam_route"] = route
+                row["emission_begin_nm"] = parse_optional_number(
+                    row.get("TargetWaveLengthBegin") or row.get("LeftWorld")
+                )
+                row["emission_end_nm"] = parse_optional_number(
+                    row.get("TargetWaveLengthEnd") or row.get("RightWorld")
+                )
+                spectral_bands.append(row)
+                if route and route not in bands_by_route:
+                    bands_by_route[route] = row
+
+            detectors_by_channel = {}
+            for element in find_descendants_by_local_name(root, "Detector"):
+                channel = element.attrib.get("Channel")
+                if not channel:
+                    continue
+                detector = dict(element.attrib)
+                reference = next(
+                    (
+                        child
+                        for child in find_descendants_by_local_name(element, "DetectionReferenceLine")
+                    ),
+                    None,
+                )
+                if reference is not None:
+                    detector["laser_name"] = reference.attrib.get("LaserName")
+                    detector["laser_wavelength_nm"] = parse_optional_number(
+                        reference.attrib.get("LaserWavelength")
+                    )
+                detectors_by_channel[channel] = detector
+
+            for row in descriptions:
+                route = row.get("beam_route")
+                band = bands_by_route.get(route)
+                if band:
+                    row["emission_begin_nm"] = band.get("emission_begin_nm")
+                    row["emission_end_nm"] = band.get("emission_end_nm")
+                    row["emission_wavelength_nm"] = midpoint(
+                        band.get("emission_begin_nm"),
+                        band.get("emission_end_nm"),
+                    )
+                    row["spectral_channel"] = band.get("Channel")
+                detector = detectors_by_channel.get(str(row.get("spectral_channel")))
+                if detector:
+                    laser_wavelength = detector.get("laser_wavelength_nm")
+                    if laser_wavelength and laser_wavelength > 0:
+                        row["excitation_wavelength_nm"] = laser_wavelength
+                    row["laser_name"] = detector.get("laser_name")
+
+            return {
+                "channel_descriptions": descriptions,
+                "spectral_bands": spectral_bands,
+            }
+
         text = decode_text_file(candidate)
         descriptions = []
         for match in re.finditer(r"<ChannelDescription\b([^>]*)>", text, flags=re.IGNORECASE):
             descriptions.append(parse_xml_attributes(match.group(1)))
         if descriptions:
-            return descriptions
-    return []
+            return {"channel_descriptions": descriptions, "spectral_bands": []}
+    return {"channel_descriptions": [], "spectral_bands": []}
+
+
+def midpoint(start, end):
+    if start is None or end is None:
+        return None
+    return (float(start) + float(end)) / 2.0
 
 
 def extract_lif_metadata(path):
@@ -710,17 +851,25 @@ def extract_lif_metadata(path):
     metadata["shape"] = list(shape) if shape is not None else None
 
     channel_names = list(getattr(image, "channel_names", []) or [])
-    sidecar_channel_descriptions = lifext_channel_descriptions(path)
+    sidecar_metadata = lifext_sidecar_metadata(path)
+    sidecar_channel_descriptions = sidecar_metadata.get("channel_descriptions", [])
     if sidecar_channel_descriptions:
         metadata["lifext_channel_descriptions"] = sidecar_channel_descriptions
+    if sidecar_metadata.get("spectral_bands"):
+        metadata["lifext_spectral_bands"] = sidecar_metadata["spectral_bands"]
     if not channel_names and sidecar_channel_descriptions:
         channel_names = [
             row.get("LUTName") or row.get("Name") or row.get("ChannelName")
             for row in sidecar_channel_descriptions
         ]
         channel_names = [name for name in channel_names if name]
+    sidecar_by_lut = {
+        str(row.get("LUTName") or "").lower(): row
+        for row in sidecar_channel_descriptions
+    }
     channels = []
     for index, label in enumerate(channel_names):
+        sidecar_channel = sidecar_by_lut.get(str(label).lower(), {})
         display = canonical_channel_display(label) or sanitize_channel_label(label, index)
         channels.append(
             {
@@ -728,9 +877,14 @@ def extract_lif_metadata(path):
                 "label": str(label),
                 "display": display,
                 "color": color_for_channel(display, None, index),
-                "fluor": None,
-                "excitation_wavelength_nm": None,
-                "emission_wavelength_nm": None,
+                "fluor": sidecar_channel.get("dye_name") or None,
+                "excitation_wavelength_nm": sidecar_channel.get("excitation_wavelength_nm"),
+                "emission_wavelength_nm": sidecar_channel.get("emission_wavelength_nm"),
+                "emission_begin_nm": sidecar_channel.get("emission_begin_nm"),
+                "emission_end_nm": sidecar_channel.get("emission_end_nm"),
+                "detector": sidecar_channel.get("detector"),
+                "beam_route": sidecar_channel.get("beam_route"),
+                "spectral_channel": sidecar_channel.get("spectral_channel"),
             }
         )
     if channels:

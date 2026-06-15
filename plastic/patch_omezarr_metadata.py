@@ -19,6 +19,25 @@ def compact_label(value):
     return "".join(char for char in str(value or "").lower() if char.isalnum())
 
 
+def display_label(value):
+    compact = compact_label(value)
+    if compact == "magenta":
+        return "Red"
+    return value
+
+
+def display_color(channel):
+    display = compact_label(channel.get("display"))
+    label = compact_label(channel.get("label"))
+    color = compact_label(channel.get("color"))
+    values = {display, label, color}
+    if "green" in values:
+        return "cyan"
+    if values.intersection({"magenta", "red"}):
+        return "magenta"
+    return channel.get("color")
+
+
 def rounded_wavelength(channel, key):
     value = channel.get(key)
     if value is None:
@@ -70,6 +89,8 @@ def real_channels_only(metadata):
     for index, channel in enumerate(channels):
         row = dict(channel)
         row["index"] = index
+        row["display"] = display_label(row.get("display") or row.get("label"))
+        row["color"] = display_color(row)
         normalized.append(row)
     return normalized
 
