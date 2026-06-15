@@ -171,12 +171,10 @@ all_images <- images %>%
     raw_path=.data[[path_column]],
     raw_path=str_remove(raw_path, "/+$")
   ) %>%
+  filter(!is.na(raw_path), raw_path != "") %>%
   filter(str_detect(raw_path, "PlasticLM")) %>%
   filter(str_detect(raw_path, "_st_3D")) %>%
-  filter(!str_detect(raw_path, ".lifext$")) %>%
-  ## now still hast -lifext files!!!!
-  
-  filter(!is.na(raw_path), raw_path != "") %>%
+  filter(str_detect(tolower(raw_path), "\\.lif$")) %>%
   mutate(
     filename=if ("filename" %in% names(images)) coalesce(filename, sanitize_name(raw_path)) else sanitize_name(raw_path),
     filename=sanitize_name(filename),
