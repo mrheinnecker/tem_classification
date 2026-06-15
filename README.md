@@ -8,8 +8,8 @@ The repo is sub-structured according to the various modalities:
 - `tem/`: Transmission electron microscopy (TEM) 
 - `sem/`: Scanning electron microscopy (SEM) 
 - `hitt/`: High-Throughput Tomography; X-ray scans 
-- `cryo/`: Cryo confocal images of Plunge-frozen grids
-- `plastic/`: Light microscopy `.lif` images for PLASTIC processing
+- `cryo/`: Cryo confocal images of Plunge-frozen grids (also waffle method)
+- `plastic/`: Confocal images of freeze-substituted resin blocks
 
 Each modality follows the same strategy: Starting from raw data as it arrives from microscopes / input sources and ending in conversion to ome-zarr format, storing everything in s3 storage and creating collection tables to browse the data through MoBie.
 Each workflow is implemented in nextflow and has its dependencies handled via Apptainer/SIngularity container (see definition files in `container/`).
@@ -24,7 +24,7 @@ The following settings are recommened for each workflow:
 - `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfHITT.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
 - `wfSEM`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
 - `wfCRYO`: lightweight: allocate a cluster node (`srun -p htc --time=0-04:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
-- `wfPLASTIC`: lightweight: similar to `wfCRYO`, but converts Leica `.lif` inputs directly with EuBI-Bridge.
+- `wfPLASTIC`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
 
 
 ## Repository Layout
