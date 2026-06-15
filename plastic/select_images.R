@@ -26,7 +26,7 @@ opt <- getopt(spec)
 #   input_table = "C:/projects/plastic_screen/plastic_images.tsv",
 #   sheet_mode = "google",
 #   sheet_url = "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503",
-#   sheet_name = "plastic_lm",
+#   sheet_name = "cryo_lm",
 #   google_key = "/g/schwab/marco/repos/tem_classification/trec-tem-screen-e98a2e03f58b.json",
 #   outdir = "/scratch/rheinnec/plastic_screen/processed",
 #   dryrun = "FALSE",
@@ -171,6 +171,11 @@ all_images <- images %>%
     raw_path=.data[[path_column]],
     raw_path=str_remove(raw_path, "/+$")
   ) %>%
+  filter(str_detect(raw_path, "PlasticLM")) %>%
+  filter(str_detect(raw_path, "_st_3D")) %>%
+  filter(!str_detect(raw_path, ".lifext$")) %>%
+  ## now still hast -lifext files!!!!
+  
   filter(!is.na(raw_path), raw_path != "") %>%
   mutate(
     filename=if ("filename" %in% names(images)) coalesce(filename, sanitize_name(raw_path)) else sanitize_name(raw_path),

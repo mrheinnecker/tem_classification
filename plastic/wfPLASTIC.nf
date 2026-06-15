@@ -213,8 +213,7 @@ process EUBIPLASTICCONVERSION {
       --zar_format "${params.zarr_format}" \
       --auto_chunk True \
       --jvm_memory 8GB \
-      --max_workers 1 \
-      \$eubi_extra_args
+      --max_workers 1
 
     touch "${filename}_conversion_done.txt"
     """
