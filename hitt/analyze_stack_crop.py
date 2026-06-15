@@ -160,6 +160,8 @@ def main():
     parser.add_argument("--padding-slices", type=int)
     parser.add_argument("--padding-low-slices", type=int)
     parser.add_argument("--padding-high-slices", type=int)
+    parser.add_argument("--manual-crop-start", default="")
+    parser.add_argument("--manual-crop-end", default="")
     parser.add_argument("--bridge-gap-slices", type=int, default=3)
     parser.add_argument("--min-run-slices", type=int, default=3)
     parser.add_argument("--sample-values-per-slice", type=int, default=100_000)
@@ -187,44 +189,65 @@ def main():
     if padding_low_slices < 0 or padding_high_slices < 0:
         raise ValueError("Padding slices must not be negative")
 
-    samples = [sample_image(path, args.sample_values_per_slice) for path in files]
-    if any(sample.size == 0 for sample in samples):
-        raise ValueError("At least one TIFF slice does not contain finite values")
-
-    enabled = parse_bool(args.enabled)
-    if args.bright_threshold.strip().lower() == "auto":
-        threshold_sample = sample_for_threshold(samples)
-        bright_threshold = float(np.percentile(threshold_sample, args.auto_percentile))
-        threshold_mode = "auto"
-    else:
-        threshold_sample = np.array([], dtype=np.float32)
-        bright_threshold = float(args.bright_threshold)
-        threshold_mode = "fixed"
-
-    bright_fractions = np.array(
-        [float(np.count_nonzero(sample >= bright_threshold) / sample.size) for sample in samples]
-    )
-    detected = bright_fractions >= args.min_bright_fraction
-    bridged = bridge_short_gaps(detected, args.bridge_gap_slices)
-    runs = [
-        (start, end)
-        for start, end in find_runs(bridged)
-        if end - start + 1 >= args.min_run_slices
-    ]
-
     fallback_reason = ""
-    if not enabled:
-        crop_start = 0
-        crop_end = len(files) - 1
-        fallback_reason = "cropping_disabled"
-    elif not runs:
-        crop_start = 0
-        crop_end = len(files) - 1
-        fallback_reason = "no_sample_run_detected"
+    manual_crop_requested = bool(args.manual_crop_start.strip() or args.manual_crop_end.strip())
+    if manual_crop_requested:
+        if not (args.manual_crop_start.strip() and args.manual_crop_end.strip()):
+            raise ValueError("Manual cropping requires both crop_start and crop_end values")
+        crop_start = int(args.manual_crop_start) - 1
+        requested_crop_end = int(args.manual_crop_end) - 1
+        crop_end = min(requested_crop_end, len(files) - 1)
+        if crop_start < 0 or requested_crop_end < crop_start:
+            raise ValueError(
+                "Manual crop range is outside the stack bounds: "
+                f"crop_start={args.manual_crop_start}, crop_end={args.manual_crop_end}, "
+                f"slice_count={len(files)}"
+            )
+        samples = []
+        bright_fractions = ["" for _ in files]
+        detected = [False for _ in files]
+        threshold_sample = np.array([], dtype=np.float32)
+        bright_threshold = ""
+        threshold_mode = "manual"
+        fallback_reason = "manual_crop"
     else:
-        sample_start, sample_end = max(runs, key=lambda run: run[1] - run[0] + 1)
-        crop_start = max(0, sample_start - padding_low_slices)
-        crop_end = min(len(files) - 1, sample_end + padding_high_slices)
+        samples = [sample_image(path, args.sample_values_per_slice) for path in files]
+        if any(sample.size == 0 for sample in samples):
+            raise ValueError("At least one TIFF slice does not contain finite values")
+
+        enabled = parse_bool(args.enabled)
+        if args.bright_threshold.strip().lower() == "auto":
+            threshold_sample = sample_for_threshold(samples)
+            bright_threshold = float(np.percentile(threshold_sample, args.auto_percentile))
+            threshold_mode = "auto"
+        else:
+            threshold_sample = np.array([], dtype=np.float32)
+            bright_threshold = float(args.bright_threshold)
+            threshold_mode = "fixed"
+
+        bright_fractions = np.array(
+            [float(np.count_nonzero(sample >= bright_threshold) / sample.size) for sample in samples]
+        )
+        detected = bright_fractions >= args.min_bright_fraction
+        bridged = bridge_short_gaps(detected, args.bridge_gap_slices)
+        runs = [
+            (start, end)
+            for start, end in find_runs(bridged)
+            if end - start + 1 >= args.min_run_slices
+        ]
+
+        if not enabled:
+            crop_start = 0
+            crop_end = len(files) - 1
+            fallback_reason = "cropping_disabled"
+        elif not runs:
+            crop_start = 0
+            crop_end = len(files) - 1
+            fallback_reason = "no_sample_run_detected"
+        else:
+            sample_start, sample_end = max(runs, key=lambda run: run[1] - run[0] + 1)
+            crop_start = max(0, sample_start - padding_low_slices)
+            crop_end = min(len(files) - 1, sample_end + padding_high_slices)
 
     low_qc_source = files[crop_start - 1] if crop_start > 0 else None
     high_qc_source = files[crop_end + 1] if crop_end < len(files) - 1 else None
@@ -235,19 +258,18 @@ def main():
             boundary_qc_filename = boundary_qc.name
 
     plan_rows = []
-    for index, (path, sample, bright_fraction) in enumerate(
-        zip(files, samples, bright_fractions), start=1
-    ):
+    for index, path in enumerate(files, start=1):
+        sample = samples[index - 1] if samples else None
         plan_rows.append(
             {
                 "index": index,
                 "filename": path.name,
                 "keep": crop_start <= index - 1 <= crop_end,
                 "detected": bool(detected[index - 1]),
-                "bright_fraction": bright_fraction,
-                "sample_min": float(np.min(sample)),
-                "sample_max": float(np.max(sample)),
-                "sample_count": sample.size,
+                "bright_fraction": bright_fractions[index - 1],
+                "sample_min": float(np.min(sample)) if sample is not None else "",
+                "sample_max": float(np.max(sample)) if sample is not None else "",
+                "sample_count": sample.size if sample is not None else "",
             }
         )
 
@@ -259,6 +281,8 @@ def main():
             "last_kept_index": crop_end + 1,
             "first_kept_filename": files[crop_start].name,
             "last_kept_filename": files[crop_end].name,
+            "manual_crop_start": args.manual_crop_start.strip(),
+            "manual_crop_end": args.manual_crop_end.strip(),
             "threshold_mode": threshold_mode,
             "bright_threshold": bright_threshold,
             "threshold_sample_count": threshold_sample.size,

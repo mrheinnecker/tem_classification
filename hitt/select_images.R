@@ -11,6 +11,7 @@ spec <- matrix(c(
   "dryrun", "d", 1, "character",
   "dryrun_n", "n", 1, "integer",
   "existing_s3", "e", 1, "character",
+  "overwrite", "w", 1, "character",
   "default_crop_stack", NA, 1, "character",
   "default_crop_bright_threshold", NA, 1, "character",
   "default_crop_auto_percentile", NA, 1, "character",
@@ -50,6 +51,11 @@ existing_s3 <- opt$existing_s3
 if (is.null(existing_s3) || is.na(existing_s3)) {
   existing_s3 <- NULL
 }
+overwrite <- opt$overwrite
+if (is.null(overwrite) || is.na(overwrite)) {
+  overwrite <- "FALSE"
+}
+overwrite_enabled <- as.logical(overwrite)
 
 parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
@@ -154,7 +160,7 @@ crop_defaults <- list(
   crop_padding_high_slices=value_or_default(opt$default_crop_padding_high_slices, "10")
 )
 
-for (column in c(names(crop_defaults), "crop_padding_slices")) {
+for (column in c(names(crop_defaults), "crop_padding_slices", "crop_start", "crop_end")) {
   if (!column %in% names(images)) {
     images[[column]] <- NA_character_
   }
@@ -187,9 +193,12 @@ all_images <- images %>%
     crop_min_bright_fraction=coalesce(crop_min_bright_fraction, crop_defaults$crop_min_bright_fraction),
     crop_padding_low_slices=coalesce(crop_padding_low_slices, crop_padding_slices, crop_defaults$crop_padding_low_slices),
     crop_padding_high_slices=coalesce(crop_padding_high_slices, crop_padding_slices, crop_defaults$crop_padding_high_slices),
+    crop_start=coalesce(crop_start, ""),
+    crop_end=coalesce(crop_end, ""),
     s3_omezarr_present=filename %in% existing_s3_names,
+    overwrite_selected=overwrite_enabled,
     convert_selected=coalesce(convert == "1", FALSE),
-    needs_processing=convert_selected & !s3_omezarr_present
+    needs_processing=convert_selected & (overwrite_selected | !s3_omezarr_present)
   ) %>%
   distinct(remote_tomo_path, .keep_all=TRUE) %>%
   select(filename, shortname, source_path, remote_tomo_path, tmp_copy_path, tomo_path, omezarr_path, req_mem, everything())

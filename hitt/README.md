@@ -6,6 +6,8 @@ Before selecting datasets, the workflow lists only the top level of the configur
 
 For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when the S3 client or connection is unavailable. Discovery, process-only, and dry-run modes can continue with an empty S3 listing.
 
+Use `--overwrite` to reprocess all rows with `convert=1`, even when a matching S3 prefix already exists. In `all` mode, the upload step removes the existing `s3_bucket/<dataset_name>/` prefix before uploading the rebuilt OME-Zarr.
+
 The input table should contain a `source_path` column with the remote dataset path or remote `tomo` directory. For compatibility, `remote_path` and `tmp_copy_path` are also accepted as column names. By default, interactive and cluster runs read this Google Sheet:
 
 ```text
@@ -56,6 +58,16 @@ After copying, the workflow samples every TIFF slice and detects a conservative 
 
 The scratch `tomo` directory is never cropped or deleted. The selected range is only applied when preparing the temporary staged stack for conversion. Per-slice decisions, a crop summary, and a combined boundary QC PNG are written under `logs/.../crop_analysis`. The PNG shows the last excluded slice on the low-Z side on the left and the first excluded slice on the high-Z side on the right. If only one boundary has excluded slices, the PNG contains that available boundary image. If no reliable sample-bearing run is detected, the workflow keeps the full stack.
 
+To collect crop decisions from multiple workflow runs into one review table:
+
+```bash
+python3 summarize_crop_logs.py \
+  /scratch/rheinnec/hitt_screen/logs \
+  --output /scratch/rheinnec/hitt_screen/hitt_crop_summary.tsv
+```
+
+The summary includes the applied slice range, manual crop values, automatic threshold settings, shape-crop decisions, uint16 scaling limits, and paths to the boundary QC PNGs.
+
 Crop parameters can be set per dataset with columns in the input table:
 
 ```text
@@ -65,9 +77,13 @@ crop_auto_percentile
 crop_min_bright_fraction
 crop_padding_low_slices
 crop_padding_high_slices
+crop_start
+crop_end
 ```
 
 Blank or missing values fall back to the launcher defaults. During migration, a legacy `crop_padding_slices` table column is also accepted and is applied to both edges unless an edge-specific value is present.
+
+If both `crop_start` and `crop_end` are set for a dataset, they override automatic crop detection. The range is 1-based and inclusive: `crop_start=500` and `crop_end=1500` keeps slices 500 through 1500 and removes everything outside that range. If `crop_end` is larger than the stack length, the workflow uses the last available slice.
 
 Useful crop overrides:
 

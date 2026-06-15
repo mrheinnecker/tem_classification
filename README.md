@@ -9,6 +9,7 @@ The repo is sub-structured according to the various modalities:
 - `sem/`: Scanning electron microscopy (SEM) 
 - `hitt/`: High-Throughput Tomography; X-ray scans 
 - `cryo/`: Cryo confocal images of Plunge-frozen grids
+- `plastic/`: Light microscopy `.lif` images for PLASTIC processing
 
 Each modality follows the same strategy: Starting from raw data as it arrives from microscopes / input sources and ending in conversion to ome-zarr format, storing everything in s3 storage and creating collection tables to browse the data through MoBie.
 Each workflow is implemented in nextflow and has its dependencies handled via Apptainer/SIngularity container (see definition files in `container/`).
@@ -23,6 +24,7 @@ The following settings are recommened for each workflow:
 - `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfHITT.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
 - `wfSEM`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
 - `wfCRYO`: lightweight: allocate a cluster node (`srun -p htc --time=0-04:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
+- `wfPLASTIC`: lightweight: similar to `wfCRYO`, but converts Leica `.lif` inputs directly with EuBI-Bridge.
 
 
 ## Repository Layout
@@ -31,6 +33,7 @@ The following settings are recommened for each workflow:
 .
 +-- container/
 |   +-- czi_to_tiff.def
+|   +-- lif_metadata.def
 |   +-- eubibridge.def
 |   +-- imod.def
 |   +-- py_mrcfile.def
@@ -38,6 +41,7 @@ The following settings are recommened for each workflow:
 +-- launch_wfSEM.sh
 +-- launch_wfHITT.sh
 +-- launch_wfCRYO.sh
++-- launch_wfPLASTIC.sh
 +-- sem/
 |   +-- wfSEM.nf
 |   +-- sem_main.sh
@@ -54,6 +58,13 @@ The following settings are recommened for each workflow:
 +-- cryo/
 |   +-- wfCRYO.nf
 |   +-- cryo_main.sh
+|   +-- nextflow.config
+|   +-- select_images.R
+|   +-- extract_metadata.py
+|   +-- make_collection_table.R
++-- plastic/
+|   +-- wfPLASTIC.nf
+|   +-- plastic_main.sh
 |   +-- nextflow.config
 |   +-- select_images.R
 |   +-- extract_metadata.py
@@ -199,6 +210,12 @@ bash ./cryo_main.sh cluster --workflow_stage collection
 ```
 
 The input table should contain one of `raw_path`, `file_path`, `filepath`, `file`, `source_path`, or `path`. Optional scale columns such as `x_scale`, `y_scale`, and `z_scale` can override file metadata; otherwise the workflow reads OME/ImageJ/TIFF metadata where available.
+
+## PLASTIC Workflow
+
+The PLASTIC workflow is defined in `plastic/wfPLASTIC.nf`, configured by `plastic/nextflow.config`, and launched through `plastic/plastic_main.sh`.
+
+It follows the CRYO table/S3/collection-table pattern, but targets Leica `.lif` light-microscopy inputs. Unlike CRYO, it does not create an intermediate OME-TIFF; it sends the raw `.lif` path directly to EuBI-Bridge. Extra EuBI flags for LIF/stitched-file handling can be passed with `--eubi_extra_args`.
 
 ## Run Modes
 

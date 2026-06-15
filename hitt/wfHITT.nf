@@ -18,7 +18,7 @@ params.y_scale = params.y_scale ?: 650
 params.z_scale = params.z_scale ?: 650
 params.input_suffix = params.input_suffix ?: "recon_111_1/tomo"
 params.output_name = params.output_name ?: "omezarr"
-params.overwrite = params.overwrite ?: "TRUE"
+params.overwrite = params.overwrite ?: "FALSE"
 params.convert_uint16 = params.convert_uint16 ?: "TRUE"
 params.uint16_lower_percentile = params.uint16_lower_percentile ?: 0.1
 params.uint16_upper_percentile = params.uint16_upper_percentile ?: 99.9
@@ -113,6 +113,7 @@ process SELECTHITTIMAGES {
     val dryrun
     val dryrun_n
     path existing_s3
+    val overwrite
     val default_crop_stack
     val default_crop_bright_threshold
     val default_crop_auto_percentile
@@ -136,6 +137,7 @@ process SELECTHITTIMAGES {
       --dryrun "${dryrun}" \
       --dryrun_n "${dryrun_n}" \
       --existing_s3 "${existing_s3}" \
+      --overwrite "${overwrite}" \
       --default_crop_stack "${default_crop_stack}" \
       --default_crop_bright_threshold "${default_crop_bright_threshold}" \
       --default_crop_auto_percentile "${default_crop_auto_percentile}" \
@@ -158,10 +160,10 @@ process COPYHITTDATA {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
+    tuple val(filename), val(remote_tomo_path), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end)
 
     output:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), emit: copied_images
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end), emit: copied_images
     path "${filename}_copy_done.txt"
 
     script:
@@ -216,7 +218,7 @@ process ANALYZEHITTCROP {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices)
+    tuple val(filename), val(tmp_copy_path), val(omezarr_path), val(req_mem), val(crop_stack), val(crop_bright_threshold), val(crop_auto_percentile), val(crop_min_bright_fraction), val(crop_padding_low_slices), val(crop_padding_high_slices), val(crop_start), val(crop_end)
 
     output:
     tuple val(filename), val(tmp_copy_path), path("${filename}_crop_plan.tsv"), val(omezarr_path), val(req_mem), emit: crop_plans
@@ -245,6 +247,8 @@ process ANALYZEHITTCROP {
       --min-bright-fraction "${crop_min_bright_fraction}" \
       --padding-low-slices "${crop_padding_low_slices}" \
       --padding-high-slices "${crop_padding_high_slices}" \
+      --manual-crop-start "${crop_start}" \
+      --manual-crop-end "${crop_end}" \
       --bridge-gap-slices "${params.crop_bridge_gap_slices}" \
       --min-run-slices "${params.crop_min_run_slices}" \
       --sample-values-per-slice "${params.crop_sample_values_per_slice}"
@@ -410,6 +414,12 @@ process S3UPLOADHITT {
       exit 1
     fi
 
+    case "${params.overwrite}" in
+      TRUE|true|1|yes|YES)
+        mc rm --recursive --force "${params.s3_bucket}/${filename}/"
+        ;;
+    esac
+
     mc cp "${omezarr_path}/" "${params.s3_bucket}/${filename}/" --recursive
     touch "${filename}_s3_upload_done.txt"
     """
@@ -490,6 +500,7 @@ workflow {
         params.dryrun,
         params.dryrun_n,
         CHECKEXISTINGHITTS3FILES.out.existing_s3,
+        params.overwrite,
         params.crop_stack,
         params.crop_bright_threshold,
         params.crop_auto_percentile,
@@ -502,7 +513,7 @@ workflow {
 
         SELECTHITTIMAGES.out.to_process
             .splitCsv(header:true)
-            .map { row -> tuple(row.filename, row.remote_tomo_path, row.tmp_copy_path, row.omezarr_path, row.req_mem, row.crop_stack, row.crop_bright_threshold, row.crop_auto_percentile, row.crop_min_bright_fraction, row.crop_padding_low_slices, row.crop_padding_high_slices) }
+            .map { row -> tuple(row.filename, row.remote_tomo_path, row.tmp_copy_path, row.omezarr_path, row.req_mem, row.crop_stack, row.crop_bright_threshold, row.crop_auto_percentile, row.crop_min_bright_fraction, row.crop_padding_low_slices, row.crop_padding_high_slices, row.crop_start, row.crop_end) }
             .set { hitt_copy_batch_ch }
 
         COPYHITTDATA(hitt_copy_batch_ch)
