@@ -1,0 +1,37 @@
+Bootstrap: docker
+From: python:3.12-slim
+
+%labels
+    Author marco
+    Tool LIF metadata
+    Description Leica LIF metadata extraction for wfPLASTIC
+
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PYTHONUNBUFFERED=1
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        libglib2.0-0 \
+        libgl1 \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+
+    python -m pip install --upgrade pip setuptools wheel
+
+    python -m pip install --no-cache-dir \
+        numpy \
+        bioio \
+        bioio-lif \
+        readlif \
+        tifffile \
+        imagecodecs
+
+%runscript
+    exec python "$@"
+
+%test
+    python -c "import numpy; import bioio; import bioio_lif; import readlif; print('LIF metadata imports OK')"
