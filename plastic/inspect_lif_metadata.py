@@ -16,9 +16,10 @@ def json_safe(value):
     return str(value)
 
 
-def simple_attrs(obj):
+def simple_attrs(obj, names=None):
     values = {}
-    for name in dir(obj):
+    iterable = names if names is not None else dir(obj)
+    for name in iterable:
         if name.startswith("_"):
             continue
         try:
@@ -95,7 +96,17 @@ def inspect_bioimage(path):
 
     image = BioImage(path)
     result = {
-        "object": simple_attrs(image),
+        "object": simple_attrs(
+            image,
+            names=[
+                "current_scene",
+                "dims",
+                "shape",
+                "physical_pixel_sizes",
+                "channel_names",
+                "scenes",
+            ],
+        ),
         "scenes": [str(scene) for scene in (getattr(image, "scenes", []) or [])],
         "per_scene": [],
     }
@@ -143,7 +154,17 @@ def inspect_readlif(path, max_images):
     except Exception as exc:
         return {"error": f"LifFile open failed: {exc!r}"}
 
-    result = {"object": simple_attrs(lif), "images": []}
+    result = {
+        "object": simple_attrs(
+            lif,
+            names=[
+                "filename",
+                "xml_header",
+                "xml_root",
+            ],
+        ),
+        "images": [],
+    }
     try:
         iterator = lif.get_iter_image()
     except Exception as exc:
@@ -154,7 +175,21 @@ def inspect_readlif(path, max_images):
         if index >= max_images:
             result["truncated_after"] = max_images
             break
-        info = {"index": index, "object": simple_attrs(image)}
+        info = {
+            "index": index,
+            "object": simple_attrs(
+                image,
+                names=[
+                    "name",
+                    "dims",
+                    "scale",
+                    "channels",
+                    "settings",
+                    "info",
+                    "path",
+                ],
+            ),
+        }
         for name in ("name", "dims", "scale", "channels", "settings", "info"):
             try:
                 value = getattr(image, name)
