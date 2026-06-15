@@ -255,6 +255,14 @@ def sanitize_channel_label(label, index):
 def color_for_channel(label, raw_color, index):
     label_lower = str(label or "").lower()
     compact_label = re.sub(r"[^a-z0-9]+", "", label_lower)
+    if compact_label == "green":
+        return "green"
+    if compact_label in {"gray", "grey"}:
+        return "white"
+    if compact_label == "yellow":
+        return "yellow"
+    if compact_label == "magenta":
+        return "magenta"
     for key, color in CHANNEL_COLOR_OVERRIDES.items():
         if key in compact_label:
             return color
@@ -615,8 +623,54 @@ def bioio_physical_size(physical_pixel_sizes, axis):
     if hasattr(physical_pixel_sizes, axis):
         return getattr(physical_pixel_sizes, axis)
     if isinstance(physical_pixel_sizes, dict):
-        return physical_pixel_sizes.get(axis)
+        return physical_pixel_sizes.get(axis) or physical_pixel_sizes.get(axis.lower())
+    if isinstance(physical_pixel_sizes, (list, tuple)):
+        index = {"Z": 0, "Y": 1, "X": 2}.get(axis)
+        if index is not None and len(physical_pixel_sizes) > index:
+            return physical_pixel_sizes[index]
     return None
+
+
+def lifext_candidates(path):
+    path = Path(path)
+    return [
+        path.with_suffix(".lifext"),
+        Path(str(path) + "ext"),
+        path.parent / f"{path.name}.lifext",
+    ]
+
+
+def decode_text_file(path):
+    raw = Path(path).read_bytes()
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            text = raw.decode(encoding)
+            printable = sum(1 for char in text[:1000] if char.isprintable() or char.isspace())
+            if printable / max(1, min(len(text), 1000)) > 0.8:
+                return text
+        except UnicodeDecodeError:
+            continue
+    return ""
+
+
+def parse_xml_attributes(text):
+    return {
+        key: value
+        for key, value in re.findall(r'([A-Za-z_:][A-Za-z0-9_.:-]*)="([^"]*)"', text)
+    }
+
+
+def lifext_channel_descriptions(path):
+    for candidate in lifext_candidates(path):
+        if not candidate.exists():
+            continue
+        text = decode_text_file(candidate)
+        descriptions = []
+        for match in re.finditer(r"<ChannelDescription\b([^>]*)>", text, flags=re.IGNORECASE):
+            descriptions.append(parse_xml_attributes(match.group(1)))
+        if descriptions:
+            return descriptions
+    return []
 
 
 def extract_lif_metadata(path):
@@ -656,6 +710,15 @@ def extract_lif_metadata(path):
     metadata["shape"] = list(shape) if shape is not None else None
 
     channel_names = list(getattr(image, "channel_names", []) or [])
+    sidecar_channel_descriptions = lifext_channel_descriptions(path)
+    if sidecar_channel_descriptions:
+        metadata["lifext_channel_descriptions"] = sidecar_channel_descriptions
+    if not channel_names and sidecar_channel_descriptions:
+        channel_names = [
+            row.get("LUTName") or row.get("Name") or row.get("ChannelName")
+            for row in sidecar_channel_descriptions
+        ]
+        channel_names = [name for name in channel_names if name]
     channels = []
     for index, label in enumerate(channel_names):
         display = canonical_channel_display(label) or sanitize_channel_label(label, index)

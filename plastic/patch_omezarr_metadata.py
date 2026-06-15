@@ -15,14 +15,6 @@ COLOR_TO_HEX = {
     "gray": "FFFFFF",
     "grey": "FFFFFF",
 }
-REAL_CHANNELS = [
-    ("GFP", "cyan"),
-    ("PE", "yellow"),
-    ("ChloA", "magenta"),
-    ("TL", "white"),
-]
-
-
 def compact_label(value):
     return "".join(char for char in str(value or "").lower() if char.isalnum())
 
@@ -74,25 +66,12 @@ def channel_matches(channel, label):
 
 def real_channels_only(metadata):
     channels = metadata.get("channels", [])
-    selected = []
-    used = set()
-    for display, color in REAL_CHANNELS:
-        for channel in channels:
-            if id(channel) in used:
-                continue
-            if channel_matches(channel, display):
-                normalized = dict(channel)
-                normalized["display"] = display
-                normalized["label"] = display
-                normalized["color"] = color
-                selected.append(normalized)
-                used.add(id(channel))
-                break
-    if selected:
-        for index, channel in enumerate(selected):
-            channel["index"] = index
-        return selected
-    return channels
+    normalized = []
+    for index, channel in enumerate(channels):
+        row = dict(channel)
+        row["index"] = index
+        normalized.append(row)
+    return normalized
 
 
 def find_zarr_root(path):

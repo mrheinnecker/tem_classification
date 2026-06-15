@@ -129,7 +129,7 @@ if (length(metadata_files) > 0) {
 }
 
 default_channel_colors <- c("red", "green", "yellow", "blue", "magenta", "cyan", "white")
-preferred_channel_order <- c("GFP", "PE", "ChloA", "TL", "DAPI")
+preferred_channel_order <- character()
 
 near_square_columns <- function(n) {
   if (n <= 1) {
@@ -141,6 +141,10 @@ near_square_columns <- function(n) {
 color_for_display <- function(display, fallback) {
   compact <- str_replace_all(tolower(display %||% ""), "[^a-z0-9]+", "")
   case_when(
+    compact == "green" ~ "green",
+    compact %in% c("gray", "grey") ~ "white",
+    compact == "yellow" ~ "yellow",
+    compact == "magenta" ~ "magenta",
     str_detect(compact, "gfp") ~ "cyan",
     str_detect(compact, "tl") ~ "white",
     str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "magenta",
@@ -207,7 +211,7 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
   })
 
   normalized <- normalized[!duplicated(map_chr(normalized, ~tolower(.x$display)))]
-  if (length(normalized) > length(preferred_channel_order)) {
+  if (length(preferred_channel_order) > 0 && length(normalized) > length(preferred_channel_order)) {
     preferred <- list()
     for (term in preferred_channel_order) {
       matches <- keep(

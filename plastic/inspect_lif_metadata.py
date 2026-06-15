@@ -57,6 +57,33 @@ def text_preview(path, limit):
     }
 
 
+def decode_text(path):
+    raw = path.read_bytes()
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            text = raw.decode(encoding)
+            printable = sum(1 for char in text[:1000] if char.isprintable() or char.isspace())
+            if printable / max(1, min(len(text), 1000)) > 0.8:
+                return text
+        except UnicodeDecodeError:
+            continue
+    return ""
+
+
+def parse_xml_attributes(text):
+    return {
+        key: value
+        for key, value in re.findall(r'([A-Za-z_:][A-Za-z0-9_.:-]*)="([^"]*)"', text)
+    }
+
+
+def channel_descriptions(text):
+    descriptions = []
+    for match in re.finditer(r"<ChannelDescription\b([^>]*)>", text, flags=re.IGNORECASE):
+        descriptions.append(parse_xml_attributes(match.group(1)))
+    return descriptions
+
+
 def lifext_candidates(path):
     return [
         path.with_suffix(".lifext"),
@@ -75,12 +102,16 @@ def inspect_lifext(path, limit):
         if not candidate.exists():
             continue
         info = text_preview(candidate, limit)
+        text = decode_text(candidate)
         info["path"] = str(candidate)
+        descriptions = channel_descriptions(text)
+        if descriptions:
+            info["channel_descriptions"] = descriptions
         channels = sorted(
             set(
                 re.findall(
                     r"(?:Channel|Detector|Dye|LUT|Fluo|Wavelength)[^<\n\r]{0,120}",
-                    info.get("preview", ""),
+                    text[: max(limit, 100000)],
                     flags=re.IGNORECASE,
                 )
             )
