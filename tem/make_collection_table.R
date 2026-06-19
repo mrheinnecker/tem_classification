@@ -89,16 +89,31 @@ if (is.null(expected_datasets) || is.na(expected_datasets) || !file.exists(expec
   stop("--expected_datasets must point to the raw-derived all_datasets.tsv file.")
 }
 
-expected_omezarr_names <- read_tsv(
+expected_datasets_table <- read_tsv(
   expected_datasets,
   col_types=cols(.default=col_character())
-) %>%
-  pull(omezarr_name) %>%
+)
+
+expected_omezarr_names <- expected_datasets_table %>%
+  select(any_of(c("omezarr_name", "s3_zarr_name"))) %>%
+  unlist(use.names=FALSE) %>%
+  as.character() %>%
   discard(is.na) %>%
+  discard(~.x == "") %>%
   unique()
 
+if ("filename" %in% names(expected_datasets_table)) {
+  expected_omezarr_names <- c(
+    expected_omezarr_names,
+    paste0(expected_datasets_table$filename, "_correctionblend_gradientcorrected.zarr")
+  ) %>%
+    discard(is.na) %>%
+    discard(~.x == "") %>%
+    unique()
+}
+
 if (length(expected_omezarr_names) == 0) {
-  stop("No expected OME-Zarr dataset names were found in the raw-derived dataset inventory.")
+  stop("No expected OME-Zarr or Zarr dataset names were found in the raw-derived dataset inventory.")
 }
 
 parse_mc_ls_path <- function(line) {

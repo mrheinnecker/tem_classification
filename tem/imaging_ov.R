@@ -96,6 +96,7 @@ has_s3_omezarr <- function(filename) {
 
   expected_names <- c(
     paste0(filename, "_omezarr"),
+    paste0(filename, "_correctionblend_gradientcorrected.zarr"),
     paste0(filename, ".ome.zarr"),
     paste0(filename, ".zarr")
   )
@@ -124,6 +125,7 @@ all_files_raw <-
     correctionblend_file=file.path(png_dir, site, paste0(filename, "_correctionblend.png")),
     png_export_file=file.path(png_dir, site, paste0(filename, "_correctionblend_gradientcorrected.png")),
     omezarr_name=paste0(filename, "_omezarr"),
+    s3_zarr_name=paste0(filename, "_correctionblend_gradientcorrected.zarr"),
     
     #grid=
   ) %>%
@@ -142,7 +144,7 @@ all_files <- all_files_raw %>%
   ungroup() %>%
   select(
     filename, file, mdoc_file, shortname, req_mem,
-    justblend_file, correctionblend_file, png_export_file, omezarr_name,
+    justblend_file, correctionblend_file, png_export_file, omezarr_name, s3_zarr_name,
     s3_omezarr_present, png_export_present, needs_s3, needs_png, needs_processing,
     filesize
   ) #%>%
