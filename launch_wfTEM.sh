@@ -20,7 +20,7 @@ scratch_dir="/scratch/rheinnec/tem_screen"
 mkdir -p "${scratch_dir}"
 cd "${scratch_dir}"
 
-bash "${repo_dir}/tem/main.sh" interactive \
+bash "${repo_dir}/tem/main.sh" cluster \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282" \
   --google_key "${repo_dir}/trec-tem-screen-e98a2e03f58b.json" \
@@ -36,7 +36,7 @@ bash "${repo_dir}/tem/main.sh" interactive \
   --workflow_stage all \
   --dryrun FALSE \
   --dryrun_n 10 \
-  --s3_bucket "s3embl/temscreen" \
+  --s3_bucket "s3embl/imatrec/central_data_processing/tem2" \
   --gradient_chunk_rows 512 \
   --gradient_downsample 16 \
   --resume TRUE
