@@ -3,9 +3,11 @@ params.script_dir = params.script_dir ?: baseDir.toString()
 params.sheet_mode = params.sheet_mode ?: "local"
 params.sheet_url = params.sheet_url ?: "https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282"
 params.collection_table_url = params.collection_table_url ?: "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
+params.collection_table_sheet = params.collection_table_sheet ?: "collection_table"
 params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
 params.local_log = params.local_log ?: "${params.outdir}/image_log_local.tsv"
 params.workflow_stage = params.workflow_stage ?: "all"
+params.dryrun_n = params.dryrun_n ?: 10
 params.imod_dir = params.imod_dir ?: "/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1"
 params.s3_bucket = params.s3_bucket ?: "s3embl/temscreen"
 params.zarr_format = params.zarr_format ?: 2
@@ -145,6 +147,7 @@ process CHECKNEWIMAGES {
     val rawdir
     val pngdir
     val dryrun
+    val dryrun_n
     val script_dir
     val sheet_mode
     val sheet_url
@@ -165,6 +168,7 @@ process CHECKNEWIMAGES {
       --rawdir "${rawdir}" \
       --pngdir "${pngdir}" \
       --dryrun "${dryrun}" \
+      --dryrun_n "${dryrun_n}" \
       --script_dir "${script_dir}" \
       --sheet_mode "${sheet_mode}" \
       --sheet_url "${sheet_url}" \
@@ -415,7 +419,7 @@ process S3UPLOAD {
     tuple val(filename), path(omezarr)
 
     output:
-    path "done.txt"
+    path "${filename}_s3_upload_done.txt"
 
     /*
      * Optional:
@@ -443,7 +447,7 @@ process S3UPLOAD {
 
     echo "Done."
     
-    touch done.txt
+    touch "${filename}_s3_upload_done.txt"
     
     """
 }
@@ -457,7 +461,7 @@ process COLLECTS3FILES {
     time "10m"
 
     input:
-    tuple path(done)
+    path done_files
 
     output:
     path "all_s3_entries.txt", emit: all_s3
@@ -509,10 +513,12 @@ process MAKECOLLECTIONTABLE {
       --sheet_mode "${params.sheet_mode}" \
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
+      --collection_table_sheet "${params.collection_table_sheet}" \
       --local_collection_table "collection_table.tsv" \
       --image_log_url "${params.sheet_url}" \
       --image_log_sheet "${params.dryrun.toString().toBoolean() ? 'image_log_test' : 'image_log'}" \
-      --local_image_log "${params.local_log}"
+      --local_image_log "${params.local_log}" \
+      --s3_bucket "${params.s3_bucket}"
 
     
     """
@@ -531,6 +537,7 @@ workflow {
     params.rawdir,
     params.pngdir,
     params.dryrun,
+    params.dryrun_n,
     params.script_dir,
     params.sheet_mode,
     params.sheet_url,

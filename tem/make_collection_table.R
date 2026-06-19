@@ -7,12 +7,14 @@ spec <- matrix(c(
   "sheet_mode", "m", 1, "character",
   "google_key", "k", 1, "character",
   "collection_table_url", "u", 1, "character",
+  "collection_table_sheet", "s", 1, "character",
   "local_collection_table", "l", 1, "character",
   "image_log_url", "i", 1, "character",
-  "image_log_sheet", "s", 1, "character",
+  "image_log_sheet", "g", 1, "character",
   "local_image_log", "a", 1, "character",
   "image_stats_dir", "x", 1, "character",
-  "expected_datasets", "e", 1, "character"
+  "expected_datasets", "e", 1, "character",
+  "s3_bucket", "b", 1, "character"
 ),
 ncol = 4,
 byrow = TRUE)
@@ -29,6 +31,11 @@ if (is.null(sheet_mode) || is.na(sheet_mode)) {
 collection_table <- opt$collection_table_url
 if (is.null(collection_table) || is.na(collection_table)) {
   collection_table <- "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951"
+}
+
+collection_table_sheet <- opt$collection_table_sheet
+if (is.null(collection_table_sheet) || is.na(collection_table_sheet)) {
+  collection_table_sheet <- "collection_table"
 }
 
 local_collection_table <- opt$local_collection_table
@@ -55,6 +62,27 @@ image_stats_dir <- opt$image_stats_dir
 if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
   image_stats_dir <- "."
 }
+
+s3_bucket <- opt$s3_bucket
+if (is.null(s3_bucket) || is.na(s3_bucket)) {
+  s3_bucket <- "s3embl/temscreen"
+}
+
+public_s3_base_url <- function(bucket) {
+  bucket <- bucket %>% str_remove("/+$")
+  if (str_detect(bucket, "^https?://")) {
+    return(bucket)
+  }
+
+  bucket_path <- bucket %>% str_remove("^[^/]+/?")
+  if (bucket_path == "") {
+    "https://s3.embl.de"
+  } else {
+    file.path("https://s3.embl.de", bucket_path)
+  }
+}
+
+s3_public_base <- public_s3_base_url(s3_bucket)
 
 expected_datasets <- opt$expected_datasets
 if (is.null(expected_datasets) || is.na(expected_datasets) || !file.exists(expected_datasets)) {
@@ -96,7 +124,7 @@ col_table <-
     cell_id=str_extract(source_name, "c0\\d+"),
     size_frac=str_extract(source_name, "\\d+to\\d+"),
     sampling_time=str_extract(source_name, "_(AM|PM|MID|TARA)_") %>% str_remove_all("_"),
-    uri=file.path("https://s3.embl.de/temscreen", s3_raw),
+    uri=file.path(s3_public_base, s3_raw),
     name=paste0(str_split(source_name, cell_id) %>% map_chr(.,1), cell_id),
     view=site,
     grid=site,
@@ -222,7 +250,7 @@ if (sheet_mode == "google") {
 
   gs4_auth(path=json_key)
   drive_auth(path = json_key)
-  write_sheet(col_table, ss = collection_table, sheet="collection_table")
+  write_sheet(col_table, ss = collection_table, sheet=collection_table_sheet)
 } else {
   write_tsv(col_table, file=local_collection_table)
 }

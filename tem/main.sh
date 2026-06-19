@@ -21,7 +21,12 @@ Options:
   --profile, --mode VALUE          Runtime profile: local, interactive, cluster, devel.
   --resume TRUE|FALSE              Add Nextflow -resume when TRUE.
   --dryrun TRUE|FALSE              Forwarded to the workflow.
+  --dryrun_n N                     Number of images to process during dryrun.
   --sheet_mode VALUE               local or google.
+  --sheet_url URL                  Image log Google Sheet URL.
+  --google_key PATH                Google service-account JSON key.
+  --collection_table_url URL       Collection-table Google Sheet URL.
+  --collection_table_sheet VALUE   Output sheet name for the collection table.
   --workflow_stage VALUE           discover, process, or all.
   --main_dir PATH                  Base TEM screen directory.
   --rawdir PATH                    Raw image directory.
@@ -30,14 +35,16 @@ Options:
   --logdir PATH                    Workflow log directory.
   --work_dir PATH                  Nextflow work directory.
   --local_log PATH                 Local image log TSV.
+  --s3_bucket VALUE                Target S3 bucket/path for OME-Zarr upload.
   --gradient_chunk_rows VALUE      Row chunk size for gradient correction.
   --gradient_downsample VALUE      Downsample factor for gradient detection.
   --help                           Show this message.
 
 Environment overrides are still supported for compatibility:
   RESUME, DRYRUN, SHEET_MODE, WORKFLOW_STAGE, TEM_SCREEN_DIR, RAWDIR,
-  PNGDIR, OUTDIR, LOGDIR, WORK_DIR, LOCAL_LOG, GRADIENT_CHUNK_ROWS,
-  GRADIENT_DOWNSAMPLE.
+  PNGDIR, OUTDIR, LOGDIR, WORK_DIR, LOCAL_LOG, S3_BUCKET, SHEET_URL,
+  GOOGLE_KEY, COLLECTION_TABLE_URL, COLLECTION_TABLE_SHEET, DRYRUN_N,
+  GRADIENT_CHUNK_ROWS, GRADIENT_DOWNSAMPLE.
 EOF
 }
 
@@ -130,6 +137,7 @@ resume="$(to_upper_bool "${RESUME:-TRUE}")"
 sheet_mode="${SHEET_MODE:-$default_sheet_mode}"
 workflow_stage="${WORKFLOW_STAGE:-$default_workflow_stage}"
 dryrun="$(to_upper_bool "${DRYRUN:-$default_dryrun}")"
+dryrun_n="${DRYRUN_N:-10}"
 
 rawdir="${RAWDIR:-}"
 pngdir="${PNGDIR:-}"
@@ -137,6 +145,11 @@ outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 local_log="${LOCAL_LOG:-}"
+s3_bucket="${S3_BUCKET:-s3embl/temscreen}"
+sheet_url="${SHEET_URL:-https://docs.google.com/spreadsheets/d/143uVeeJ72SQE5eK01lzWYCEiT7pJUF3lX7hJl3R9s9I/edit?gid=258669282#gid=258669282}"
+google_key="${GOOGLE_KEY:-${script_dir}/trec-tem-screen-e98a2e03f58b.json}"
+collection_table_url="${COLLECTION_TABLE_URL:-https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951}"
+collection_table_sheet="${COLLECTION_TABLE_SHEET:-collection_table}"
 gradient_chunk_rows="${GRADIENT_CHUNK_ROWS:-}"
 gradient_downsample="${GRADIENT_DOWNSAMPLE:-}"
 
@@ -172,12 +185,52 @@ while [[ $# -gt 0 ]]; do
       dryrun="$(to_upper_bool "${1#*=}")"
       shift
       ;;
+    --dryrun_n|--dryrun-n)
+      dryrun_n="${2:?--dryrun_n requires a value}"
+      shift 2
+      ;;
+    --dryrun_n=*|--dryrun-n=*)
+      dryrun_n="${1#*=}"
+      shift
+      ;;
     --sheet_mode|--sheet-mode|--sheete_mode)
       sheet_mode="${2:?--sheet_mode requires a value}"
       shift 2
       ;;
     --sheet_mode=*|--sheet-mode=*|--sheete_mode=*)
       sheet_mode="${1#*=}"
+      shift
+      ;;
+    --sheet_url|--sheet-url)
+      sheet_url="${2:?--sheet_url requires a value}"
+      shift 2
+      ;;
+    --sheet_url=*|--sheet-url=*)
+      sheet_url="${1#*=}"
+      shift
+      ;;
+    --google_key|--google-key)
+      google_key="${2:?--google_key requires a path}"
+      shift 2
+      ;;
+    --google_key=*|--google-key=*)
+      google_key="${1#*=}"
+      shift
+      ;;
+    --collection_table_url|--collection-table-url)
+      collection_table_url="${2:?--collection_table_url requires a value}"
+      shift 2
+      ;;
+    --collection_table_url=*|--collection-table-url=*)
+      collection_table_url="${1#*=}"
+      shift
+      ;;
+    --collection_table_sheet|--collection-table-sheet)
+      collection_table_sheet="${2:?--collection_table_sheet requires a value}"
+      shift 2
+      ;;
+    --collection_table_sheet=*|--collection-table-sheet=*)
+      collection_table_sheet="${1#*=}"
       shift
       ;;
     --workflow_stage|--workflow-stage)
@@ -244,6 +297,14 @@ while [[ $# -gt 0 ]]; do
       local_log="${1#*=}"
       shift
       ;;
+    --s3_bucket|--s3-bucket)
+      s3_bucket="${2:?--s3_bucket requires a value}"
+      shift 2
+      ;;
+    --s3_bucket=*|--s3-bucket=*)
+      s3_bucket="${1#*=}"
+      shift
+      ;;
     --gradient_chunk_rows|--gradient-chunk-rows)
       gradient_chunk_rows="${2:?--gradient_chunk_rows requires a value}"
       shift 2
@@ -288,8 +349,14 @@ nextflow_args=(
   --outdir "$outdir"
   --local_log "$local_log"
   --sheet_mode "$sheet_mode"
+  --sheet_url "$sheet_url"
+  --google_key "$google_key"
+  --collection_table_url "$collection_table_url"
+  --collection_table_sheet "$collection_table_sheet"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
+  --dryrun_n "$dryrun_n"
+  --s3_bucket "$s3_bucket"
   -profile "$profile"
 )
 

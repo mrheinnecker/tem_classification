@@ -7,6 +7,7 @@ spec <- matrix(c(
   "rawdir",                   "r",   1,   "character",
   "pngdir",        "p",   1,   "character",
   "dryrun", "d",   1,   "character",
+  "dryrun_n", "n", 1, "integer",
   "script_dir", "s", 1, "character",
   "sheet_mode", "m", 1, "character",
   "sheet_url", "u", 1, "character",
@@ -61,6 +62,11 @@ if (is.null(existing_s3) || is.na(existing_s3)) {
   existing_s3 <- NULL
 }
 
+dryrun_n <- opt$dryrun_n
+if (is.null(dryrun_n) || is.na(dryrun_n)) {
+  dryrun_n <- 10L
+}
+
 parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
   ifelse(
@@ -71,22 +77,30 @@ parse_mc_ls_path <- function(line) {
 }
 
 existing_s3_paths <- character()
+existing_s3_names <- character()
 if (!is.null(existing_s3) && file.exists(existing_s3)) {
   existing_s3_paths <- read_lines(existing_s3) %>%
     parse_mc_ls_path() %>%
     str_remove("/$") %>%
     discard(is.na)
+
+  existing_s3_names <- existing_s3_paths %>%
+    basename() %>%
+    unique()
 }
 
 has_s3_omezarr <- function(filename) {
-  if (length(existing_s3_paths) == 0) {
+  if (length(existing_s3_names) == 0) {
     return(FALSE)
   }
 
-  any(
-    str_detect(existing_s3_paths, fixed(paste0(filename, "_omezarr"))) |
-      str_detect(existing_s3_paths, fixed(filename))
+  expected_names <- c(
+    paste0(filename, "_omezarr"),
+    paste0(filename, ".ome.zarr"),
+    paste0(filename, ".zarr")
   )
+
+  any(expected_names %in% existing_s3_names)
 }
 
 all_files_raw <- 
@@ -136,7 +150,7 @@ all_files <- all_files_raw %>%
 if(as.logical(opt$dryrun)){
   to_run <- all_files %>%
     filter(needs_processing) %>%
-    head(10)
+    head(dryrun_n)
 } else {
   to_run <- all_files %>%
     filter(needs_processing)
