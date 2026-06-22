@@ -13,6 +13,7 @@ spec <- matrix(c(
   "annotation_log_dir", "a", 1, "character",
   "annotations_sheet", "n", 1, "character",
   "assignees", "g", 1, "character",
+  "max_rows_per_person", "w", 1, "integer",
   "s3_base_url", "b", 1, "character",
   "image_stats_dir", "x", 1, "character",
   "local_annotations_log", "l", 1, "character"
@@ -35,6 +36,7 @@ opt <- getopt(spec)
 #   annotation_log_dir = "/g/schwab/tem_screen/annotations/log",
 #   annotations_sheet = "annotations_log",
 #   assignees = "marco,chandni,yannick,karel,viktoria",
+#   max_rows_per_person = NA_integer_,
 #   s3_base_url = "https://s3.embl.de/temscreen",
 #   image_stats_dir = "/g/schwab/tem_screen/processed",
 #   local_annotations_log = "split_collection_tables/annotations_log.tsv"
@@ -112,6 +114,14 @@ people <- str_split(assignees, ",")[[1]] %>%
 
 if (length(people) == 0) {
   stop("--assignees must contain at least one sheet/person name.")
+}
+
+max_rows_per_person <- opt$max_rows_per_person
+if (is.null(max_rows_per_person) || is.na(max_rows_per_person)) {
+  max_rows_per_person <- Inf
+}
+if (!is.infinite(max_rows_per_person) && max_rows_per_person < 0) {
+  stop("--max_rows_per_person must be 0 or greater.")
 }
 
 s3_base_url <- opt$s3_base_url
@@ -444,6 +454,20 @@ split_contiguous <- function(rows, template) {
     return(split_tables)
   }
 
+  if (max_rows_per_person == 0) {
+    return(split_tables)
+  }
+
+  max_total_rows <- if (is.infinite(max_rows_per_person)) {
+    Inf
+  } else {
+    max_rows_per_person * length(people)
+  }
+
+  rows <- rows %>%
+    arrange(site, name) %>%
+    head(max_total_rows)
+
   chunk_size <- ceiling(nrow(rows) / length(people))
   rows <- rows %>%
     arrange(site, name) %>%
@@ -480,6 +504,12 @@ assign_annotated_elsewhere <- function(rows, split_tables) {
     }
     if (length(allowed_people) == 0) {
       allowed_people <- people
+    }
+
+    current_counts <- map_int(split_tables[allowed_people], nrow)
+    allowed_people <- allowed_people[current_counts < max_rows_per_person]
+    if (length(allowed_people) == 0) {
+      next
     }
 
     current_counts <- map_int(split_tables[allowed_people], nrow)
