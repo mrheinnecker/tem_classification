@@ -89,7 +89,10 @@ done
 mkdir -p "$outdir"
 
 cmd=(
-  singularity exec "$container"
+  singularity exec
+  -B /g
+  -B /home
+  "$container"
   Rscript "$repo_dir/overview/collection_table_overview.R"
   --outdir "$outdir"
   --prefix "$prefix"
