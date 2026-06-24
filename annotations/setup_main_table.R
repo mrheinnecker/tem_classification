@@ -39,14 +39,14 @@ annotation_columns <- tribble(
   ~full, ~short,
   "cell_count",  "n_cells",
   "life_status", "life_status",
-  "major_group", "maj_group",
+  "major_group", "major_group",
   "taxomomic_class", "taxo_class",
   "cell_covering", "cell_cover",
   "nucleus",  "nucleus",
   "nucleolus",  "nucleolus",
   "thrichocysts", "tricho",
   "large_light_core_vesicle", "core_vesic",
-  "flagellar_apparatus", "flag_app",
+  "flagellar_apparatus", "flagell_app",
   "symbiosis", "symbiosis",
   "chloroplasts", "chloropl", 
   "plastoglobuli", "plastoglob",
@@ -60,15 +60,15 @@ annotation_columns <- tribble(
   "crystal_rich_ret_net", "cryst_rich_RN",
   "eyespot", "eyespot",
   "rhabdosome", "rhabdo",
-  "er", "er", 
+  "er", "ER", 
   "mitochondria", "mito",
   "golgi","golgi",
   "lipid_droplets", "lipid_drop", 
-  "fibrous_body", "fibr_body",
-  "putative_cell_division", "division",
+  "fibrous_body", "fibrous_body",
+  "putative_cell_division", "put_division",
   "silica_deposition_vesicle", "SDV",
   "lysosome", "lysosome",
-  "SER_whirls", "SER_whirls",
+  "SER_whorls", "SER_whorls",
   "undescribed_organelles", "undescribed",
   "beauty",  "beauty", 
   "annotated_by", "annotated_by",
@@ -88,11 +88,11 @@ all_cols_df <- tibble(
 
 emtpy_full <- bind_cols(annotation_main, all_cols_df)
 
-
-main_annotations_url <- "https://docs.google.com/spreadsheets/d/1NDyVERdrl7nXJrQRWBbwHjyHCMNEZhj1RQnBKUObwuU/edit?gid=0#gid=0"
-
-write_sheet(emtpy_full, ss=main_annotations_url, sheet="main")
-
+# 
+# main_annotations_url <- "https://docs.google.com/spreadsheets/d/1NDyVERdrl7nXJrQRWBbwHjyHCMNEZhj1RQnBKUObwuU/edit?gid=0#gid=0"
+# 
+# write_sheet(emtpy_full, ss=main_annotations_url, sheet="main")
+# 
 
 
 
