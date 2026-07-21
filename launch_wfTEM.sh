@@ -39,4 +39,4 @@ bash "${repo_dir}/tem/main.sh" cluster \
   --s3_bucket "s3embl/imatrec/central_data_processing/tem2" \
   --gradient_chunk_rows 512 \
   --gradient_downsample 16 \
-  --resume TRUE
+  --resume FALSE

@@ -343,7 +343,7 @@ process EXTRACTIMAGESTATS {
   
     cpus   = 1
     memory = "32GB"
-    time   = "10m"    
+    time   = "100m"    
   
     publishDir "${params.logdir}/image_stats", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
@@ -369,7 +369,7 @@ process EUBICONVERSION {
   
     cpus   = 1
     memory { "${Math.min(Math.max((req_mem as Integer) * 2, 32), 128)}GB" }
-    time   = "1h"    
+    time   = "2h"    
   
     publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'

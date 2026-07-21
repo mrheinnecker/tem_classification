@@ -1,4 +1,4 @@
-
+library(tidyverse)
 library(googlesheets4)
 library(googledrive)
 
@@ -44,31 +44,31 @@ annotation_columns <- tribble(
   "cell_covering", "cell_cover",
   "nucleus",  "nucleus",
   "nucleolus",  "nucleolus",
-  "thrichocysts", "tricho",
-  "large_light_core_vesicle", "core_vesic",
-  "flagellar_apparatus", "flagell_app",
-  "symbiosis", "symbiosis",
-  "chloroplasts", "chloropl", 
-  "plastoglobuli", "plastoglob",
-  "pyrenoid", "pyrenoid",
-  "pusule", "pusule",
-  "reticulated_net", "retic_net",
-  "electron_dense_sheets", "electr_sheets",
-  "tubular_net", "tubul_net", 
-  "food_vacuole", "food_vac", 
-  "starch", "starch",
-  "crystal_rich_ret_net", "cryst_rich_RN",
-  "eyespot", "eyespot",
-  "rhabdosome", "rhabdo",
+  "golgi","golgi",
   "er", "ER", 
   "mitochondria", "mito",
-  "golgi","golgi",
-  "lipid_droplets", "lipid_drop", 
-  "fibrous_body", "fibrous_body",
-  "putative_cell_division", "put_division",
-  "silica_deposition_vesicle", "SDV",
+  "chloroplasts", "chloropl", 
+  "plastoglobuli", "plastoglob",
+  "pyrenoid", "pyrenoid", 
+  "starch", "starch",
+  "large_light_core_vesicle", "core_vesic", 
+  "food_vacuole", "food_vac",
+  "reticulated_net", "retic_net",
+  "crystal_rich_ret_net", "cryst_rich_RN",
+  "electron_dense_sheets", "electr_sheets",
+  "pusule", "pusule",
+  "tubular_net", "tubul_net",
+  "thrichocysts", "tricho",
+  "eyespot", "eyespot",
+  "rhabdosome", "rhabdo",
   "lysosome", "lysosome",
   "SER_whorls", "SER_whorls",
+  "lipid_droplets", "lipid_drop", 
+  "fibrous_body", "fibrous_body",
+  "flagellar_apparatus", "flagell_app",
+  "silica_deposition_vesicle", "SDV",
+  "putative_cell_division", "put_division",
+  "symbiosis", "symbiosis",
   "undescribed_organelles", "undescribed",
   "beauty",  "beauty", 
   "annotated_by", "annotated_by",
@@ -76,6 +76,49 @@ annotation_columns <- tribble(
   "comments", "comments"
   
 )  
+
+
+# viktorias suggestions for column order
+# "
+# n_cells
+# life_status
+# major_group
+# taxo_class
+# cell_cover
+# nucleus
+# nucleolus
+# golgi
+# ER
+# mito
+# chloropl
+# plastoglob
+# pyrenoid
+# starch 
+# core_vesic
+# food_vac
+# retic_net
+# cryst_rich_RN
+# electr_sheets
+# pusule
+# tubul_net
+# tricho
+# 
+# eyespot
+# rhabdo
+# lysosome
+# SER_whorls
+# lipid_drop
+# fibrous_body
+# flagell_app
+# SDV
+# put_division
+# symbiosis
+# undescribed
+# 
+# 
+# "
+# 
+
 
 
 all_cols_df <- tibble(
