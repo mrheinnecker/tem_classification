@@ -146,6 +146,8 @@ validation_keep_columns <- c(
   "contrast_limits", "annotated_by"
 )
 
+collection_identity_columns <- setdiff(validation_keep_columns, "annotated_by")
+
 s3_base_url <- opt$s3_base_url
 if (is.null(s3_base_url) || is.na(s3_base_url)) {
   s3_base_url <- "https://s3.embl.de/temscreen"
@@ -490,13 +492,13 @@ write_annotations_log <- function(annotations) {
 
 add_annotations <- function(col_table, annotations) {
   annotations <- standardize_annotation_table(annotations)
-  annotation_cols <- setdiff(names(annotations), names(col_table))
+  annotation_cols <- setdiff(names(annotations), collection_identity_columns)
 
-  if (length(annotation_cols) == 0) {
-    annotation_cols <- character()
-  }
-
+  # Annotation values merged from the personal sheets must replace the previous
+  # values in the source table. This matters when the source and annotation log
+  # are the same sheet (as they are in annotations/launcher.sh).
   joined <- col_table %>%
+    select(-any_of(annotation_cols)) %>%
     left_join(
       annotations %>% select(name, all_of(annotation_cols)),
       by="name"
@@ -573,8 +575,14 @@ split_contiguous <- function(rows, template) {
 }
 
 blank_validation_fields <- function(row) {
-  row %>%
+  annotated_by_before <- as.character(row$annotated_by)
+  blanked <- row %>%
     mutate(across(-any_of(validation_keep_columns), ~replace(.x, seq_along(.x), NA)))
+
+  if (!identical(as.character(blanked$annotated_by), annotated_by_before)) {
+    stop("Internal error: annotated_by changed while preparing a validation assignment.")
+  }
+  blanked
 }
 
 assign_annotated_elsewhere <- function(rows, split_tables) {
