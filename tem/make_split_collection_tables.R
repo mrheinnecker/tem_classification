@@ -13,7 +13,7 @@ spec <- matrix(c(
   "annotation_log_dir", "a", 1, "character",
   "annotations_sheet", "n", 1, "character",
   "assignees", "g", 1, "character",
-  "max_rows_per_person", "w", 1, "integer",
+  "max_rows_per_person", "w", 1, "character",
   "s3_base_url", "b", 1, "character",
   "image_stats_dir", "x", 1, "character",
   "local_annotations_log", "l", 1, "character"
@@ -118,11 +118,33 @@ if (length(people) == 0) {
 
 max_rows_per_person <- opt$max_rows_per_person
 if (is.null(max_rows_per_person) || is.na(max_rows_per_person)) {
-  max_rows_per_person <- Inf
+  max_rows_per_person <- rep(Inf, length(people))
+} else {
+  max_rows_per_person <- str_split(max_rows_per_person, ",", simplify=FALSE)[[1]] %>%
+    str_trim() %>%
+    as.numeric()
+  if (any(is.na(max_rows_per_person))) {
+    stop("--max_rows_per_person must be one number or a comma-separated number for each assignee.")
+  }
+  if (length(max_rows_per_person) == 1) {
+    max_rows_per_person <- rep(max_rows_per_person, length(people))
+  } else if (length(max_rows_per_person) != length(people)) {
+    stop(
+      "--max_rows_per_person must contain either one value or exactly ",
+      length(people), " values (one per assignee)."
+    )
+  }
 }
-if (!is.infinite(max_rows_per_person) && max_rows_per_person < 0) {
-  stop("--max_rows_per_person must be 0 or greater.")
+if (any(max_rows_per_person < 0)) {
+  stop("--max_rows_per_person values must be 0 or greater.")
 }
+max_rows_per_person <- set_names(max_rows_per_person, people)
+
+validation_keep_columns <- c(
+  "uri", "name", "view", "grid", "site", "cell_id", "size_frac",
+  "sampling_time", "source_name", "exclusive", "min_gray", "max_gray",
+  "contrast_limits", "annotated_by"
+)
 
 s3_base_url <- opt$s3_base_url
 if (is.null(s3_base_url) || is.na(s3_base_url)) {
@@ -361,7 +383,7 @@ merge_annotation_rows <- function(df) {
     )
 }
 
-read_current_annotations <- function() {
+read_current_annotation_sources <- function() {
   if (sheet_mode == "google") {
     library(googlesheets4)
     if (is.null(google_key) || is.na(google_key) || !file.exists(google_key)) {
@@ -369,41 +391,90 @@ read_current_annotations <- function() {
     }
     gs4_auth(path=google_key)
     existing_log <- read_google_sheet_if_exists(collection_table_url, annotations_sheet)
-    split_logs <- map_dfr(people, function(person) {
-      read_google_sheet_if_exists(collection_table_url, person) %>%
-        mutate(.assignment_sheet=person)
-    })
+    split_logs <- set_names(
+      map(people, ~read_google_sheet_if_exists(collection_table_url, .x)),
+      people
+    )
   } else {
     existing_log <- if (file.exists(local_annotations_log)) {
       read_tsv(local_annotations_log, col_types=cols(.default=col_character()))
     } else {
       tibble()
     }
-    split_logs <- map_dfr(people, function(person) {
+    split_logs <- set_names(map(people, function(person) {
       file <- file.path(local_outdir, paste0(person, ".tsv"))
       if (file.exists(file)) {
-        read_tsv(file, col_types=cols(.default=col_character())) %>%
-          mutate(.assignment_sheet=person)
+        read_tsv(file, col_types=cols(.default=col_character()))
       } else {
         tibble()
       }
-    })
+    }), people)
   }
 
+  list(main=existing_log, assignments=split_logs)
+}
+
+merge_annotation_sources <- function(sources) {
+  split_logs <- imap_dfr(sources$assignments, function(table, person) {
+    if (nrow(table) == 0) {
+      return(tibble())
+    }
+    table %>% mutate(.assignment_sheet=person)
+  })
   bind_rows(
-    standardize_annotation_table(existing_log) %>% mutate(.priority=1),
+    standardize_annotation_table(sources$main) %>% mutate(.priority=1),
     standardize_annotation_table(split_logs) %>% mutate(.priority=2)
   ) %>%
     merge_annotation_rows()
 }
 
-backup_annotations <- function(annotations) {
+write_backup_table <- function(table, path) {
+  if (ncol(table) == 0) {
+    write_lines(character(), path)
+  } else {
+    write_tsv(table, path)
+  }
+}
+
+backup_annotations <- function(sources, annotations) {
   timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
-  dir.create(annotation_log_dir, recursive=TRUE, showWarnings=FALSE)
-  backup_file <- file.path(annotation_log_dir, paste0(annotations_sheet, "_", timestamp, ".tsv"))
-  write_tsv(annotations, backup_file)
-  message("Backed up annotations to: ", backup_file)
-  invisible(backup_file)
+  backup_dir <- file.path(annotation_log_dir, timestamp)
+  if (dir.exists(backup_dir)) {
+    stop("Backup directory already exists; refusing to overwrite it: ", backup_dir)
+  }
+  dir.create(backup_dir, recursive=TRUE, showWarnings=FALSE)
+  if (!dir.exists(backup_dir)) {
+    stop("Could not create backup directory: ", backup_dir)
+  }
+
+  write_backup_table(sources$main, file.path(backup_dir, paste0(annotations_sheet, ".tsv")))
+  iwalk(sources$assignments, function(table, person) {
+    write_backup_table(table, file.path(backup_dir, paste0(person, ".tsv")))
+  })
+  write_backup_table(annotations, file.path(backup_dir, "merged_annotations.tsv"))
+  write_tsv(
+    tibble(
+      setting=c("sheet_mode", "collection_table_url", "annotations_sheet", "assignees", "max_rows_per_person"),
+      value=c(
+        sheet_mode, collection_table_url, annotations_sheet,
+        paste(people, collapse=","), paste(max_rows_per_person, collapse=",")
+      )
+    ),
+    file.path(backup_dir, "run_configuration.tsv")
+  )
+
+  expected_files <- c(
+    paste0(annotations_sheet, ".tsv"), paste0(people, ".tsv"),
+    "merged_annotations.tsv", "run_configuration.tsv"
+  )
+  missing_files <- expected_files[!file.exists(file.path(backup_dir, expected_files))]
+  if (length(missing_files) > 0) {
+    stop("Backup is incomplete; no Google Sheets data will be overwritten. Missing: ",
+         paste(missing_files, collapse=", "))
+  }
+
+  message("Complete pre-write backup saved to: ", backup_dir)
+  invisible(backup_dir)
 }
 
 write_annotations_log <- function(annotations) {
@@ -454,37 +525,56 @@ split_contiguous <- function(rows, template) {
     return(split_tables)
   }
 
-  if (max_rows_per_person == 0) {
+  if (all(max_rows_per_person == 0)) {
     return(split_tables)
   }
 
-  max_total_rows <- if (is.infinite(max_rows_per_person)) {
+  max_total_rows <- if (any(is.infinite(max_rows_per_person))) {
     Inf
   } else {
-    max_rows_per_person * length(people)
+    sum(max_rows_per_person)
   }
 
-  rows <- rows %>%
-    arrange(site, name) %>%
-    head(max_total_rows)
+  rows <- rows %>% arrange(site, name)
+  if (!is.infinite(max_total_rows)) {
+    rows <- rows %>% head(max_total_rows)
+  }
 
-  chunk_size <- ceiling(nrow(rows) / length(people))
-  rows <- rows %>%
-    arrange(site, name) %>%
-    mutate(
-      split_index=pmin(ceiling(row_number() / chunk_size), length(people)),
-      split_sheet=people[split_index]
+  next_row <- 1L
+  for (person_index in seq_along(people)) {
+    remaining_rows <- nrow(rows) - next_row + 1L
+    if (remaining_rows <= 0) {
+      break
+    }
+    remaining_people <- length(people) - person_index + 1L
+    later_capacity <- if (person_index == length(people)) {
+      0
+    } else {
+      sum(max_rows_per_person[(person_index + 1L):length(people)])
+    }
+    minimum_needed_here <- if (is.infinite(later_capacity)) {
+      0
+    } else {
+      max(0, remaining_rows - later_capacity)
+    }
+    balanced_share <- ceiling(remaining_rows / remaining_people)
+    take <- min(
+      max_rows_per_person[[person_index]],
+      max(minimum_needed_here, balanced_share)
     )
-
-  rows %>%
-    group_split(split_sheet) %>%
-    walk(function(sheet_rows) {
-      sheet_name <- unique(sheet_rows$split_sheet)
-      split_tables[[sheet_name]] <<- sheet_rows %>%
-        select(-split_index, -split_sheet)
-    })
+    if (take > 0) {
+      last_row <- next_row + take - 1L
+      split_tables[[people[[person_index]]]] <- rows[next_row:last_row, , drop=FALSE]
+      next_row <- last_row + 1L
+    }
+  }
 
   split_tables
+}
+
+blank_validation_fields <- function(row) {
+  row %>%
+    mutate(across(-any_of(validation_keep_columns), ~replace(.x, seq_along(.x), NA)))
 }
 
 assign_annotated_elsewhere <- function(rows, split_tables) {
@@ -507,14 +597,19 @@ assign_annotated_elsewhere <- function(rows, split_tables) {
     }
 
     current_counts <- map_int(split_tables[allowed_people], nrow)
-    allowed_people <- allowed_people[current_counts < max_rows_per_person]
+    allowed_people <- allowed_people[
+      current_counts < max_rows_per_person[allowed_people]
+    ]
     if (length(allowed_people) == 0) {
       next
     }
 
     current_counts <- map_int(split_tables[allowed_people], nrow)
     target <- allowed_people[which.min(current_counts)]
-    split_tables[[target]] <- bind_rows(split_tables[[target]], row)
+    split_tables[[target]] <- bind_rows(
+      split_tables[[target]],
+      blank_validation_fields(row)
+    )
   }
 
   split_tables
@@ -569,8 +664,9 @@ if (sheet_mode == "google") {
   drive_auth(path=google_key)
 }
 
-current_annotations <- read_current_annotations()
-backup_annotations(current_annotations)
+annotation_sources <- read_current_annotation_sources()
+current_annotations <- merge_annotation_sources(annotation_sources)
+backup_annotations(annotation_sources, current_annotations)
 
 source_collection_table <- read_source_collection_table() %>%
   standardize_collection_table()

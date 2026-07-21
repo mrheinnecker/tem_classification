@@ -19,5 +19,4 @@ Rscript tem/make_split_collection_tables.R \
   --source_collection_sheet "main" \
   --annotation_log_dir /g/schwab/tem_screen/annotations/log \
   --assignees "marco,chandni,yannick,karel,viktoria" \
-  --max_rows_per_person 20
-
+  --max_rows_per_person "20,20,100,20,20"
