@@ -576,8 +576,9 @@ split_contiguous <- function(rows, template) {
 
 blank_validation_fields <- function(row) {
   annotated_by_before <- as.character(row$annotated_by)
+  columns_to_blank <- setdiff(names(row), validation_keep_columns)
   blanked <- row %>%
-    mutate(across(-any_of(validation_keep_columns), ~replace(.x, seq_along(.x), NA)))
+    mutate(across(all_of(columns_to_blank), ~replace(.x, seq_along(.x), NA)))
 
   if (!identical(as.character(blanked$annotated_by), annotated_by_before)) {
     stop("Internal error: annotated_by changed while preparing a validation assignment.")
