@@ -34,6 +34,36 @@ remove_for_now <- c(annotated_by_viktoria$shortname, multiple_cells$shortname) %
 annotation_main <- tem_collection_table %>%
   filter(!name %in% remove_for_now)
 
+to_be_reannoatted_viktoria <- tem_collection_table %>%
+  filter(name %in% annotated_by_viktoria$shortname) %>%
+  left_join(image_log %>%
+              select(name=shortname,
+                     
+                     n_cells=cell_count, 
+                     life_status, 
+                     cell_cover=theca, 
+                     nucleus, 
+                     nucleolus, 
+                     golgi=golgi_apparatus, 
+                     mito=mitochondria, 
+                     chloropl=chloroplasts, 
+                     plastoglob=plastoglobuli, 
+                     starch, 
+                     core_vesic=vacuole, 
+                     ER, 
+                     retic_net=`reticulated_network/crystalline_compartment`, 
+                     tubul_net=tubular_network, 
+                     pusule, 
+                     electr_sheets=electron_dense_sheets, 
+                     rhabdo=rhabdosome, 
+                     eyespot, 
+                     flagell_app=`basal_body/flagellum`, 
+                     symbiosis=`symbiotic/parasitism`, tmp_nin_ident=`non-identified`, 
+                     comments=comment
+                     
+                     ), 
+            by="name")
+
 
 annotation_columns <- tribble(
   ~full, ~short,
@@ -127,23 +157,52 @@ all_cols_df <- tibble(
 )
 
 
-
-
 emtpy_full <- bind_cols(annotation_main, all_cols_df)
-
+# 
 # 
 # main_annotations_url <- "https://docs.google.com/spreadsheets/d/1NDyVERdrl7nXJrQRWBbwHjyHCMNEZhj1RQnBKUObwuU/edit?gid=0#gid=0"
 # 
 # write_sheet(emtpy_full, ss=main_annotations_url, sheet="main")
 # 
+# 
+
+filt_anno_cols <- annotation_columns %>%
+  filter(!short %in% names(to_be_reannoatted_viktoria))
+
+all_cols_df_only_those_toberedone <- tibble(
+  !!!setNames(rep(list(NA), nrow(filt_anno_cols)),
+              filt_anno_cols$short)
+)
+
+
+to_be_redone_by_viktoria <- bind_cols(to_be_reannoatted_viktoria, all_cols_df_only_those_toberedone)
+
+ordered_redone <- to_be_redone_by_viktoria[, c("name", colnames(emtpy_full %>% select(-name)))]
+
+# 
+# main_annotations_url <- "https://docs.google.com/spreadsheets/d/1NDyVERdrl7nXJrQRWBbwHjyHCMNEZhj1RQnBKUObwuU/edit?gid=694322446#gid=694322446"
+# 
+# write_sheet(ordered_redone, ss=main_annotations_url, sheet="viktoria")
+# 
+# 
+
+
+## now i also need to add them to the main table
+
+to_be_added_main_tab <- tem_collection_table %>%
+  filter(name %in% annotated_by_viktoria$shortname) %>%
+  mutate(exclusive=as.character(exclusive))
 
 
 
+main_annotations_url <- "https://docs.google.com/spreadsheets/d/1NDyVERdrl7nXJrQRWBbwHjyHCMNEZhj1RQnBKUObwuU/edit?gid=694322446#gid=694322446"
 
 
+main <- read_sheet(main_annotations_url, sheet="main")
 
-
-
-
+# 
+# combined <- bind_rows(main, to_be_added_main_tab)
+# 
+# write_sheet(combined, ss=main_annotations_url, sheet="main")
 
 
