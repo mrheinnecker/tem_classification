@@ -8,6 +8,11 @@ For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be 
 
 ## Input table
 
+In contrast to the other workflows, the data for cryo and plastic is already registred in 
+labID, which means we rely on thsi as out main input source. This also measn that we need to query labID first... this needs password authentification which is currently not supported in the labid command line tool
+So whenever new data is there we need to query via this command the table in labID, copy it to a google sheet (https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503)
+and then rerun the workflow.
+
 The input table can be a Google Sheet or local TSV/CSV. It should contain one raw-file column. Accepted names are:
 
 ```text
