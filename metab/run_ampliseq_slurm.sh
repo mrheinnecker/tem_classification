@@ -16,6 +16,8 @@ readonly PARAMS_FILE="${PARAMS_FILE:-${SCRIPT_DIR}/ampliseq_params.yaml}"
 readonly CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/ampliseq_orientation.config}"
 readonly WORK_DIR="${WORK_DIR:-${SCRIPT_DIR}/work}"
 readonly APPTAINER_CACHE="${NXF_APPTAINER_CACHEDIR:-${SCRIPT_DIR}/apptainer_cache}"
+readonly PIPELINE_VERSION="${PIPELINE_VERSION:-2.18.0}"
+readonly CONTAINER_PROFILE="${CONTAINER_PROFILE:-apptainer}"
 
 if [[ ! -r "${PARAMS_FILE}" ]]; then
     echo "Error: parameter file not found: ${PARAMS_FILE}" >&2
@@ -42,15 +44,15 @@ mkdir -p -- "${WORK_DIR}" "${APPTAINER_CACHE}"
 export NXF_APPTAINER_CACHEDIR="${APPTAINER_CACHE}"
 export NXF_OPTS="${NXF_OPTS:--Xms1g -Xmx4g}"
 
-echo "Starting nf-core/ampliseq 2.18.0"
+echo "Starting nf-core/ampliseq ${PIPELINE_VERSION}"
 echo "Parameters:      ${PARAMS_FILE}"
 echo "Custom config:  ${CONFIG_FILE}"
 echo "Work directory: ${WORK_DIR}"
 echo "Container cache:${NXF_APPTAINER_CACHEDIR}"
 
 nextflow run nf-core/ampliseq \
-    -r 2.18.0 \
-    -profile apptainer \
+    -r "${PIPELINE_VERSION}" \
+    -profile "${CONTAINER_PROFILE}" \
     -params-file "${PARAMS_FILE}" \
     -c "${CONFIG_FILE}" \
     -work-dir "${WORK_DIR}" \

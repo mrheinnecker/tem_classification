@@ -28,37 +28,18 @@ normalizes paired orientation by swapping mates when appropriate.
 
 ## Pilot procedure
 
-Generate a pilot containing four environmental samples and four controls after
-those FASTQ pairs have downloaded:
+Edit the single command in `launcher.sh`. All changing inputs are listed there,
+including paths, sample counts, primers, pipeline version, resource ceilings,
+container profile, and optional Slurm allocation fields. Then run:
 
 ```bash
-./make_ampliseq_samplesheet.sh \
-    /absolute/path/to/fastq \
-    /absolute/path/to/ampliseq_samplesheet.tsv \
-    /absolute/path/to/sampleinfo.tsv \
-    4 \
-    4
+./launcher.sh
 ```
 
-For an orientation/ASV-only pilot with four environmental samples and no
-controls, use `4 0` as the final two arguments. Omit the limits (or use `all`)
-to include every available sample of that type.
-
-While downloads are still in progress, prefix the command with
-`SKIP_INCOMPLETE=1`. The generator will gzip-test candidate pairs, skip partial
-files, and continue until it finds the requested number of complete pairs.
-
-Copy and edit the parameter template:
-
-```bash
-cp ampliseq_params.example.yaml ampliseq_params.yaml
-```
-
-Submit the controller job:
-
-```bash
-sbatch run_ampliseq_slurm.sh
-```
+`main.sh` validates those values, gzip-tests and selects the requested samples,
+creates the samplesheet and parameter file, prepares scratch directories, and
+submits the Nextflow controller job. Use `all` for either sample count to
+include every available sample of that type.
 
 The pilot deliberately sets `skip_taxonomy: true`. First inspect Cutadapt read
 retention, DADA2 filtering/merging, ASV lengths, FastQC, and MultiQC. Taxonomic

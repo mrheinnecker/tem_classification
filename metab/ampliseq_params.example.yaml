@@ -1,25 +1,25 @@
 # nf-core/ampliseq 2.18.0 pilot parameters.
 # Replace all REPLACE_ME values before submission.
 
-input: "REPLACE_ME_WITH_ABSOLUTE_PATH/ampliseq_samplesheet.tsv"
-outdir: "REPLACE_ME_WITH_ABSOLUTE_PATH/ampliseq_pilot_results"
+input: "REPLACE_ME_INPUT"
+outdir: "REPLACE_ME_OUTDIR"
 
 # Biological amplicon primers only, written 5' to 3'. Do not include Illumina
 # adapters, indices, pads, linkers, heterogeneity spacers, or barcodes.
-FW_primer: "GTGYCAGCMGCCGCGGTAA"
-RV_primer: "CCGYCAATTYMTTTRAGTTT"
+FW_primer: "REPLACE_ME_FORWARD_PRIMER"
+RV_primer: "REPLACE_ME_REVERSE_PRIMER"
 
 # The observed FASTQ quality characters correspond to binned Phred scores.
-binned_quality: "2,11,25,37"
+binned_quality: "REPLACE_ME_BINNED_QUALITY"
 
 # First validate trimming, orientation, merging, and ASV inference. The stock
 # SILVA classifier is not suitable for the eukaryotic fraction of these data.
-skip_taxonomy: true
+skip_taxonomy: REPLACE_ME_SKIP_TAXONOMY
 
 # Resource ceilings for individual pipeline processes; adjust to cluster policy.
-max_cpus: 16
-max_memory: "64.GB"
-max_time: "48.h"
+max_cpus: REPLACE_ME_MAX_CPUS
+max_memory: "REPLACE_ME_MAX_MEMORY"
+max_time: "REPLACE_ME_MAX_TIME"
 
 # Keep failed-sample detection strict during the pilot.
 min_read_counts: 1
