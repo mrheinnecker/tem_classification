@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-exec "$(dirname -- "${BASH_SOURCE[0]}")/main.sh" \
+bash "/g/schwab/marco/repos/tem_classification/metab/main.sh" \
     --raw-dir "/g/schwab/marco/projects/trec_metab/datahub_downloads" \
-    --sampleinfo "$(dirname -- "${BASH_SOURCE[0]}")/sampleinfo.tsv" \
+    --sampleinfo "/g/schwab/marco/repos/tem_classification/metab/sampleinfo.tsv" \
     --run-dir "/scratch/rheinnec/ampliseq_4env_test" \
     --work-dir "/scratch/rheinnec/ampliseq_4env_test/work" \
     --results-dir "/scratch/rheinnec/ampliseq_4env_test/ampliseq_pilot_results" \
@@ -19,7 +19,4 @@ exec "$(dirname -- "${BASH_SOURCE[0]}")/main.sh" \
     --max-time "48.h" \
     --skip-taxonomy "true" \
     --skip-incomplete "1" \
-    --check-gzip "1" \
-    --account "" \
-    --partition "" \
-    --qos ""
+    --check-gzip "1" 
