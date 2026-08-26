@@ -20,7 +20,7 @@ set -uo pipefail
 
 readonly FILES_PER_TASK=10
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-readonly LINK_FILE="${LINK_FILE:-${SCRIPT_DIR}/datahub_links.txt}"
+readonly LINK_FILE="/g/schwab/marco/repos/tem_classification/metab/datahub_links.txt"
 readonly DOWNLOAD_DIR="${DOWNLOAD_DIR:-/mnt/c/projects/biobank/metab}"
 
 if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
