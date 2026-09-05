@@ -47,6 +47,55 @@ arg_file <- commandArgs(FALSE) %>%
   str_remove("^--file=") %>%
   .[1]
 
+
+
+annotation_columns <- tribble(
+  ~full, ~short,
+ # "cell_count",  "n_cells",
+  "life_status", "life_status",
+  "major_group", "major_group",
+  "taxomomic_class", "taxo_class",
+  "cell_covering", "cell_cover",
+  "thecal_struc", "thecal_struc",
+  "nucleus",  "nucleus",
+  "nucleolus",  "nucleolus",
+  "golgi","golgi",
+  "er", "ER", 
+  "mitochondria", "mito",
+  "chloroplasts", "chloropl", 
+  "plastoglobuli", "plastoglob",
+  "pyrenoid", "pyrenoid", 
+  "starch", "starch",
+  "large_light_core_vesicle", "core_vesic", 
+  "food_vacuole", "food_vac",
+  "lysosome", "lysosome",
+  "reticulated_net", "retic_net",
+  "crystal_rich_ret_net", "cryst_rich_RN",
+  "electron_dense_sheets", "electr_sheets",
+  "pusule", "pusule",
+  "tubular_net", "tubul_net",
+  "thrichocysts", "tricho",
+  "eyespot", "eyespot",
+  "rhabdosome", "rhabdo",
+  "SER_whorls", "SER_whorls",
+  "lipid_droplets", "lipid_drop", 
+  "fibrous_body", "fibrous_body",
+  "peduncle", "peduncle",
+  "flagellar_apparatus", "flagell_app",
+  "silica_deposition_vesicle", "SDV",
+  "putative_cell_division", "put_division",
+  "symbiosis", "symbiosis",
+  "undescribed_organelles", "undescribed",
+  "beauty",  "beauty", 
+  # "annotated_by", "annotated_by",
+  # "validated_by", "validated_by",
+   "comments", "comments"
+  
+)  
+
+
+
+
 script_dir <- if (!is.na(arg_file)) {
   dirname(normalizePath(arg_file))
 } else {
@@ -642,7 +691,10 @@ write_split_tables <- function(col_table) {
         view=sheet_name,
         grid=sheet_name
       ) %>%
-      arrange(site, name)
+      ## blank all annotation columns for second user
+      mutate_at(.vars = annotation_columns$short,
+                .funs = ~NA) %>%
+      arrange(site, name) 
   })
 
   if (sheet_mode == "google") {
