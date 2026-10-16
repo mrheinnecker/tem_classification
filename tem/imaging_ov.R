@@ -45,10 +45,10 @@ if (is.null(local_log) || is.na(local_log)) {
 }
 
 # opt <- tibble(
-#   # rawdir="/g/schwab/tem_screen/raw",
-#   # pngdir="/g/schwab/tem_screen/pngs",
-#   rawdir="/scratch/rheinnec/tem_screen/raw",
-#   pngdir="/scratch/rheinnec/tem_screen/pngs",
+#    rawdir="/g/schwab/tem_screen/raw",
+#    pngdir="/g/schwab/tem_screen/pngs",
+#   #rawdir="/scratch/rheinnec/tem_screen/raw",
+#   #pngdir="/scratch/rheinnec/tem_screen/pngs",
 #   dryrun="TRUE"
 # )
 
@@ -119,7 +119,7 @@ all_files_raw <-
     cell_id=str_extract(file, "c0\\d+\\.mrc$") %>% str_remove("\\.mrc"),
     
     shortname=str_extract(basename(dirname(file)), "^.*Cut\\d+") %>% paste(cell_id, sep="_"),
-    
+     
     filename=str_split(basename(dirname(file)), "Cut\\d*_") %>% map_chr(.,2) %>% paste(shortname,., sep="_"),
     justblend_file=file.path(png_dir, site, paste0(filename, "_blend.png")),
     correctionblend_file=file.path(png_dir, site, paste0(filename, "_correctionblend.png")),
