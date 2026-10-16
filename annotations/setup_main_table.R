@@ -65,6 +65,12 @@ to_be_reannoatted_viktoria <- tem_collection_table %>%
             by="name")
 
 
+
+#Zu den kleinen Änderungen in der Tabelle, ich hab thecal_struc zwischen cell_cover und nucleus 
+#Und peduncle zwischen fibrous_body und flagell_app
+#Und ich hab lysosome hinter food_vac verschoben
+
+
 annotation_columns <- tribble(
   ~full, ~short,
   "cell_count",  "n_cells",
@@ -72,6 +78,7 @@ annotation_columns <- tribble(
   "major_group", "major_group",
   "taxomomic_class", "taxo_class",
   "cell_covering", "cell_cover",
+  "thecal_struc", "thecal_struc",
   "nucleus",  "nucleus",
   "nucleolus",  "nucleolus",
   "golgi","golgi",
@@ -83,6 +90,7 @@ annotation_columns <- tribble(
   "starch", "starch",
   "large_light_core_vesicle", "core_vesic", 
   "food_vacuole", "food_vac",
+  "lysosome", "lysosome",
   "reticulated_net", "retic_net",
   "crystal_rich_ret_net", "cryst_rich_RN",
   "electron_dense_sheets", "electr_sheets",
@@ -91,10 +99,10 @@ annotation_columns <- tribble(
   "thrichocysts", "tricho",
   "eyespot", "eyespot",
   "rhabdosome", "rhabdo",
-  "lysosome", "lysosome",
   "SER_whorls", "SER_whorls",
   "lipid_droplets", "lipid_drop", 
   "fibrous_body", "fibrous_body",
+  "peduncle", "peduncle",
   "flagellar_apparatus", "flagell_app",
   "silica_deposition_vesicle", "SDV",
   "putative_cell_division", "put_division",
