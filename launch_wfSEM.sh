@@ -33,5 +33,5 @@ bash "${repo_dir}/sem/sem_main.sh" interactive \
   --local_log "/g/schwab/sem_screen/sem_image_log_local.tsv" \
   --workflow_stage all \
   --dryrun FALSE \
-  --s3_bucket "s3embl/imatrec/central_data_processing/sem" \
-  --resume TRUE
+  --s3_bucket "s3test/imatrec/central_data_processing/sem" \
+  --resume FALSE
