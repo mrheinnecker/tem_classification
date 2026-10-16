@@ -71,9 +71,14 @@ public_s3_base_url <- function(s3_bucket) {
 
   bucket_path <- bucket %>% str_remove("^[^/]+/?")
   if (bucket_path == "") {
-    "https://s3.embl.de"
+    #"https://s3.embl.de"
+    "https://schwab.buckets.embl.de"
+    
   } else {
-    file.path("https://s3.embl.de", bucket_path)
+    file.path(
+      #"https://s3.embl.de", 
+      "https://schwab.buckets.embl.de",
+      bucket_path)
   }
 }
 

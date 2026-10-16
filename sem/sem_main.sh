@@ -243,6 +243,7 @@ nextflow_args=(
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
   --s3_bucket "$s3_bucket"
+  --zarr_format "3"
   -profile "$profile"
 )
 

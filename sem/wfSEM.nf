@@ -9,8 +9,8 @@ params.collection_table_url = params.collection_table_url ?: "https://docs.googl
 params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e98a2e03f58b.json"
 params.local_log = params.local_log ?: "${params.outdir}/sem_image_log_local.tsv"
 params.workflow_stage = params.workflow_stage ?: "discover"
-params.s3_bucket = params.s3_bucket ?: "s3embl/imatrec/central_data_processing/sem"
-params.zarr_format = params.zarr_format ?: 2
+params.s3_bucket = params.s3_bucket ?: "s3test/imatrec/central_data_processing/sem"
+params.zarr_format = params.zarr_format ?: 3
 
 
 process SELECTSEMIMAGES {
@@ -120,7 +120,7 @@ process EUBISEMCONVERSION {
       --dimension_order xyzct \
       --squeeze True \
       --save_omexml True \
-      --zar_format "${params.zarr_format}" \
+      --zarr_format "${params.zarr_format}" \
       --auto_chunk True \
       --jvm_memory 8GB \
       --max_workers 1
