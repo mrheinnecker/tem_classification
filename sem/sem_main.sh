@@ -32,6 +32,7 @@ case "$mode" in
   cluster)
     main_dir="${SEM_SCREEN_DIR:-/g/schwab/sem_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/sem_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/sem"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -43,6 +44,7 @@ case "$mode" in
   interactive)
     main_dir="${SEM_SCREEN_DIR:-/g/schwab/sem_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/sem_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/sem"
     profile="interactive"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -54,6 +56,7 @@ case "$mode" in
   local)
     main_dir="${SEM_SCREEN_DIR:-C:/projects/sem_screen}"
     default_work_dir="${WORK_DIR:-${main_dir}/work}"
+    default_log_root="${main_dir}/logs"
     profile="local"
     default_sheet_mode="local"
     default_workflow_stage="discover"
@@ -221,7 +224,7 @@ done
 
 rawdir="${rawdir:-/g/schwab/Chandni/SEM/IMATREC SEM}"
 outdir="${outdir:-${main_dir}/processed}"
-logdir="${logdir:-${main_dir}/logs/wfSEM_${timestamp}}"
+logdir="${logdir:-${default_log_root}/wfSEM_${timestamp}}"
 local_log="${local_log:-${main_dir}/sem_image_log_local.tsv}"
 
 mkdir -p "$logdir" "$outdir" "$work_dir"

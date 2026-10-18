@@ -30,7 +30,7 @@ bash "${repo_dir}/tem/main.sh" cluster \
   --rawdir "/g/schwab/tem_screen/raw" \
   --pngdir "/g/schwab/tem_screen/pngs" \
   --outdir "${scratch_dir}" \
-  --logdir "/g/schwab/tem_screen/logs/wfTEM_${timestamp}" \
+  --logdir "/g/schwab/biobank_logs/tem/wfTEM_${timestamp}" \
   --work_dir "${scratch_dir}/work" \
   --local_log "/g/schwab/tem_screen/image_log_local.tsv" \
   --workflow_stage all \

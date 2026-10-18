@@ -28,7 +28,7 @@ bash "${repo_dir}/sem/sem_main.sh" interactive \
   --main_dir "/g/schwab/sem_screen" \
   --rawdir "/g/schwab/Chandni/SEM/IMATREC SEM" \
   --outdir "/g/schwab/sem_screen/processed" \
-  --logdir "/g/schwab/sem_screen/logs/wfSEM_${timestamp}" \
+  --logdir "/g/schwab/biobank_logs/sem/wfSEM_${timestamp}" \
   --work_dir "${scratch_dir}/work" \
   --local_log "/g/schwab/sem_screen/sem_image_log_local.tsv" \
   --workflow_stage all \
