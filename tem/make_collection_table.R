@@ -65,7 +65,7 @@ if (is.null(image_stats_dir) || is.na(image_stats_dir)) {
 
 s3_bucket <- opt$s3_bucket
 if (is.null(s3_bucket) || is.na(s3_bucket)) {
-  s3_bucket <- "s3embl/temscreen"
+  s3_bucket <- "s3test/imatrec/central_data_processing/tem"
 }
 
 public_s3_base_url <- function(bucket) {
@@ -74,11 +74,12 @@ public_s3_base_url <- function(bucket) {
     return(bucket)
   }
 
+  ## the mc alias (e.g. s3test) is dropped, the rest of the path is served by the public endpoint
   bucket_path <- bucket %>% str_remove("^[^/]+/?")
   if (bucket_path == "") {
-    "https://s3.embl.de"
+    "https://schwab.buckets.embl.de"
   } else {
-    file.path("https://s3.embl.de", bucket_path)
+    file.path("https://schwab.buckets.embl.de", bucket_path)
   }
 }
 

@@ -61,7 +61,7 @@ site_from_name <- function(name) {
 public_s3_base_url <- function(s3_bucket) {
   bucket <- s3_bucket
   if (is.null(bucket) || is.na(bucket)) {
-    bucket <- "s3embl/imatrec/central_data_processing/sem"
+    bucket <- "s3test/imatrec/central_data_processing/sem"
   }
 
   bucket <- bucket %>% str_remove("/+$")

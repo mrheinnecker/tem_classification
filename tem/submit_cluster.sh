@@ -24,6 +24,6 @@ bash "${script_dir}/main.sh" \
   --workflow_stage "${WORKFLOW_STAGE:-all}" \
   --main_dir "${TEM_SCREEN_DIR:-/g/schwab/tem_screen}" \
   --work_dir "${WORK_DIR:-/scratch/rheinnec/tem_screen/work}" \
-  --s3_bucket "${S3_BUCKET:-s3embl/temscreen}" \
+  --s3_bucket "${S3_BUCKET:-s3test/imatrec/central_data_processing/tem}" \
   --gradient_chunk_rows "${GRADIENT_CHUNK_ROWS:-512}" \
   --gradient_downsample "${GRADIENT_DOWNSAMPLE:-16}"
