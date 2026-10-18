@@ -9,8 +9,8 @@ params.local_log = params.local_log ?: "${params.outdir}/image_log_local.tsv"
 params.workflow_stage = params.workflow_stage ?: "all"
 params.dryrun_n = params.dryrun_n ?: 10
 params.imod_dir = params.imod_dir ?: "/g/easybuild/x86_64/Rocky/8/haswell/software/IMOD/5.1.0-foss-2023a-CUDA-12.1.1"
-params.s3_bucket = params.s3_bucket ?: "s3embl/temscreen"
-params.zarr_format = params.zarr_format ?: 2
+params.s3_bucket = params.s3_bucket ?: ""
+params.zarr_format = params.zarr_format ?: 3
 params.pixel_scale_x = params.pixel_scale_x ?: 1.766
 params.pixel_scale_y = params.pixel_scale_y ?: 1.766
 params.gradient_mode = params.gradient_mode ?: "auto"
@@ -187,7 +187,7 @@ process RENAME {
     memory { "${Math.min(Math.max((req_mem as Integer), 4), 32)}GB" }
     time   = "0.25h"    
   
-    publishDir "${params.outdir}/${filename}", mode:'copy'
+    //publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
     tuple val(filename), path(raw_mrc), path(mdoc_file), val(shortname), val(req_mem)
@@ -212,7 +212,7 @@ process JUSTBLEND {
     errorStrategy 'retry'
     maxRetries 1
   
-    publishDir "${params.outdir}/${filename}", mode:'copy'
+    //publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'  
     input:
     tuple val(filename), path(raw_mrc), path(raw_mdoc), val(req_mem)
@@ -237,7 +237,7 @@ process CORRECTIONBLEND {
     memory = "5GB"
     time   = "1h"    
   
-    publishDir "${params.outdir}/${filename}", mode:'copy'
+    //publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /home --bind /scratch'  
     errorStrategy = 'ignore' 
 
@@ -311,7 +311,7 @@ process CORRECTGRADIENT {
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 96)}GB" }
     time   = "1h"    
   
-    publishDir "${params.outdir}/${filename}", mode:'copy'
+    //publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
     errorStrategy = 'ignore' 
 
@@ -371,7 +371,7 @@ process EUBICONVERSION {
     memory { "${Math.min(Math.max((req_mem as Integer) * 2, 32), 128)}GB" }
     time   = "2h"    
   
-    publishDir "${params.outdir}/${filename}", mode:'copy'
+    //publishDir "${params.outdir}/${filename}", mode:'copy'
     containerOptions '--bind /g --bind /home --bind /scratch'
     errorStrategy = 'ignore' 
 
@@ -394,7 +394,7 @@ process EUBICONVERSION {
       --dimension_order xyzct \
       --squeeze True \
       --save_omexml True \
-      --zar_format "${params.zarr_format}" \
+      --zarr_format "${params.zarr_format}" \
       --auto_chunk True \
       --jvm_memory 8GB \
       --max_workers 1

@@ -25,7 +25,6 @@ Options:
   --sheet_mode VALUE               local or google.
   --sheet_url URL                  Image log Google Sheet URL.
   --google_key PATH                Google service-account JSON key.
-  --collection_table_url URL       Collection-table Google Sheet URL.
   --collection_table_sheet VALUE   Output sheet name for the collection table.
   --workflow_stage VALUE           discover, process, or all.
   --main_dir PATH                  Base TEM screen directory.
@@ -357,6 +356,7 @@ nextflow_args=(
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"
   --s3_bucket "$s3_bucket"
+  --zarr_format 3
   -profile "$profile"
 )
 

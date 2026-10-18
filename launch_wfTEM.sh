@@ -29,14 +29,14 @@ bash "${repo_dir}/tem/main.sh" cluster \
   --main_dir "/g/schwab/tem_screen" \
   --rawdir "/g/schwab/tem_screen/raw" \
   --pngdir "/g/schwab/tem_screen/pngs" \
-  --outdir "/g/schwab/tem_screen/processed" \
+  --outdir "${scratch_dir}" \
   --logdir "/g/schwab/tem_screen/logs/wfTEM_${timestamp}" \
   --work_dir "${scratch_dir}/work" \
   --local_log "/g/schwab/tem_screen/image_log_local.tsv" \
   --workflow_stage all \
   --dryrun FALSE \
   --dryrun_n 10 \
-  --s3_bucket "s3embl/imatrec/central_data_processing/tem2" \
+  --s3_bucket "s3test/imatrec/central_data_processing/tem" \
   --gradient_chunk_rows 512 \
   --gradient_downsample 16 \
   --resume FALSE
