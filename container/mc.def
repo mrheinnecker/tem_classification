@@ -1,32 +1,18 @@
 # MinIO client (mc) + procps (`ps` is needed by Nextflow trace/report/timeline).
-# MinIO no longer serves mc downloads, so the (static) mc binary is taken from the existing image.
-# Check its location first:  singularity exec EMBL_mc_2024-05-03T11-21-07Z.sif which mc
+# Builds on top of the existing EasyBuild module snapshot (rockylinux:8), so mc and its
+# environment stay exactly the same. mc lives in
+# /g/easybuild/x86_64/Rocky/8/haswell/software/mc/2024-05-03T11-21-07Z/mc
 
 Bootstrap: localimage
 From: /g/schwab/marco/container_devel/EMBL_mc_2024-05-03T11-21-07Z.sif
-Stage: mc
-
-Bootstrap: docker
-From: debian:bookworm-slim
-Stage: final
 
 %labels
     Author marco
-    Tool MinIO client (mc) RELEASE.2024-05-03T11-21-07Z
-
-%files from mc
-    /usr/bin/mc /usr/local/bin/mc
+    Tool MinIO client (mc) RELEASE.2024-05-03T11-21-07Z + procps
 
 %post
-    apt-get update && apt-get install -y --no-install-recommends \
-        procps \
-        ca-certificates \
-        && apt-get clean \
-        && rm -rf /var/lib/apt/lists/*
-
-%runscript
-    exec mc "$@"
+    dnf install -y procps-ng && dnf clean all
 
 %test
-    mc --version
     ps --version
+    /g/easybuild/x86_64/Rocky/8/haswell/software/mc/2024-05-03T11-21-07Z/mc --version
