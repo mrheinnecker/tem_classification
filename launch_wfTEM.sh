@@ -26,17 +26,18 @@ bash "${repo_dir}/tem/main.sh" cluster \
   --google_key "${repo_dir}/trec-tem-screen-e98a2e03f58b.json" \
   --collection_table_url "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1643802951#gid=1643802951" \
   --collection_table_sheet "tem_collection_table" \
-  --main_dir "/g/schwab/tem_screen" \
+  --main_dir "/g/schwab/biobank_logs/tem" \
   --rawdir "/g/schwab/tem_screen/raw" \
   --pngdir "/g/schwab/tem_screen/pngs" \
   --outdir "${scratch_dir}" \
   --logdir "/g/schwab/biobank_logs/tem/wfTEM_${timestamp}" \
   --work_dir "${scratch_dir}/work" \
-  --local_log "/g/schwab/tem_screen/image_log_local.tsv" \
+  --local_log "/g/schwab/biobank_logs/tem/wfTEM_${timestamp}/image_log_local.tsv" \
   --workflow_stage all \
   --dryrun FALSE \
   --dryrun_n 10 \
   --s3_bucket "s3test/imatrec/central_data_processing/tem" \
   --gradient_chunk_rows 512 \
   --gradient_downsample 16 \
-  --resume FALSE
+  --resume FALSE \
+  --dryrun TRUE --dryrun_n 2
