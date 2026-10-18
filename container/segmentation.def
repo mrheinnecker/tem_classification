@@ -13,6 +13,7 @@ From: python:3.11-slim
 %post
 
     apt-get update && apt-get install -y \
+        procps \
         build-essential \
         gcc \
         g++ \

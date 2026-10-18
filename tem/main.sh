@@ -87,6 +87,7 @@ case "$mode" in
   local)
     main_dir="${TEM_SCREEN_DIR:-C:/projects/tem_screen}"
     default_work_dir="${WORK_DIR:-${main_dir}/work}"
+    default_log_root="${main_dir}/logs"
     profile="local"
     default_sheet_mode="local"
     default_workflow_stage="discover"
@@ -95,6 +96,7 @@ case "$mode" in
   cluster)
     main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/tem"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -106,6 +108,7 @@ case "$mode" in
   interactive)
     main_dir="${TEM_SCREEN_DIR:-/scratch/rheinnec/tem_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/tem"
     profile="interactive"
     default_sheet_mode="local"
     default_workflow_stage="process"
@@ -117,6 +120,7 @@ case "$mode" in
   devel)
     main_dir="${TEM_SCREEN_DIR:-/g/schwab/tem_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/tem_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/tem"
     profile="cluster"
     default_sheet_mode="google"
     default_workflow_stage="all"
@@ -331,7 +335,7 @@ done
 rawdir="${rawdir:-${main_dir}/raw}"
 pngdir="${pngdir:-${main_dir}/pngs}"
 outdir="${outdir:-${main_dir}/processed}"
-logdir="${logdir:-${main_dir}/logs/wfTEM_${timestamp}}"
+logdir="${logdir:-${default_log_root}/wfTEM_${timestamp}}"
 local_log="${local_log:-${main_dir}/image_log_local.tsv}"
 
 mkdir -p "$logdir" "$pngdir" "$outdir" "$work_dir"
@@ -358,6 +362,10 @@ nextflow_args=(
   --s3_bucket "$s3_bucket"
   --zarr_format 3
   -profile "$profile"
+  -with-trace "${logdir}/trace.tsv"
+  -with-report "${logdir}/report.html"
+  -with-timeline "${logdir}/timeline.html"
+  -with-dag "${logdir}/dag.html"
 )
 
 if [ -n "$gradient_chunk_rows" ]; then

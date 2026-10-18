@@ -1,0 +1,16 @@
+# IMOD + procps (`ps` is needed by Nextflow trace/report/timeline).
+# Builds on top of the existing EasyBuild module snapshot (rockylinux:8, see imod.def for how
+# that was generated), so IMOD and its environment stay exactly the same.
+
+Bootstrap: localimage
+From: /g/schwab/marco/container_legacy/EMBL_IMOD_5.1.0-foss-2023a-CUDA-12.1.1.sif
+
+%labels
+    Author marco
+    Tool IMOD 5.1.0-foss-2023a-CUDA-12.1.1 + procps
+
+%post
+    dnf install -y procps-ng && dnf clean all
+
+%test
+    ps --version

@@ -183,6 +183,7 @@ process CHECKNEWIMAGES {
 
 process RENAME {
   
+    tag "${filename}"
     cpus   = 1
     memory { "${Math.min(Math.max((req_mem as Integer), 4), 32)}GB" }
     time   = "0.25h"    
@@ -205,6 +206,7 @@ process RENAME {
 
 process JUSTBLEND {
   
+    tag "${filename}"
     cpus   = 1
     memory = "2GB"
     time   = "1h"    
@@ -233,6 +235,7 @@ process JUSTBLEND {
 
 process CORRECTIONBLEND {
   
+    tag "${filename}"
     cpus   = 1
     memory = "5GB"
     time   = "1h"    
@@ -264,6 +267,7 @@ process CORRECTIONBLEND {
 
 process EXPORTOVPNG {
   
+    tag "${filename}"
     cpus   = 1
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 96)}GB" }
     time   = "1h"    
@@ -280,7 +284,7 @@ process EXPORTOVPNG {
     tuple val(filename), path(correctionblend_mrc), val(req_mem)
 
     output:
-    path "*.png", emit: png_ov
+    path "${correctionblend_mrc.baseName}.png", emit: png_ov
     
     script:
     """
@@ -307,11 +311,12 @@ process EXPORTOVPNG {
 
 process CORRECTGRADIENT {
   
+    tag "${filename}"
     cpus   = 1
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 96)}GB" }
     time   = "1h"    
   
-    //publishDir "${params.outdir}/${filename}", mode:'copy'
+    publishDir "${params.logdir}/metadata/gradient_correction", mode:'copy', pattern: "*_gradient_{qc.png,metrics.tsv}"
     containerOptions '--bind /g --bind /home --bind /scratch'
     errorStrategy = 'ignore' 
 
@@ -341,6 +346,7 @@ process CORRECTGRADIENT {
 
 process EXTRACTIMAGESTATS {
   
+    tag "${filename}"
     cpus   = 1
     memory = "32GB"
     time   = "100m"    
@@ -367,6 +373,7 @@ process EXTRACTIMAGESTATS {
 
 process EUBICONVERSION {
   
+    tag "${filename}"
     cpus   = 1
     memory { "${Math.min(Math.max((req_mem as Integer) * 2, 32), 128)}GB" }
     time   = "2h"    
@@ -411,6 +418,7 @@ process EUBICONVERSION {
 process S3UPLOAD {
 
 
+    tag "${filename}"
     cpus 1
     memory "1 GB"
     time "10m"
