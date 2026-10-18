@@ -100,13 +100,11 @@ done
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SAMPLESHEET="${RUN_DIR}/ampliseq_samplesheet.tsv"
 readonly PARAMS_FILE="${RUN_DIR}/ampliseq_params.yaml"
-readonly PARAMS_TEMPLATE="${SCRIPT_DIR}/ampliseq_params.example.yaml"
 readonly SAMPLESHEET_BUILDER="${SCRIPT_DIR}/make_ampliseq_samplesheet.sh"
 readonly SLURM_RUNNER="${SCRIPT_DIR}/run_ampliseq_slurm.sh"
 
 for required_file in \
     "${SAMPLEINFO}" \
-    "${PARAMS_TEMPLATE}" \
     "${SAMPLESHEET_BUILDER}" \
     "${SLURM_RUNNER}" \
     "${SCRIPT_DIR}/ampliseq_orientation.config"; do
@@ -136,23 +134,22 @@ SKIP_INCOMPLETE="${SKIP_INCOMPLETE}" CHECK_GZIP="${CHECK_GZIP}" \
     "${ENVIRONMENTAL_SAMPLES}" \
     "${CONTROL_SAMPLES}"
 
-cp -- "${PARAMS_TEMPLATE}" "${PARAMS_FILE}"
-sed -i \
-    -e "s|REPLACE_ME_INPUT|${SAMPLESHEET}|g" \
-    -e "s|REPLACE_ME_OUTDIR|${RESULTS_DIR}|g" \
-    -e "s|REPLACE_ME_FORWARD_PRIMER|${FW_PRIMER}|g" \
-    -e "s|REPLACE_ME_REVERSE_PRIMER|${RV_PRIMER}|g" \
-    -e "s|REPLACE_ME_BINNED_QUALITY|${BINNED_QUALITY}|g" \
-    -e "s|REPLACE_ME_SKIP_TAXONOMY|${SKIP_TAXONOMY}|g" \
-    -e "s|REPLACE_ME_MAX_CPUS|${MAX_CPUS}|g" \
-    -e "s|REPLACE_ME_MAX_MEMORY|${MAX_MEMORY}|g" \
-    -e "s|REPLACE_ME_MAX_TIME|${MAX_TIME}|g" \
-    "${PARAMS_FILE}"
-
-if grep -q 'REPLACE_ME' "${PARAMS_FILE}"; then
-    echo "Error: unresolved REPLACE_ME placeholder in ${PARAMS_FILE}." >&2
-    exit 2
-fi
+# Generate a complete run record from launcher.sh arguments. Users do not need
+# to maintain a separate YAML template or edit this generated file.
+{
+    printf 'input: "%s"\n' "${SAMPLESHEET}"
+    printf 'outdir: "%s"\n' "${RESULTS_DIR}"
+    printf 'FW_primer: "%s"\n' "${FW_PRIMER}"
+    printf 'RV_primer: "%s"\n' "${RV_PRIMER}"
+    printf 'binned_quality: "%s"\n' "${BINNED_QUALITY}"
+    printf 'skip_taxonomy: %s\n' "${SKIP_TAXONOMY}"
+    printf 'max_cpus: %s\n' "${MAX_CPUS}"
+    printf 'max_memory: "%s"\n' "${MAX_MEMORY}"
+    printf 'max_time: "%s"\n' "${MAX_TIME}"
+    printf 'min_read_counts: 1\n'
+    printf 'ignore_empty_input_files: false\n'
+    printf 'ignore_failed_trimming: false\n'
+} > "${PARAMS_FILE}"
 
 SBATCH_OPTIONS=()
 [[ -n "${SBATCH_ACCOUNT}" ]] && SBATCH_OPTIONS+=("--account=${SBATCH_ACCOUNT}")
