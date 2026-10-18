@@ -78,7 +78,7 @@ process CHECKEXISTINGCRYOS3FILES {
     : > "existing_s3_entries.txt"
     : > "incomplete_s3_entries.txt"
     while IFS= read -r line; do
-      name="\$(echo "\$line" | awk '{print \$NF}')"
+      name="\${line##* }"
       case "\$name" in
         */) name="\${name%/}" ;;
         *) continue ;;

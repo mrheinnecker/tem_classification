@@ -78,7 +78,7 @@ process CHECKEXISTINGS3FILES {
     : > "existing_s3_entries.txt"
     : > "incomplete_s3_entries.txt"
     while IFS= read -r line; do
-      name="\$(echo "\$line" | awk '{print \$NF}')"
+      name="\${line##* }"
       case "\$name" in
         */) name="\${name%/}" ;;
         *) continue ;;
@@ -464,12 +464,22 @@ process S3UPLOAD {
     image_zarr="$omezarr"
     image_target_name="\$(basename "\$image_zarr")"
 
+    # eubi writes the zarr into a subfolder of <filename>_omezarr -> upload that inner zarr
+    # (plain globs, the mc container has no `find`)
     if [ ! -e "\$image_zarr/zarr.json" ] && [ ! -e "\$image_zarr/.zattrs" ] && [ ! -e "\$image_zarr/.zgroup" ]; then
-      inner_zarr="\$(find "\$image_zarr" -mindepth 1 -maxdepth 3 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' \\) | head -n 1)"
-      if [ -n "\$inner_zarr" ]; then
-        image_zarr="\$inner_zarr"
-        image_target_name="\$(basename "\$inner_zarr")"
-      fi
+      for candidate in "\$image_zarr"/*.zarr "\$image_zarr"/*/*.zarr "\$image_zarr"/*/*/*.zarr; do
+        if [ -d "\$candidate" ]; then
+          image_zarr="\$candidate"
+          image_target_name="\$(basename "\$candidate")"
+          break
+        fi
+      done
+    fi
+
+    if [ ! -e "\$image_zarr/zarr.json" ] && [ ! -e "\$image_zarr/.zattrs" ] && [ ! -e "\$image_zarr/.zgroup" ]; then
+      echo "Could not find an OME-Zarr root (zarr.json / .zattrs / .zgroup) under $omezarr" >&2
+      ls -la "$omezarr" >&2 || true
+      exit 1
     fi
 
     # everything except the root zarr.json first, the root zarr.json last: its presence on S3
