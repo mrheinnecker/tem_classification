@@ -245,6 +245,10 @@ nextflow_args=(
   --s3_bucket "$s3_bucket"
   --zarr_format "3"
   -profile "$profile"
+  -with-trace "${logdir}/trace.tsv"
+  -with-report "${logdir}/report.html"
+  -with-timeline "${logdir}/timeline.html"
+  -with-dag "${logdir}/dag.html"
 )
 
 case "$resume" in

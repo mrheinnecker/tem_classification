@@ -51,11 +51,13 @@ process SELECTSEMIMAGES {
 
 process EXTRACTSEMMETADATA {
 
+    tag "${filename}"
     cpus 1
     memory "2GB"
     time "20m"
 
-    publishDir "${params.outdir}/${filename}", mode:"copy"
+    // only the small metadata files are kept, the raw tif stays where it is
+    publishDir "${params.logdir}/metadata", mode:"copy", pattern:"*_{metadata.json,pixel_size.tsv}"
     containerOptions "--bind /g --bind /scratch --bind /home"
 
     input:
@@ -89,11 +91,11 @@ PY
 
 process EUBISEMCONVERSION {
 
+    tag "${filename}"
     cpus 1
     memory "4G"
     time "1h"
 
-    publishDir "${params.outdir}/${filename}", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
     errorStrategy "retry"
     maxRetries 1
@@ -132,6 +134,7 @@ process EUBISEMCONVERSION {
 
 process S3UPLOADSEM {
 
+    tag "${filename}"
     cpus 1
     memory "1GB"
     time "10m"
