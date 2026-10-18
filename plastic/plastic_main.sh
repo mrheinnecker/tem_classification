@@ -29,7 +29,7 @@ Options:
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
   --s3_bucket VALUE                S3 bucket/prefix, default s3test/imatrec/central_data_processing/plastic.
-  --zarr_format VALUE              OME-Zarr format version, default 2.
+  --zarr_format VALUE              OME-Zarr format version, default 3.
   --eubi_extra_args VALUE          Extra raw arguments appended to eubi to_zarr.
   --default_x_scale VALUE          Fallback X pixel size.
   --default_y_scale VALUE          Fallback Y pixel size.
@@ -125,7 +125,7 @@ outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3test/imatrec/central_data_processing/plastic}"
-zarr_format="${ZARR_FORMAT:-2}"
+zarr_format="${ZARR_FORMAT:-3}"
 eubi_extra_args="${EUBI_EXTRA_ARGS:-}"
 default_x_scale="${DEFAULT_X_SCALE:-}"
 default_y_scale="${DEFAULT_Y_SCALE:-}"

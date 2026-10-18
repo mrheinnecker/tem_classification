@@ -29,7 +29,7 @@ Options:
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
   --s3_bucket VALUE                S3 bucket/prefix, default s3test/imatrec/central_data_processing/cryo.
-  --zarr_format VALUE              OME-Zarr format version, default 2.
+  --zarr_format VALUE              OME-Zarr format version, default 3.
   --default_x_scale VALUE          Fallback X pixel size.
   --default_y_scale VALUE          Fallback Y pixel size.
   --default_z_scale VALUE          Fallback Z spacing.
@@ -124,7 +124,7 @@ outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3test/imatrec/central_data_processing/cryo}"
-zarr_format="${ZARR_FORMAT:-2}"
+zarr_format="${ZARR_FORMAT:-3}"
 default_x_scale="${DEFAULT_X_SCALE:-}"
 default_y_scale="${DEFAULT_Y_SCALE:-}"
 default_z_scale="${DEFAULT_Z_SCALE:-}"

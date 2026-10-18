@@ -98,14 +98,39 @@ def real_channels_only(metadata):
 
 def find_zarr_root(path):
     root = Path(path)
-    if (root / ".zattrs").exists() or (root / ".zgroup").exists():
+    if is_zarr_root(root):
         return root
 
     for candidate in root.rglob("*"):
         if candidate.is_dir() and candidate.suffix in {".zarr", ".ome.zarr"}:
-            if (candidate / ".zattrs").exists() or (candidate / ".zgroup").exists():
+            if is_zarr_root(candidate):
                 return candidate
     raise FileNotFoundError(f"Could not find OME-Zarr root below {root}")
+
+
+def is_zarr_root(path):
+    return (path / "zarr.json").exists() or (path / ".zattrs").exists() or (path / ".zgroup").exists()
+
+
+def load_root_attributes(zarr_root):
+    """Root group attributes of an OME-Zarr.
+
+    zarr v3 (OME-Zarr 0.5): zarr.json -> attributes, OME metadata under attributes["ome"]
+    zarr v2 (OME-Zarr 0.4): .zattrs, OME metadata (multiscales, omero) at the top level
+
+    Returns (file to write, full document, custom attributes, OME attributes).
+    """
+    zarr_json = zarr_root / "zarr.json"
+    if zarr_json.exists():
+        document = json.loads(zarr_json.read_text(encoding="utf-8"))
+        attributes = document.setdefault("attributes", {})
+        return zarr_json, document, attributes, attributes.setdefault("ome", {})
+
+    zattrs_path = zarr_root / ".zattrs"
+    attrs = {}
+    if zattrs_path.exists():
+        attrs = json.loads(zattrs_path.read_text(encoding="utf-8"))
+    return zattrs_path, attrs, attrs, attrs
 
 
 def parse_contrast_limits(value):
@@ -261,7 +286,7 @@ def copy_czi_metadata_xml(zarr_root, czi_metadata_xml):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Patch extracted CRYO/CZI metadata into an OME-Zarr .zattrs file."
+        description="Patch extracted CRYO/CZI metadata into the root attributes of an OME-Zarr (zarr.json or .zattrs)."
     )
     parser.add_argument("--omezarr", required=True)
     parser.add_argument("--metadata-json", required=True)
@@ -270,21 +295,18 @@ def main():
     args = parser.parse_args()
 
     zarr_root = find_zarr_root(args.omezarr)
-    zattrs_path = zarr_root / ".zattrs"
-    attrs = {}
-    if zattrs_path.exists():
-        attrs = json.loads(zattrs_path.read_text(encoding="utf-8"))
+    zattrs_path, document, attrs, ome_attrs = load_root_attributes(zarr_root)
 
     metadata = json.loads(Path(args.metadata_json).read_text(encoding="utf-8"))
     omero_channels = build_omero_channels(metadata)
     if omero_channels:
-        omero = attrs.get("omero", {})
+        omero = ome_attrs.get("omero", {})
         omero["channels"] = omero_channels
         omero.setdefault("rdefs", {})["model"] = "color"
-        attrs["omero"] = omero
+        ome_attrs["omero"] = omero
 
     attrs["cryo_metadata"] = compact_cryo_metadata(metadata)
-    zattrs_path.write_text(json.dumps(attrs, indent=2, sort_keys=True), encoding="utf-8")
+    zattrs_path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
     patched_ome_xmls = patch_ome_xml_files(zarr_root, metadata)
     copied_czi_metadata = copy_czi_metadata_xml(zarr_root, args.czi_metadata_xml)
 

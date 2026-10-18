@@ -31,8 +31,9 @@ bash "${repo_dir}/cryo/cryo_main.sh" interactive \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/cryo/metadata" \
   --workflow_stage all \
   --dryrun FALSE \
+  --dryrun_n 2 \
   --s3_bucket "s3test/imatrec/central_data_processing/cryo" \
-  --zarr_format 2 \
+  --zarr_format 3 \
   --scale_unit nm \
   --resume FALSE
 
