@@ -137,8 +137,9 @@ all_files_raw <-
     png_export_present=file.exists(png_export_file),
     needs_s3=!s3_omezarr_present,
     needs_png=!png_export_present,
-    needs_processing=needs_s3 | needs_png
-  ) 
+    ## only the final OME-Zarr on S3 decides, the png is kept for information only
+    needs_processing=needs_s3
+  )
 
 all_files <- all_files_raw %>%
   ungroup() %>%

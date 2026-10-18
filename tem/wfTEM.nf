@@ -25,7 +25,7 @@ process CHECKEXISTINGS3FILES {
 
     cpus 1
     memory "1 GB"
-    time "10m"
+    time "1h"
 
     publishDir "${params.logdir}", mode:'copy'
     containerOptions "--bind /g --bind /scratch --bind /home"
@@ -37,6 +37,8 @@ process CHECKEXISTINGS3FILES {
 
     output:
     path "existing_s3_entries.txt", emit: existing_s3
+    path "existing_s3_entries_all.txt"
+    path "incomplete_s3_entries.txt"
 
     script:
     """
@@ -55,20 +57,38 @@ process CHECKEXISTINGS3FILES {
     fi
 
     if command -v mc >/dev/null 2>&1; then
-      if ! mc ls "${s3_bucket}" > "existing_s3_entries.txt"; then
+      if ! mc ls "${s3_bucket}" > "existing_s3_entries_all.txt"; then
         if [ "\$require_s3" = "TRUE" ]; then
           echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
           exit 1
         fi
-        : > "existing_s3_entries.txt"
+        : > "existing_s3_entries_all.txt"
       fi
     else
       if [ "\$require_s3" = "TRUE" ]; then
         echo "mc command is not available; refusing to continue because this run depends on S3 skip detection." >&2
         exit 1
       fi
-      : > "existing_s3_entries.txt"
+      : > "existing_s3_entries_all.txt"
     fi
+
+    # a dataset only counts as present when its root metadata is on S3: zarr.json (zarr v3) or .zattrs (v2).
+    # S3UPLOAD uploads the root zarr.json last, so a missing one means the upload did not finish
+    # -> the image is not listed in existing_s3_entries.txt and gets processed again.
+    : > "existing_s3_entries.txt"
+    : > "incomplete_s3_entries.txt"
+    while IFS= read -r line; do
+      name="\$(echo "\$line" | awk '{print \$NF}')"
+      case "\$name" in
+        */) name="\${name%/}" ;;
+        *) continue ;;
+      esac
+      if mc stat "${s3_bucket}/\$name/zarr.json" >/dev/null 2>&1 || mc stat "${s3_bucket}/\$name/.zattrs" >/dev/null 2>&1; then
+        echo "\$line" >> "existing_s3_entries.txt"
+      else
+        echo "\$name" >> "incomplete_s3_entries.txt"
+      fi
+    done < "existing_s3_entries_all.txt"
     """
 }
 
@@ -437,13 +457,14 @@ process S3UPLOAD {
 
     script:
     """
+    set -euo pipefail
 
     echo "Uploading file...."
 
     image_zarr="$omezarr"
     image_target_name="\$(basename "\$image_zarr")"
 
-    if [ ! -e "\$image_zarr/.zattrs" ] && [ ! -e "\$image_zarr/.zgroup" ]; then
+    if [ ! -e "\$image_zarr/zarr.json" ] && [ ! -e "\$image_zarr/.zattrs" ] && [ ! -e "\$image_zarr/.zgroup" ]; then
       inner_zarr="\$(find "\$image_zarr" -mindepth 1 -maxdepth 3 -type d \\( -name '*.zarr' -o -name '*.ome.zarr' \\) | head -n 1)"
       if [ -n "\$inner_zarr" ]; then
         image_zarr="\$inner_zarr"
@@ -451,7 +472,19 @@ process S3UPLOAD {
       fi
     fi
 
-    mc cp "\$image_zarr/" "${params.s3_bucket}/" -r
+    # everything except the root zarr.json first, the root zarr.json last: its presence on S3
+    # marks a complete upload (checked in CHECKEXISTINGS3FILES). A failed copy stops the script
+    # before zarr.json is uploaded.
+    target="${params.s3_bucket}/\$image_target_name"
+    for entry in "\$image_zarr"/* "\$image_zarr"/.[!.]*; do
+      [ -e "\$entry" ] || continue
+      [ "\$(basename "\$entry")" = "zarr.json" ] && continue
+      mc cp -r "\$entry" "\$target/"
+    done
+
+    if [ -e "\$image_zarr/zarr.json" ]; then
+      mc cp "\$image_zarr/zarr.json" "\$target/zarr.json"
+    fi
 
     echo "Done."
     
