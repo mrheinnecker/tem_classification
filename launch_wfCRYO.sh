@@ -26,12 +26,12 @@ bash "${repo_dir}/cryo/cryo_main.sh" interactive \
   --collection_table_sheet "cryo_collection_table" \
   --main_dir "/scratch/rheinnec/cryo_screen" \
   --outdir "/scratch/rheinnec/cryo_screen/processed" \
-  --logdir "/scratch/rheinnec/cryo_screen/logs/wfCRYO_${timestamp}" \
+  --logdir "/g/schwab/biobank_logs/cryo/wfCRYO_${timestamp}" \
   --work_dir "/scratch/rheinnec/cryo_screen/work" \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/cryo/metadata" \
   --workflow_stage all \
   --dryrun FALSE \
-  --s3_bucket "s3embl/imatrec/central_data_processing/cryo" \
+  --s3_bucket "s3test/imatrec/central_data_processing/cryo" \
   --zarr_format 2 \
   --scale_unit nm \
   --resume FALSE
@@ -53,10 +53,10 @@ bash "${repo_dir}/cryo/cryo_main.sh" interactive \
 #   --collection_table_url "https://docs.google.com/spreadsheets/d/REPLACE_WITH_COLLECTION_TABLE_SHEET_ID/edit?gid=0#gid=0" \
 #   --collection_table_sheet "cryo_collection_table" \
 #   --main_dir "/scratch/rheinnec/cryo_screen" \
-#   --logdir "/scratch/rheinnec/cryo_screen/logs/wfCRYO_${timestamp}" \
+#   --logdir "/g/schwab/biobank_logs/cryo/wfCRYO_${timestamp}" \
 #   --work_dir "/scratch/rheinnec/cryo_screen/work" \
 #   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/cryo/metadata" \
 #   --workflow_stage collection \
 #   --dryrun FALSE \
-#   --s3_bucket "s3embl/imatrec/central_data_processing/cryo" \
+#   --s3_bucket "s3test/imatrec/central_data_processing/cryo" \
 #   --resume FALSE

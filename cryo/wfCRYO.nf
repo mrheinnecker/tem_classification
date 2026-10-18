@@ -12,7 +12,7 @@ params.script_dir = params.script_dir ?: baseDir.toString()
 params.outdir = params.outdir ?: "cryo_processed"
 params.logdir = params.logdir ?: "cryo_logs"
 params.workflow_stage = params.workflow_stage ?: "discover"
-params.s3_bucket = params.s3_bucket ?: "s3embl/cryotest"
+params.s3_bucket = params.s3_bucket ?: "s3test/imatrec/central_data_processing/cryo"
 params.zarr_format = params.zarr_format ?: 2
 params.default_x_scale = params.default_x_scale ?: ""
 params.default_y_scale = params.default_y_scale ?: ""
@@ -25,7 +25,7 @@ process CHECKEXISTINGCRYOS3FILES {
 
     cpus 1
     memory "1GB"
-    time "10m"
+    time "1h"
 
     publishDir "${params.logdir}", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
@@ -37,6 +37,8 @@ process CHECKEXISTINGCRYOS3FILES {
 
     output:
     path "existing_s3_entries.txt", emit: existing_s3
+    path "existing_s3_entries_all.txt"
+    path "incomplete_s3_entries.txt"
 
     script:
     """
@@ -55,20 +57,38 @@ process CHECKEXISTINGCRYOS3FILES {
     fi
 
     if command -v mc >/dev/null 2>&1; then
-      if ! mc ls "${s3_bucket}" > "existing_s3_entries.txt"; then
+      if ! mc ls "${s3_bucket}" > "existing_s3_entries_all.txt"; then
         if [ "\$require_s3" = "TRUE" ]; then
           echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
           exit 1
         fi
-        : > "existing_s3_entries.txt"
+        : > "existing_s3_entries_all.txt"
       fi
     else
       if [ "\$require_s3" = "TRUE" ]; then
         echo "mc command is not available; refusing to continue because this run depends on S3 skip detection." >&2
         exit 1
       fi
-      : > "existing_s3_entries.txt"
+      : > "existing_s3_entries_all.txt"
     fi
+
+    # a dataset only counts as present when its root metadata is on S3: zarr.json (zarr v3) or .zattrs (v2).
+    # The upload process copies the root metadata last, so a missing one means the upload did not finish
+    # -> the image is not listed in existing_s3_entries.txt and gets processed again.
+    : > "existing_s3_entries.txt"
+    : > "incomplete_s3_entries.txt"
+    while IFS= read -r line; do
+      name="\$(echo "\$line" | awk '{print \$NF}')"
+      case "\$name" in
+        */) name="\${name%/}" ;;
+        *) continue ;;
+      esac
+      if mc stat "${s3_bucket}/\$name/zarr.json" >/dev/null 2>&1 || mc stat "${s3_bucket}/\$name/.zattrs" >/dev/null 2>&1; then
+        echo "\$line" >> "existing_s3_entries.txt"
+      else
+        echo "\$name" >> "incomplete_s3_entries.txt"
+      fi
+    done < "existing_s3_entries_all.txt"
     """
 }
 
@@ -123,6 +143,7 @@ process SELECTCRYOIMAGES {
 
 process EXTRACTCRYOMETADATA {
 
+    tag "${filename}"
     cpus 1
     memory "2GB"
     time "20m"
@@ -169,6 +190,7 @@ process EXTRACTCRYOMETADATA {
 
 process PREPARECRYOINPUT {
 
+    tag "${filename}"
     cpus 1
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 128)}GB" }
     time "2h"
@@ -205,11 +227,11 @@ process PREPARECRYOINPUT {
 
 process EUBICRYOCONVERSION {
 
+    tag "${filename}"
     cpus 1
     memory { "${Math.min(Math.max((req_mem as Integer), 16), 128)}GB" }
     time "2h"
 
-    publishDir "${params.outdir}/${filename}", mode:"copy"
     containerOptions "--bind /g --bind /scratch --bind /home"
     errorStrategy "ignore"
 
@@ -254,7 +276,7 @@ process EUBICRYOCONVERSION {
       --dimension_order xyzct \
       --squeeze True \
       --save_omexml True \
-      --zar_format "${params.zarr_format}" \
+      --zarr_format "${params.zarr_format}" \
       --auto_chunk True \
       --jvm_memory 8GB \
       --max_workers 1
@@ -266,6 +288,7 @@ process EUBICRYOCONVERSION {
 
 process PATCHCRYOOMEZARRMETADATA {
 
+    tag "${filename}"
     cpus 1
     memory "1GB"
     time "10m"
@@ -296,6 +319,7 @@ process PATCHCRYOOMEZARRMETADATA {
 
 process S3UPLOADCRYO {
 
+    tag "${filename}"
     cpus 1
     memory "1GB"
     time "30m"
@@ -315,7 +339,7 @@ process S3UPLOADCRYO {
     set -euo pipefail
 
     image_zarr="${omezarr}"
-    if [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
+    if [ ! -e "\${image_zarr}/zarr.json" ] && [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
       for candidate in "\${image_zarr}"/*.zarr "\${image_zarr}"/*.ome.zarr "\${image_zarr}"/*/*.zarr "\${image_zarr}"/*/*.ome.zarr "\${image_zarr}"/*/*/*.zarr "\${image_zarr}"/*/*/*.ome.zarr; do
         if [ -d "\$candidate" ]; then
           image_zarr="\$candidate"
@@ -324,13 +348,29 @@ process S3UPLOADCRYO {
       done
     fi
 
-    if [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
+    if [ ! -e "\${image_zarr}/zarr.json" ] && [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
       echo "Could not find an OME-Zarr root marker under ${omezarr}" >&2
       ls -la "${omezarr}" >&2 || true
       exit 1
     fi
 
-    mc cp "\${image_zarr}/" "${params.s3_bucket}/${filename}.ome.zarr/" --recursive
+    # everything except the root metadata first, the root metadata (.zgroup, .zattrs, zarr.json) last:
+    # its presence on S3 marks a complete upload (checked in CHECKEXISTINGCRYOS3FILES).
+    # A failed copy stops the script before the root metadata is uploaded.
+    target="${params.s3_bucket}/${filename}.ome.zarr"
+    for entry in "\${image_zarr}"/* "\${image_zarr}"/.[!.]*; do
+      [ -e "\$entry" ] || continue
+      case "\$(basename "\$entry")" in
+        zarr.json|.zattrs|.zgroup) continue ;;
+      esac
+      mc cp --recursive "\$entry" "\$target/"
+    done
+
+    for marker in .zgroup .zattrs zarr.json; do
+      if [ -e "\${image_zarr}/\$marker" ]; then
+        mc cp "\${image_zarr}/\$marker" "\$target/\$marker"
+      fi
+    done
     touch "${filename}_s3_upload_done.txt"
     """
 }

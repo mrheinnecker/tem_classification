@@ -28,7 +28,7 @@ Options:
   --workflow_stage VALUE           discover, process, all, or collection.
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
-  --s3_bucket VALUE                S3 bucket/prefix, default s3embl/plastictest.
+  --s3_bucket VALUE                S3 bucket/prefix, default s3test/imatrec/central_data_processing/plastic.
   --zarr_format VALUE              OME-Zarr format version, default 2.
   --eubi_extra_args VALUE          Extra raw arguments appended to eubi to_zarr.
   --default_x_scale VALUE          Fallback X pixel size.
@@ -73,6 +73,7 @@ case "$mode" in
   local)
     main_dir="${PLASTIC_SCREEN_DIR:-C:/projects/plastic_screen}"
     default_work_dir="${WORK_DIR:-${main_dir}/work}"
+    default_log_root="${main_dir}/logs"
     profile="local"
     default_workflow_stage="discover"
     default_sheet_mode="local"
@@ -81,6 +82,7 @@ case "$mode" in
   interactive)
     main_dir="${PLASTIC_SCREEN_DIR:-/scratch/rheinnec/plastic_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/plastic_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/plastic"
     profile="interactive"
     default_workflow_stage="all"
     default_sheet_mode="google"
@@ -92,6 +94,7 @@ case "$mode" in
   cluster)
     main_dir="${PLASTIC_SCREEN_DIR:-/scratch/rheinnec/plastic_screen}"
     default_work_dir="${WORK_DIR:-/scratch/rheinnec/plastic_screen/work}"
+    default_log_root="/g/schwab/biobank_logs/plastic"
     profile="cluster"
     default_workflow_stage="all"
     default_sheet_mode="google"
@@ -121,7 +124,7 @@ collection_table_sheet="${COLLECTION_TABLE_SHEET:-plastic_collection_table}"
 outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
-s3_bucket="${S3_BUCKET:-s3embl/plastictest}"
+s3_bucket="${S3_BUCKET:-s3test/imatrec/central_data_processing/plastic}"
 zarr_format="${ZARR_FORMAT:-2}"
 eubi_extra_args="${EUBI_EXTRA_ARGS:-}"
 default_x_scale="${DEFAULT_X_SCALE:-}"
@@ -340,7 +343,7 @@ done
 
 input_table="${input_table:-${main_dir}/plastic_images.tsv}"
 outdir="${outdir:-${main_dir}/processed}"
-logdir="${logdir:-${main_dir}/logs/wfPLASTIC_${timestamp}}"
+logdir="${logdir:-${default_log_root}/wfPLASTIC_${timestamp}}"
 persistent_metadata_dir="${persistent_metadata_dir:-${main_dir}/metadata}"
 
 mkdir -p "$logdir" "$outdir" "$work_dir" "$persistent_metadata_dir"
@@ -372,6 +375,10 @@ nextflow_args=(
   --scale_unit "$scale_unit"
   --persistent_metadata_dir "$persistent_metadata_dir"
   -profile "$profile"
+  -with-trace "${logdir}/trace.tsv"
+  -with-report "${logdir}/report.html"
+  -with-timeline "${logdir}/timeline.html"
+  -with-dag "${logdir}/dag.html"
 )
 
 if [ "$resume" = "TRUE" ]; then

@@ -26,12 +26,12 @@ bash "${repo_dir}/plastic/plastic_main.sh" interactive \
   --collection_table_sheet "plastic_collection_table" \
   --main_dir "/scratch/rheinnec/plastic_screen" \
   --outdir "/scratch/rheinnec/plastic_screen/processed" \
-  --logdir "/scratch/rheinnec/plastic_screen/logs/wfPLASTIC_${timestamp}" \
+  --logdir "/g/schwab/biobank_logs/plastic/wfPLASTIC_${timestamp}" \
   --work_dir "/scratch/rheinnec/plastic_screen/work" \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/plastic/metadata" \
   --workflow_stage all \
   --dryrun FALSE \
-  --s3_bucket "s3embl/imatrec/central_data_processing/plastic" \
+  --s3_bucket "s3test/imatrec/central_data_processing/plastic" \
   --zarr_format 2 \
   --scale_unit nm \
   --resume FALSE
@@ -53,10 +53,10 @@ bash "${repo_dir}/plastic/plastic_main.sh" interactive \
 #   --collection_table_url "https://docs.google.com/spreadsheets/d/REPLACE_WITH_COLLECTION_TABLE_SHEET_ID/edit?gid=0#gid=0" \
 #   --collection_table_sheet "plastic_collection_table" \
 #   --main_dir "/scratch/rheinnec/plastic_screen" \
-#   --logdir "/scratch/rheinnec/plastic_screen/logs/wfPLASTIC_${timestamp}" \
+#   --logdir "/g/schwab/biobank_logs/plastic/wfPLASTIC_${timestamp}" \
 #   --work_dir "/scratch/rheinnec/plastic_screen/work" \
 #   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/plastic/metadata" \
 #   --workflow_stage collection \
 #   --dryrun FALSE \
-#   --s3_bucket "s3embl/imatrec/central_data_processing/plastic" \
+#   --s3_bucket "s3test/imatrec/central_data_processing/plastic" \
 #   --resume FALSE

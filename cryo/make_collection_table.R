@@ -24,7 +24,7 @@ collection_table_url <- value_or_default(opt$collection_table_url, "")
 collection_table_sheet <- value_or_default(opt$collection_table_sheet, "cryo_collection_table")
 local_collection_table <- value_or_default(opt$local_collection_table, "cryo_collection_table.tsv")
 metadata_dir <- value_or_default(opt$metadata_dir, ".")
-s3_bucket <- value_or_default(opt$s3_bucket, "s3embl/cryotest")
+s3_bucket <- value_or_default(opt$s3_bucket, "s3test/imatrec/central_data_processing/cryo")
 
 parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
@@ -35,11 +35,12 @@ parse_mc_ls_path <- function(line) {
   )
 }
 
+## the mc alias (e.g. s3test) is dropped, the rest of the path is served by the public endpoint
 s3_public_prefix <- function(bucket) {
   bucket_path <- bucket %>%
-    str_remove("^s3embl/") %>%
+    str_remove("^[^/]+/") %>%
     str_remove("/$")
-  file.path("https://s3.embl.de", bucket_path)
+  file.path("https://schwab.buckets.embl.de", bucket_path)
 }
 
 metadata_row <- function(path) {
