@@ -19,6 +19,7 @@ From: mambaorg/micromamba:1.5.10-bookworm-slim
 
     apt-get update && apt-get install -y --no-install-recommends \
         git \
+        procps \
         build-essential \
         ca-certificates \
         libgl1 \
