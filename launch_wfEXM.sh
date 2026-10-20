@@ -17,7 +17,7 @@ timestamp="$(date +%Y-%m-%d_%H-%M)"
 repo_dir="/g/schwab/marco/repos/tem_classification"
 cd /scratch/rheinnec/exm_screen
 
-bash "${repo_dir}/exm/exm_main.sh" interactive \
+bash "${repo_dir}/exm/exm_main.sh" cluster \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1331814489#gid=1331814489" \
   --sheet_name "exm_input_table" \
@@ -31,7 +31,7 @@ bash "${repo_dir}/exm/exm_main.sh" interactive \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/exm/metadata" \
   --workflow_stage all \
   --dryrun TRUE \
-  --dryrun_n 5 \
+  --dryrun_n 10 \
   --s3_bucket "s3test/imatrec/central_data_processing/exm" \
   --zarr_format 3 \
   --scale_unit nm \
