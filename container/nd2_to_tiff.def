@@ -1,0 +1,34 @@
+Bootstrap: docker
+From: python:3.12-slim
+
+%labels
+    Author marco
+    Tool ND2 to OME-TIFF
+    Description Nikon ND2 metadata extraction and per-channel ND2 -> CZYX OME-TIFF merge (EXM workflow)
+
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PYTHONUNBUFFERED=1
+
+%post
+    apt-get update && apt-get install -y --no-install-recommends \
+        procps \
+        ca-certificates \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+
+    python -m pip install --upgrade pip setuptools wheel
+
+    python -m pip install --no-cache-dir \
+        numpy \
+        nd2 \
+        tifffile \
+        imagecodecs
+
+%runscript
+    exec python "$@"
+
+%test
+    ps --version
+    python -c "import numpy; import nd2; import tifffile; print('ND2 to OME-TIFF imports OK')"
