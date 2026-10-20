@@ -97,7 +97,8 @@ collection_sources <- tribble(
   "SEM", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1595862976#gid=1595862976", "sem_collection_table",
   "HITT", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=1062275333#gid=1062275333", "hitt_collection_table",
   "CRYO", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=199938698#gid=199938698", "cryo_collection_table",
-  "PLASTIC", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=199938698#gid=199938698", "plastic_collection_table"
+  "PLASTIC", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=199938698#gid=199938698", "plastic_collection_table",
+  "EXM", "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit", "exm_collection_table"
 )
 
 if (!is.null(opt$modalities) && !is.na(opt$modalities) && opt$modalities != "") {
@@ -263,7 +264,8 @@ palette <- c(
   SEM="#7A4EAB",
   HITT="#C85A3D",
   CRYO="#2F8F83",
-  PLASTIC="#D9A441"
+  PLASTIC="#D9A441",
+  EXM="#4F7F3A"
 )
 
 pick_first_column <- function(df, columns) {
