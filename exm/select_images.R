@@ -195,7 +195,8 @@ expand_nd2_paths <- function(path) {
 ## the Nikon software writes one file per channel:
 ##   Img0098_ChannelCy5 (Single EM)_Seq0068.nd2
 ## -> all files with the same folder + image prefix (Img0098) form one dataset with one channel each
-channel_file_pattern <- "^(.*?)_Channel(.+?)_Seq\\d+$"
+## tolerated variants: "Img0126 _Channel...", "Img0028__Channel...", missing "_Seq0000", copies ending in " (1)"
+channel_file_pattern <- "^(.*?)[\\s_]*_Channel(.+?)(?:_Seq\\d+)?(?:\\s*\\(\\d+\\))?\\s*$"
 
 files <- images %>%
   mutate(
@@ -207,8 +208,10 @@ files <- images %>%
   distinct(raw_file, .keep_all=TRUE) %>%
   mutate(
     file_stem=tools::file_path_sans_ext(basename(raw_file)),
-    image_prefix=coalesce(str_match(file_stem, channel_file_pattern)[, 2], file_stem),
-    channel_name=str_match(file_stem, channel_file_pattern)[, 3],
+    image_prefix=str_trim(coalesce(str_match(file_stem, channel_file_pattern)[, 2], file_stem)),
+    channel_name=str_trim(str_match(file_stem, channel_file_pattern)[, 3]),
+    ## "Cy5 (Single EM)" -> "Cy5", to find the same channel saved twice
+    channel_key=str_trim(str_remove_all(channel_name, "\\(.*?\\)")),
     image_dir=dirname(raw_file),
     ## image numbers (Img0098) restart per session -> the folder name is part of the dataset name
     default_filename=paste(basename(image_dir), image_prefix, sep="_")
@@ -245,6 +248,19 @@ all_images <- files %>%
   ) %>%
   select(filename, shortname, raw_path, output_path, req_mem, x_scale, y_scale, z_scale, scale_unit, everything())
 
+## the same channel in two files (e.g. a copy "..._Seq0016 (1).nd2") would end up as an extra channel
+double_channels <- files %>%
+  filter(!is.na(channel_key)) %>%
+  group_by(image_dir, image_prefix, channel_key) %>%
+  filter(n() > 1) %>%
+  ungroup()
+if (nrow(double_channels) > 0) {
+  stop(
+    "The same channel is listed in more than one file of an image; keep one of them in the input table:\n  ",
+    paste(double_channels$raw_file, collapse="\n  ")
+  )
+}
+
 ## all channel rows of one image must carry the same name, otherwise the first file's value would be used silently
 name_columns <- intersect(c("dataset_name", "shortname"), names(files))
 inconsistent <- files %>%
@@ -264,7 +280,7 @@ if (any(duplicated(all_images$filename))) {
     filter(filename %in% filename[duplicated(filename)]) %>%
     mutate(entry=paste0(filename, " <- ", image_dir, "/", image_prefix))
   stop(
-    "The same dataset name is used for images in different folders (Nikon image numbers restart per session):\n  ",
+    "The same dataset name is used for different images (Nikon image numbers restart per session):\n  ",
     paste(duplicates$entry, collapse="\n  "),
     "\nMake the shortname unique, e.g. add the date or sample: BAR_20240320_Img0093."
   )
