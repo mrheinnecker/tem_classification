@@ -165,6 +165,8 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
   })
 }
 
+site_pattern <- "ATH|BAR|KRI|TAL|NAP|BIL|POR"
+
 base_table <- s3_root_markers %>%
   left_join(
     all_datasets %>%
@@ -186,10 +188,14 @@ base_table <- s3_root_markers %>%
     y_scale_nm=coalesce(as.character(y_scale_nm), sheet_y_scale),
     z_scale_nm=coalesce(as.character(z_scale_nm), sheet_z_scale),
     source_name=name,
-    site=str_extract(source_name, "^[A-Za-z]+"),
+    ## sampling site as in the other data layers: from the dataset name (BAR_Img0093),
+    ## else from the raw path (.../ExM_TREC/BAR/...)
+    site=coalesce(
+      str_extract(source_name, site_pattern),
+      str_extract(coalesce(raw_path, metadata_raw_path), paste0("(?<=/)(", site_pattern, ")(?=/)"))
+    ),
     view=coalesce(site, "exm"),
     grid=coalesce(site, "exm"),
-    grid_index=row_number() - 1L,
     channels=map2(channels, size_c, normalize_channels),
     exclusive=FALSE,
     blend="sum",
@@ -198,6 +204,8 @@ base_table <- s3_root_markers %>%
   ) %>%
   group_by(grid) %>%
   mutate(
+    ## position within the site's grid
+    grid_index=row_number() - 1L,
     grid_columns=near_square_columns(n()),
     grid_position=paste0("(", grid_index %% grid_columns, ",", grid_index %/% grid_columns, ")")
   ) %>%
