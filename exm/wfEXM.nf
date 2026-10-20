@@ -231,10 +231,8 @@ process EUBIEXMCONVERSION {
     cpus 1
     // eubi peaks at ~3.3x the prepared OME-TIFF (35 GB for a 10.6 GB 4 x 250 x 2304 x 2304 stack, incl. the 8 GB JVM heap)
     // -> 4x the input + 8 GB, at least req_mem from the sheet
-    memory {
-        def input_gb = (prepared_input.toFile().listFiles()*.length().sum() ?: 0) / 1e9
-        "${Math.min(Math.max(Math.max((req_mem as Integer), 16), Math.ceil(4 * input_gb + 8) as Integer), 192)}GB"
-    }
+    // (input_gb is measured in the workflow block: inside this closure the staged input path is not resolvable)
+    memory { "${Math.min(Math.max(Math.max((req_mem as Integer), 16), Math.ceil(4 * (input_gb as Double) + 8) as Integer), 192)}GB" }
     // timed-out images can be rerun with --eubi_time 6h (completed ones are on S3 and skipped)
     time "${params.eubi_time}"
 
@@ -242,7 +240,7 @@ process EUBIEXMCONVERSION {
     errorStrategy "ignore"
 
     input:
-    tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), path(raw_metadata_json), val(req_mem)
+    tuple val(filename), path(prepared_input), val(output_path), path(metadata_json), path(pixel_size_tsv), path(raw_metadata_json), val(req_mem), val(input_gb)
 
     output:
     tuple val(filename), path("${filename}.ome.zarr"), path(metadata_json), path(raw_metadata_json), emit: omezarr
@@ -478,7 +476,14 @@ workflow {
 
         PREPAREEXMINPUT(EXTRACTEXMMETADATA.out.metadata)
 
-        EUBIEXMCONVERSION(PREPAREEXMINPUT.out.prepared)
+        // size of the prepared OME-TIFF in GB, sets the memory of the conversion job
+        EUBIEXMCONVERSION(
+            PREPAREEXMINPUT.out.prepared.map { filename, prepared_input, output_path, metadata_json, pixel_size_tsv, raw_metadata_json, req_mem ->
+                def files = prepared_input.toFile().listFiles()
+                def input_gb = files ? files.collect { it.length() }.sum() / 1e9 : 0
+                tuple(filename, prepared_input, output_path, metadata_json, pixel_size_tsv, raw_metadata_json, req_mem, input_gb)
+            }
+        )
         PATCHEXMOMEZARRMETADATA(EUBIEXMCONVERSION.out.omezarr)
 
         if (params.workflow_stage == "all") {
