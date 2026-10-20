@@ -245,11 +245,28 @@ all_images <- files %>%
   ) %>%
   select(filename, shortname, raw_path, output_path, req_mem, x_scale, y_scale, z_scale, scale_unit, everything())
 
-if (any(duplicated(all_images$filename))) {
+## all channel rows of one image must carry the same name, otherwise the first file's value would be used silently
+name_columns <- intersect(c("dataset_name", "shortname"), names(files))
+inconsistent <- files %>%
+  group_by(image_dir, image_prefix) %>%
+  summarise(across(all_of(name_columns), ~n_distinct(na.omit(.x))), .groups="drop") %>%
+  filter(if_any(all_of(name_columns), ~.x > 1))
+if (nrow(inconsistent) > 0) {
   stop(
-    "Dataset names are not unique: ",
-    paste(unique(all_images$filename[duplicated(all_images$filename)]), collapse=", "),
-    ". Add a dataset_name column to the input table."
+    "The channel rows of an image have different ", paste(name_columns, collapse="/"), " values: ",
+    paste(file.path(inconsistent$image_dir, inconsistent$image_prefix), collapse=", "),
+    ". Use one name per image (all 4 channel rows the same), e.g. shortname BAR_Img0093; leave dataset_name out."
+  )
+}
+
+if (any(duplicated(all_images$filename))) {
+  duplicates <- all_images %>%
+    filter(filename %in% filename[duplicated(filename)]) %>%
+    mutate(entry=paste0(filename, " <- ", image_dir, "/", image_prefix))
+  stop(
+    "The same dataset name is used for images in different folders (Nikon image numbers restart per session):\n  ",
+    paste(duplicates$entry, collapse="\n  "),
+    "\nMake the shortname unique, e.g. add the date or sample: BAR_20240320_Img0093."
   )
 }
 

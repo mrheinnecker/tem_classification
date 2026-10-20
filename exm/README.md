@@ -49,7 +49,9 @@ i.e. of the expanded sample. If the pre-expansion size is wanted, provide correc
   writes `<name>_metadata.json`, `<name>_pixel_size.tsv` and the full per-file metadata `<name>_nd2_metadata.json`.
 - `prepare_input.py`: merges the channels into one CZYX OME-TIFF in the work directory (one channel in memory at a time)
   and adds per-channel contrast limits (0.1 / 99.9 percentiles).
-- EuBI-Bridge converts the OME-TIFF to OME-Zarr.
+- EuBI-Bridge converts the OME-TIFF to OME-Zarr. Memory: 4x the OME-TIFF size + 8 GB, at least `req_mem` (default 32 GB);
+  a 4 x 250 x 2304 x 2304 stack (10.6 GB) needs ~35 GB and takes ~25 min. Time limit 2h; rerun timed-out images with `--eubi_time 6h`
+  (images already on S3 are skipped).
 - `patch_omezarr_metadata.py`: writes `omero.channels` and an `exm_metadata` block into the root attributes
   (`zarr.json` for zarr v3, `.zattrs` for v2) and copies the raw metadata to `nd2_metadata/nd2_metadata.json`.
 

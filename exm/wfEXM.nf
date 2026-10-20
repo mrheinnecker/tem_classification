@@ -14,6 +14,7 @@ params.logdir = params.logdir ?: "exm_logs"
 params.workflow_stage = params.workflow_stage ?: "discover"
 params.s3_bucket = params.s3_bucket ?: "s3test/imatrec/central_data_processing/exm"
 params.zarr_format = params.zarr_format ?: 3
+params.eubi_time = params.eubi_time ?: "2h"
 params.default_x_scale = params.default_x_scale ?: ""
 params.default_y_scale = params.default_y_scale ?: ""
 params.default_z_scale = params.default_z_scale ?: ""
@@ -228,8 +229,14 @@ process EUBIEXMCONVERSION {
 
     tag "${filename}"
     cpus 1
-    memory { "${Math.min(Math.max((req_mem as Integer), 16), 128)}GB" }
-    time "2h"
+    // eubi peaks at ~3.3x the prepared OME-TIFF (35 GB for a 10.6 GB 4 x 250 x 2304 x 2304 stack, incl. the 8 GB JVM heap)
+    // -> 4x the input + 8 GB, at least req_mem from the sheet
+    memory {
+        def input_gb = (prepared_input.toFile().listFiles()*.length().sum() ?: 0) / 1e9
+        "${Math.min(Math.max(Math.max((req_mem as Integer), 16), Math.ceil(4 * input_gb + 8) as Integer), 192)}GB"
+    }
+    // timed-out images can be rerun with --eubi_time 6h (completed ones are on S3 and skipped)
+    time "${params.eubi_time}"
 
     containerOptions "--bind /g --bind /scratch --bind /home"
     errorStrategy "ignore"

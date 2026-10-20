@@ -30,6 +30,7 @@ Options:
   --dryrun_n N                     Number of rows to process during dryrun.
   --s3_bucket VALUE                S3 bucket/prefix, default s3test/imatrec/central_data_processing/exm.
   --zarr_format VALUE              OME-Zarr format version, default 3.
+  --eubi_time VALUE                Time limit of the EuBI conversion jobs, default 2h (e.g. 6h for a rerun of timed-out images).
   --default_x_scale VALUE          Fallback X pixel size.
   --default_y_scale VALUE          Fallback Y pixel size.
   --default_z_scale VALUE          Fallback Z spacing.
@@ -125,6 +126,7 @@ logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3test/imatrec/central_data_processing/exm}"
 zarr_format="${ZARR_FORMAT:-3}"
+eubi_time="${EUBI_TIME:-2h}"
 default_x_scale="${DEFAULT_X_SCALE:-}"
 default_y_scale="${DEFAULT_Y_SCALE:-}"
 default_z_scale="${DEFAULT_Z_SCALE:-}"
@@ -283,6 +285,14 @@ while [[ $# -gt 0 ]]; do
       zarr_format="${1#*=}"
       shift
       ;;
+    --eubi_time|--eubi-time)
+      eubi_time="${2:?--eubi_time requires a value}"
+      shift 2
+      ;;
+    --eubi_time=*|--eubi-time=*)
+      eubi_time="${1#*=}"
+      shift
+      ;;
     --default_x_scale|--default-x-scale)
       default_x_scale="${2:?--default_x_scale requires a value}"
       shift 2
@@ -355,6 +365,7 @@ nextflow_args=(
   --dryrun_n "$dryrun_n"
   --s3_bucket "$s3_bucket"
   --zarr_format "$zarr_format"
+  --eubi_time "$eubi_time"
   --scale_unit "$scale_unit"
   --persistent_metadata_dir "$persistent_metadata_dir"
   -profile "$profile"
