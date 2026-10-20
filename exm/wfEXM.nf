@@ -263,6 +263,9 @@ process EUBIEXMCONVERSION {
 
     rm -rf "${filename}.ome.zarr"
 
+    # --overwrite True: if a eubi worker process dies (e.g. out of memory), eubi retries the scene once in a new
+    # process; without overwrite that retry fails on the half-written array ("ContainsArrayError ... /0")
+
     eubi to_zarr \
       "\$input_path" \
       "${filename}.ome.zarr" \
@@ -276,6 +279,7 @@ process EUBIEXMCONVERSION {
       --squeeze True \
       --save_omexml True \
       --zarr_format "${params.zarr_format}" \
+      --overwrite True \
       --auto_chunk True \
       --jvm_memory 8GB \
       --max_workers 1
