@@ -270,6 +270,8 @@ process EUBIEXMCONVERSION {
 
     # --overwrite True: if a eubi worker process dies (e.g. out of memory), eubi retries the scene once in a new
     # process; without overwrite that retry fails on the half-written array ("ContainsArrayError ... /0")
+    # --*_shard_coef 2: shards of 2x2x2 chunks (~1 MB each) stay below 16 MiB even uncompressed; with the default 3
+    # (27 chunks, up to 27 MB) mc switches to multipart uploads, which the S3 endpoint rejects ("not implemented")
 
     eubi to_zarr \
       "\$input_path" \
@@ -286,6 +288,9 @@ process EUBIEXMCONVERSION {
       --zarr_format "${params.zarr_format}" \
       --overwrite True \
       --auto_chunk True \
+      --z_shard_coef 2 \
+      --y_shard_coef 2 \
+      --x_shard_coef 2 \
       --jvm_memory 8GB \
       --max_workers 1
 
