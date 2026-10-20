@@ -348,19 +348,13 @@ nextflow_args=(
   --outdir "$outdir"
   --input_table "$input_table"
   --sheet_mode "$sheet_mode"
-  --sheet_url "$sheet_url"
-  --sheet_name "$sheet_name"
   --google_key "$google_key"
-  --collection_table_url "$collection_table_url"
   --collection_table_sheet "$collection_table_sheet"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"
   --s3_bucket "$s3_bucket"
   --zarr_format "$zarr_format"
-  --default_x_scale "$default_x_scale"
-  --default_y_scale "$default_y_scale"
-  --default_z_scale "$default_z_scale"
   --scale_unit "$scale_unit"
   --persistent_metadata_dir "$persistent_metadata_dir"
   -profile "$profile"
@@ -369,6 +363,13 @@ nextflow_args=(
   -with-timeline "${logdir}/timeline.html"
   -with-dag "${logdir}/dag.html"
 )
+
+# optional values are only passed when set: Nextflow turns `--param ""` into the boolean true
+for optional in sheet_url sheet_name collection_table_url default_x_scale default_y_scale default_z_scale; do
+  if [ -n "${!optional}" ]; then
+    nextflow_args+=("--${optional}" "${!optional}")
+  fi
+done
 
 if [ "$resume" = "TRUE" ]; then
   nextflow_args+=("-resume")

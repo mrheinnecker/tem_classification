@@ -166,6 +166,19 @@ images[["exm_scale_unit"]] <- coalesce_column_values(
   scale_unit
 )
 
+## scale overrides must be numbers, anything else (e.g. TRUE from another sheet column) is ignored
+## and the pixel size from the .nd2 file is used
+numeric_or_empty <- function(value, column, image) {
+  if (is.na(value) || value == "") {
+    return("")
+  }
+  if (is.na(suppressWarnings(as.numeric(value)))) {
+    warning("Ignoring non-numeric ", column, " '", value, "' for ", image)
+    return("")
+  }
+  value
+}
+
 ## a row can point to a single .nd2 file or to a folder with .nd2 files
 expand_nd2_paths <- function(path) {
   if (dir.exists(path)) {
@@ -207,12 +220,18 @@ all_images <- files %>%
     raw_path=paste(sort(raw_file), collapse=";"),
     n_files=n(),
     channel_names=paste(sort(na.omit(channel_name)), collapse=";"),
-    filename=if ("filename" %in% names(files)) first(na.omit(c(filename, default_filename))) else first(default_filename),
+    ## dataset name: dataset_name column, else shortname (e.g. BAR_Img0093), else <folder>_<image prefix>
+    ## (a filename column holds the raw file names and is not used)
+    filename=first(na.omit(c(
+      if ("dataset_name" %in% names(files)) dataset_name,
+      if ("shortname" %in% names(files)) shortname,
+      default_filename
+    ))),
     shortname=if ("shortname" %in% names(files)) first(na.omit(c(shortname, image_prefix))) else first(image_prefix),
     req_mem=if ("req_mem" %in% names(files)) first(na.omit(c(req_mem, "32"))) else "32",
-    x_scale=first(exm_x_scale),
-    y_scale=first(exm_y_scale),
-    z_scale=first(exm_z_scale),
+    x_scale=numeric_or_empty(first(exm_x_scale), "x_scale", first(image_prefix)),
+    y_scale=numeric_or_empty(first(exm_y_scale), "y_scale", first(image_prefix)),
+    z_scale=numeric_or_empty(first(exm_z_scale), "z_scale", first(image_prefix)),
     scale_unit=first(exm_scale_unit),
     convert=first(convert),
     .groups="drop"
@@ -230,7 +249,7 @@ if (any(duplicated(all_images$filename))) {
   stop(
     "Dataset names are not unique: ",
     paste(unique(all_images$filename[duplicated(all_images$filename)]), collapse=", "),
-    ". Add a filename column to the input table."
+    ". Add a dataset_name column to the input table."
   )
 }
 

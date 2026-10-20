@@ -22,9 +22,14 @@ NAMED_COLORS = {
 
 
 def parse_optional_float(value):
-    if value is None or str(value).strip() in {"", "NA", "nan", "None"}:
+    value = "" if value is None else str(value).strip()
+    # "true" comes from Nextflow when an empty --param "" is passed
+    if value == "" or value.lower() in {"true", "false", "na", "nan", "none", "null"}:
         return None
-    return float(value)
+    try:
+        return float(value)
+    except ValueError:
+        raise ValueError(f"Scale override must be a number, got '{value}' (check the x/y/z_scale columns of the input table)")
 
 
 def to_nm(value, unit):

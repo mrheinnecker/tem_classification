@@ -32,11 +32,13 @@ multi-channel OME-Zarr, ordered by excitation wavelength (DAPI, FITC, TRITC, Cy5
 Google Sheet (tab `exm_input_table`) or local TSV/CSV with one path column (`FilePath`, `raw_path`, `file_path`, `filepath`, `file`, `source_path` or `path`).
 A row can be a single `.nd2` file or a folder (all `.nd2` files in it are used); duplicates are dropped.
 
-The dataset name is `<folder name>_<image prefix>`, e.g. `exm_input_Img0098` (image numbers restart per session, so the folder is part of the name).
-Add a `filename` column to set names yourself; the workflow stops if names are not unique.
+The dataset name (S3 and collection table) is taken from, in this order: a `dataset_name` column, the `shortname` column
+(e.g. `BAR_Img0093`), or `<folder name>_<image prefix>`. Use the same value on all channel rows of an image; the workflow stops if
+names are not unique. A `filename` column (raw file names) is ignored. The letters at the start of the name (e.g. `BAR`) are used as
+view/grid in the collection table.
 
-Optional columns: `filename`, `shortname`, `convert` (`0`/`FALSE`/`no` skips an image), `req_mem`, and pixel-size overrides
-`x_scale`, `y_scale`, `z_scale`, `scale_unit` (`nm`, `um`, `mm`).
+Optional columns: `dataset_name`, `shortname`, `convert` (`0`/`FALSE`/`no` skips an image), `req_mem`, and pixel-size overrides
+`x_scale`, `y_scale`, `z_scale`, `scale_unit` (`nm`, `um`, `mm`); non-numeric values are ignored with a warning.
 
 Note: the pixel size written to the OME-Zarr is the one stored in the `.nd2` (42.14 nm x 42.14 nm x 400 nm for the example data),
 i.e. of the expanded sample. If the pre-expansion size is wanted, provide corrected values via the overrides.
