@@ -94,7 +94,8 @@ s3_root_markers <- read_lines(opt$all_s3) %>%
   filter(!is.na(name), name != "") %>%
   distinct(name, .keep_all=TRUE) %>%
   mutate(
-    uri=file.path(s3_public_prefix(s3_bucket), s3_prefix, "/")
+    ## paste0, not file.path(..., "/"): on Linux that gives ".ome.zarr//", which the Fiji OME-Zarr reader cannot open
+    uri=paste0(s3_public_prefix(s3_bucket), "/", s3_prefix, "/")
   ) %>%
   select(uri, name, s3_prefix, s3_raw)
 
