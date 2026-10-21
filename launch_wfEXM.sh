@@ -30,14 +30,15 @@ bash "${repo_dir}/exm/exm_main.sh" cluster \
   --work_dir "/scratch/rheinnec/exm_screen/work" \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/exm/metadata" \
   --workflow_stage all \
-  --dryrun TRUE \
-  --dryrun_n 2 \
-  --dryrun_images "BAR_Img0098,BAR_Img0099" \
+  --dryrun FALSE \
   --s3_bucket "s3test/imatrec/central_data_processing/exm" \
   --zarr_format 3 \
   --scale_unit nm \
   --resume FALSE
-
+  
+  
+  
+#--dryrun_images "BAR_Img0098,BAR_Img0099" \
 # If the .nd2 pixel size should be overridden (e.g. pre-expansion size), provide physical scales:
 #
 #   --default_x_scale 250 \
