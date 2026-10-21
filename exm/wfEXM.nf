@@ -288,9 +288,6 @@ process EUBIEXMCONVERSION {
       --zarr_format "${params.zarr_format}" \
       --overwrite True \
       --auto_chunk True \
-      --z_shard_coef 2 \
-      --y_shard_coef 2 \
-      --x_shard_coef 2 \
       --jvm_memory 8GB \
       --max_workers 1
 

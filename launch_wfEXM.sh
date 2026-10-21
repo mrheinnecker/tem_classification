@@ -31,7 +31,7 @@ bash "${repo_dir}/exm/exm_main.sh" cluster \
   --persistent_metadata_dir "/g/schwab/marco/central_data_processing/exm/metadata" \
   --workflow_stage all \
   --dryrun TRUE \
-  --dryrun_n 10 \
+  --dryrun_n 2 \
   --s3_bucket "s3test/imatrec/central_data_processing/exm" \
   --zarr_format 3 \
   --scale_unit nm \
