@@ -2,16 +2,17 @@
 
 Expansion microscopy (EXM) workflow. Same structure as the CRYO workflow (it was started as a copy of it):
 it reads listed Nikon `.nd2` files, extracts pixel-size metadata, prepares each raw file for conversion,
-converts it to OME-Zarr (zarr format 3 by default) with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
+converts it to OME-Zarr (zarr format 3 by default) with EuBI-Bridge, copies completed datasets into the mounted S3 share, and writes a collection table.
 
 ```text
 CHECKEXISTINGEXMS3FILES -> SELECTEXMIMAGES -> EXTRACTEXMMETADATA -> PREPAREEXMINPUT
-  -> EUBIEXMCONVERSION -> PATCHEXMOMEZARRMETADATA -> S3UPLOADEXM -> COLLECTEXMS3FILES -> MAKEEXMCOLLECTIONTABLE
+  -> EUBIEXMCONVERSION -> PATCHEXMOMEZARRMETADATA (patch + publish) -> COLLECTEXMS3FILES -> MAKEEXMCOLLECTIONTABLE
 ```
 
-Before selecting datasets, the workflow lists the top level of the configured S3 bucket with `mc ls`.
-A dataset only counts as present when its root metadata (`zarr.json` or `.zattrs`) is on S3; the upload copies the root metadata last,
-so incomplete uploads are listed in `incomplete_s3_entries.txt` and processed again.
+No upload with `mc`: the S3 bucket is mounted at `/g/schwab/s3-public/...` (`--publish_dir`), and PATCHEXMOMEZARRMETADATA copies
+the finished OME-Zarr there (only with `--workflow_stage all`). The copy goes into a hidden `.<name>.ome.zarr.partial` directory that
+is renamed when complete. Before selecting datasets, the workflow lists `publish_dir`; a dataset only counts as present when its
+root metadata (`zarr.json` or `.zattrs`) exists, others are listed in `incomplete_s3_entries.txt` and processed again.
 
 ## Input data
 
@@ -73,7 +74,8 @@ Stages: `discover` (selection only), `process` (convert, no upload), `all` (conv
 
 ## Outputs
 
-- S3: `<s3_bucket>/<dataset_name>.ome.zarr/`, default bucket `s3test/imatrec/central_data_processing/exm`
+- S3: `<publish_dir>/<dataset_name>.ome.zarr/`, default `/g/schwab/s3-public/imatrec/central_data_processing/exm`;
+  the public URLs in the collection table are built from `--s3_bucket` (`s3test/imatrec/central_data_processing/exm`)
   (public URL `https://schwab.buckets.embl.de/imatrec/central_data_processing/exm/...`)
 - Logs, Nextflow trace/report/timeline/dag and metadata: `/g/schwab/biobank_logs/exm/wfEXM_<timestamp>`
 - Collection table: Google Sheet tab `exm_collection_table`
