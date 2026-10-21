@@ -8,6 +8,7 @@ params.collection_table_sheet = params.collection_table_sheet ?: "exm_collection
 params.local_collection_table = params.local_collection_table ?: "${params.logdir}/exm_collection_table.tsv"
 params.dryrun = params.dryrun ?: "TRUE"
 params.dryrun_n = params.dryrun_n ?: 2
+params.dryrun_images = params.dryrun_images ?: ""
 params.script_dir = params.script_dir ?: baseDir.toString()
 params.outdir = params.outdir ?: "exm_processed"
 params.logdir = params.logdir ?: "exm_logs"
@@ -107,6 +108,7 @@ process SELECTEXMIMAGES {
     val outdir
     val dryrun
     val dryrun_n
+    val dryrun_images
     path existing_s3
     val default_x_scale
     val default_y_scale
@@ -128,6 +130,7 @@ process SELECTEXMIMAGES {
       --outdir "${outdir}" \
       --dryrun "${dryrun}" \
       --dryrun_n "${dryrun_n}" \
+      --dryrun_images "${dryrun_images}" \
       --existing_s3 "${existing_s3}" \
       --default_x_scale "${default_x_scale}" \
       --default_y_scale "${default_y_scale}" \
@@ -435,6 +438,7 @@ workflow {
         params.outdir,
         params.dryrun,
         params.dryrun_n,
+        params.dryrun_images,
         CHECKEXISTINGEXMS3FILES.out.existing_s3,
         params.default_x_scale,
         params.default_y_scale,

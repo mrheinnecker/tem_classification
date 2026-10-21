@@ -10,6 +10,7 @@ spec <- matrix(c(
   "outdir", "o", 1, "character",
   "dryrun", "d", 1, "character",
   "dryrun_n", "n", 1, "integer",
+  "dryrun_images", NA, 1, "character",
   "existing_s3", "e", 1, "character",
   "default_x_scale", NA, 1, "character",
   "default_y_scale", NA, 1, "character",
@@ -290,7 +291,21 @@ if (any(duplicated(all_images$filename))) {
 to_run <- all_images %>%
   filter(needs_processing)
 if (as.logical(dryrun)) {
-  to_run <- head(to_run, dryrun_n)
+  ## dryrun_images (comma-separated dataset names, e.g. BAR_Img0098,BAR_Img0099) are taken first,
+  ## the rest of dryrun_n is filled in table order
+  dryrun_images <- value_or_default(opt$dryrun_images, "")
+  dryrun_images <- if (tolower(dryrun_images) == "true") character() else str_trim(str_split_1(dryrun_images, ","))
+  dryrun_images <- dryrun_images[dryrun_images != ""]
+  not_selectable <- setdiff(dryrun_images, to_run$filename)
+  if (length(not_selectable) > 0) {
+    warning(
+      "dryrun_images not in the images to process (unknown name or already published): ",
+      paste(not_selectable, collapse=", ")
+    )
+  }
+  to_run <- to_run %>%
+    arrange(!filename %in% dryrun_images) %>%
+    head(dryrun_n)
 }
 
 write_csv(to_run, file="images_to_process.csv")

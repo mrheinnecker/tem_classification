@@ -32,6 +32,7 @@ bash "${repo_dir}/exm/exm_main.sh" cluster \
   --workflow_stage all \
   --dryrun TRUE \
   --dryrun_n 2 \
+  --dryrun_images "BAR_Img0098,BAR_Img0099" \
   --s3_bucket "s3test/imatrec/central_data_processing/exm" \
   --zarr_format 3 \
   --scale_unit nm \

@@ -28,6 +28,7 @@ Options:
   --workflow_stage VALUE           discover, process, all, or collection.
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
+  --dryrun_images A,B              Dataset names a dryrun takes first (e.g. BAR_Img0098,BAR_Img0099).
   --s3_bucket VALUE                S3 bucket/prefix for the public URLs, default s3test/imatrec/central_data_processing/exm.
   --publish_dir PATH               Mounted S3 share the OME-Zarrs are copied to, default /g/schwab/s3-public/imatrec/central_data_processing/exm.
   --zarr_format VALUE              OME-Zarr format version, default 3.
@@ -116,6 +117,7 @@ workflow_stage="${WORKFLOW_STAGE:-$default_workflow_stage}"
 sheet_mode="${SHEET_MODE:-$default_sheet_mode}"
 dryrun="$(to_upper_bool "${DRYRUN:-$default_dryrun}")"
 dryrun_n="${DRYRUN_N:-2}"
+dryrun_images="${DRYRUN_IMAGES:-}"
 input_table="${INPUT_TABLE:-}"
 sheet_url="${SHEET_URL:-}"
 sheet_name="${SHEET_NAME:-}"
@@ -173,6 +175,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dryrun_n=*|--dryrun-n=*)
       dryrun_n="${1#*=}"
+      shift
+      ;;
+    --dryrun_images|--dryrun-images)
+      dryrun_images="${2:?--dryrun_images requires a value}"
+      shift 2
+      ;;
+    --dryrun_images=*|--dryrun-images=*)
+      dryrun_images="${1#*=}"
       shift
       ;;
     --workflow_stage|--workflow-stage)
@@ -387,7 +397,7 @@ nextflow_args=(
 )
 
 # optional values are only passed when set: Nextflow turns `--param ""` into the boolean true
-for optional in sheet_url sheet_name collection_table_url default_x_scale default_y_scale default_z_scale; do
+for optional in sheet_url sheet_name collection_table_url dryrun_images default_x_scale default_y_scale default_z_scale; do
   if [ -n "${!optional}" ]; then
     nextflow_args+=("--${optional}" "${!optional}")
   fi
