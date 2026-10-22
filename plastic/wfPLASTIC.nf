@@ -64,6 +64,11 @@ process CHECKEXISTINGPLASTICS3FILES {
     : > "existing_s3_entries.txt"
     : > "incomplete_s3_entries.txt"
 
+    # first run: the share is mounted (parent exists) but this workflow's folder not yet -> create it
+    if [ ! -d "${publish_dir}" ] && [ -d "\$(dirname "${publish_dir}")" ]; then
+      mkdir -p "${publish_dir}"
+    fi
+
     if [ ! -d "${publish_dir}" ]; then
       if [ "\$require_s3" = "TRUE" ]; then
         echo "${publish_dir} is not accessible; refusing to continue because this run depends on skip detection." >&2
