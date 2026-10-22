@@ -143,9 +143,15 @@ near_square_columns <- function(n) {
 sanitize_channel_display <- function(value, index) {
   value <- value %||% paste0("channel_", index)
   value <- str_replace_all(as.character(value), "[^A-Za-z0-9]+", "_") %>%
-    str_replace_all("^_|_$", "")
+    str_replace_all("^_|_$", "") %>%
+    ## zoom suffix of some acquisitions: "Cy5 4x (Single EM)1" -> Cy5_4x_1 -> Cy5
+    str_remove("_\\d+x(_.*)?$")
   ifelse(value == "", paste0("channel_", index), value)
 }
+
+## colors in MoBIE by channel; channels not listed keep the color from the .nd2 metadata
+## (white = grey scale)
+channel_colors <- c(DAPI="blue", FITC="green", TRITC="magenta", Cy5="white")
 
 ## EXM: channel names (DAPI, FITC, TRITC, Cy5) and colors come from the .nd2 metadata
 ## (extract_metadata.py), contrast limits from prepare_input.py
@@ -157,11 +163,15 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
   imap(channels, function(channel, i) {
     index <- as.integer(channel$index %||% (i - 1L))
     label <- channel$label %||% paste0("channel_", index)
+    display <- sanitize_channel_display(channel$display %||% label, index)
     list(
       index=index,
       label=as.character(label),
-      display=sanitize_channel_display(channel$display %||% label, index),
-      color=as.character(channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]]),
+      display=display,
+      color=unname(coalesce(
+        channel_colors[display],
+        as.character(channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]])
+      )),
       contrast_limits=as.character(channel$contrast_limits %||% "")
     )
   })

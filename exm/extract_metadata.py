@@ -54,8 +54,10 @@ def nearest_named_color(color):
 
 
 def channel_display(name):
-    """'Cy5 (Single EM)' -> 'Cy5'"""
+    """'Cy5 (Single EM)' -> 'Cy5', 'Cy5 4x (Single EM)1' -> 'Cy5'"""
     display = re.sub(r"\s*\(.*?\)\s*", " ", name or "").strip()
+    # zoom suffix of some acquisitions ("4x ... 1"), the channel is the same as without it
+    display = re.sub(r"\s+\d+x\b.*$", "", display)
     display = re.sub(r"[^A-Za-z0-9]+", "_", display).strip("_")
     return display or None
 
