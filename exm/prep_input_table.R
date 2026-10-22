@@ -13,7 +13,7 @@ df <- list.files("/g/dey/EmilyWollinger/TREC_2026/ExM_TREC", pattern=".nd2$", re
     shortname=basename(dirname(dirname(dirname(dirname(path))))) %>% paste(basename(path) %>% str_split("_") %>% map_chr(.,1), sep="_")
   ) %>%
   filter(
-    shortname %in% c("KRI_Img0030", "KRI_Img0047", "TAL_Img0000")
+    !shortname %in% c("KRI_Img0030", "KRI_Img0047", "TAL_Img0000")
   )
 
 
