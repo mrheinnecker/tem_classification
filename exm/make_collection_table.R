@@ -100,8 +100,19 @@ s3_root_markers <- read_lines(opt$all_s3) %>%
   ) %>%
   select(uri, name, s3_prefix, s3_raw)
 
+## only datasets that are (still) in the input table; others on S3 (old test runs, removed rows) are left out
+not_in_input <- setdiff(s3_root_markers$name, all_datasets$filename)
+if (length(not_in_input) > 0) {
+  message(
+    "Leaving out ", length(not_in_input), " S3 dataset(s) that are not in the input table: ",
+    paste(not_in_input, collapse=", ")
+  )
+}
+s3_root_markers <- s3_root_markers %>%
+  filter(name %in% all_datasets$filename)
+
 if (nrow(s3_root_markers) == 0) {
-  stop("No EXM OME-Zarr datasets found in S3 listing.")
+  stop("No EXM OME-Zarr datasets found in S3 listing that are in the input table.")
 }
 
 metadata_files <- list.files(

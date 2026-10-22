@@ -468,9 +468,10 @@ workflow {
         PATCHEXMOMEZARRMETADATA(EUBIEXMCONVERSION.out.omezarr)
 
         if (params.workflow_stage == "all") {
-            COLLECTEXMS3FILES(PATCHEXMOMEZARRMETADATA.out.published.collect())
+            // ifEmpty: with no new images the table is still rebuilt (collect() of an empty channel emits nothing)
+            COLLECTEXMS3FILES(PATCHEXMOMEZARRMETADATA.out.published.collect().ifEmpty("no_new_images"))
 
-            metadata_jsons_ch = EXTRACTEXMMETADATA.out.metadata_json.collect()
+            metadata_jsons_ch = EXTRACTEXMMETADATA.out.metadata_json.collect().ifEmpty("no_new_metadata")
             MAKEEXMCOLLECTIONTABLE(
                 COLLECTEXMS3FILES.out.all_s3,
                 SELECTEXMIMAGES.out.all_datasets,
