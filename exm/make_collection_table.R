@@ -163,6 +163,8 @@ sanitize_channel_display <- function(value, index) {
 ## colors in MoBIE by channel; channels not listed keep the color from the .nd2 metadata
 ## (white = grey scale)
 channel_colors <- c(DAPI="blue", FITC="green", TRITC="magenta", Cy5="white")
+## names shown in MoBIE: the stained structure instead of the dye (colors above stay keyed by dye)
+channel_names <- c(DAPI="DAPI", FITC="Centrin", TRITC="Tubulin", Cy5="NHS")
 
 ## EXM: channel names (DAPI, FITC, TRITC, Cy5) and colors come from the .nd2 metadata
 ## (extract_metadata.py), contrast limits from prepare_input.py
@@ -178,7 +180,7 @@ normalize_channels <- function(channels, size_c=NA_integer_) {
     list(
       index=index,
       label=as.character(label),
-      display=display,
+      display=unname(coalesce(channel_names[display], display)),
       color=unname(coalesce(
         channel_colors[display],
         as.character(channel$color %||% default_channel_colors[[(index %% length(default_channel_colors)) + 1]])
