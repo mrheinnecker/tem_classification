@@ -37,6 +37,43 @@ if (refresh_from_sheets) {
   write_tsv(chemfix, file=file.path(ov_dir, "chemfix.tsv"))
 }
 
+
+## ---- imaging: MoBIE collection tables written by the workflows ---------------------------------
+## one tab per workflow in the collection table sheet; saved as <ov_dir>/collection_tables/<tab>.tsv
+refresh_collection_tables <- TRUE
+
+collection_table_sheet <- "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit"
+collection_table_tabs <- c(
+  "tem_collection_table",
+  "sem_collection_table",
+  "hitt_collection_table",
+  "cryo_collection_table",
+  "plastic_collection_table",
+  "exm_collection_table"
+)
+collection_table_dir <- file.path(ov_dir, "collection_tables")
+
+if (refresh_collection_tables) {
+  dir.create(collection_table_dir, showWarnings=FALSE, recursive=TRUE)
+  ## tabs in the sheet, to report missing ones instead of failing
+  available_tabs <- googlesheets4::sheet_names(collection_table_sheet)
+  message("Tabs in the collection table sheet: ", paste(available_tabs, collapse=", "))
+
+  walk(collection_table_tabs, function(tab) {
+    if (!tab %in% available_tabs) {
+      warning("Collection table tab not found: ", tab)
+      return(invisible(NULL))
+    }
+    tab_data <- googlesheets4::read_sheet(collection_table_sheet, sheet=tab, col_types="c")
+    write_tsv(tab_data, file=file.path(collection_table_dir, paste0(tab, ".tsv")))
+    message(tab, ": ", nrow(tab_data), " rows")
+  })
+}
+
+collection_tables <- list.files(collection_table_dir, pattern="\\.tsv$", full.names=TRUE) %>%
+  set_names(str_remove(basename(.), "\\.tsv$")) %>%
+  map(~read_tsv(.x, col_types=cols(.default=col_character())))
+
 sampling_events <- read_tsv(file.path(ov_dir, "sampling_events.tsv"), col_types=cols(.default=col_character()))
 hpf <- read_tsv(file.path(ov_dir, "hpf.tsv"), col_types=cols(.default=col_character()))
 cryo_pf <- read_tsv(file.path(ov_dir, "cryo_pf.tsv"), col_types=cols(.default=col_character()))
@@ -157,7 +194,10 @@ hpf_samples <- hpf %>%
   transmute(
     barcode, site, date, date_raw, time_of_day, tara,
     parent_barcode=na_if(`Parent HPF barcode (if at all)`, "NA"),
-    block_name=na_if(block_name_if_produced, "NA"),
+    ## typos in the sheet: "NAP _10to40_..." and a " CHOPPED" suffix
+    block_name=na_if(block_name_if_produced, "NA") %>%
+      str_remove(" CHOPPED$") %>%
+      str_remove_all(" "),
     cryo_name=na_if(`Cryo name (automatically generated FP)`, "NA"),
     used=na_if(Used, "NA"),
     imaged=Imaged,
@@ -241,11 +281,15 @@ chemfix_samples <- chemfix %>%
   mutate(
     Site=unname(coalesce(site_codes[Site], Site)),
     Barcode=`TREC ID`,
-    TARA=TARA_AML
+    TARA=TARA_AML,
+    ## year typo in the sheet (also in the sample names): Barcelona was sampled in March 2024 only
+    ## (all events, HPF and MetaB), the rows dated March 2023 are the same days in 2024
+    date_corrected=Site == "Barcelona" & str_detect(Date, "^202303"),
+    Date=if_else(date_corrected, str_replace(Date, "^2023", "2024"), Date)
   ) %>%
   sample_base() %>%
   transmute(
-    barcode, site, date, date_raw, time_of_day, tara,
+    barcode, site, date, date_raw, date_corrected, time_of_day, tara,
     name=`Sample name`,
     ## "20-200" and "20to200" both occur
     fraction=str_replace(`Size fraction`, "-", "to"),
@@ -259,6 +303,205 @@ chemfix_events <- map_to_events(chemfix_samples, events) %>%
 write_tsv(chemfix_events, file=file.path(ov_dir, "chemfix_event_map.tsv"))
 
 
+## ---- imaging -> samples / events ------------------------------------------------------------
+## images from the collection tables (EXM skipped for now), linked in this order:
+##   barcode       9-digit barcode in the image name -> sample of any layer
+##   block_name    resin block name in the image name -> HPF sample with that block
+##   name_event    site, date and time of day parsed from the name (or columns) -> sampling event only
+##   none          nothing found
+
+## all physical samples, one row per barcode
+sample_index <- bind_rows(
+  hpf_events %>% transmute(barcode, block_name, sample_layer="HPF", event_id),
+  cryo_pf_events %>% transmute(barcode, sample_layer="cryo PF", event_id),
+  cryo_wm_events %>% transmute(barcode, sample_layer="cryo WM", event_id),
+  metab_events %>% transmute(barcode, sample_layer="MetaB", event_id),
+  chemfix_events %>% transmute(barcode, sample_layer="Chem fixation", event_id)
+) %>%
+  ## "-" is used as placeholder in the chem fixation sheet
+  filter(!is.na(barcode), !barcode %in% c("NA", "-"))
+
+duplicated_barcodes <- sample_index %>% count(barcode) %>% filter(n > 1)
+if (nrow(duplicated_barcodes) > 0) {
+  warning(nrow(duplicated_barcodes), " barcodes occur in more than one sample row, the first is used")
+}
+sample_by_barcode <- sample_index %>%
+  distinct(barcode, .keep_all=TRUE) %>%
+  select(barcode, sample_layer, sample_event_id=event_id)
+
+sample_by_block <- sample_index %>%
+  filter(!is.na(block_name)) %>%
+  distinct(block_name, .keep_all=TRUE) %>%
+  select(block_name, block_barcode=barcode, block_event_id=event_id)
+
+## SITE_[TARA_]fraction_date_time...: site name, date and time of day for the event fallback
+parse_sample_name <- function(x) {
+  m <- str_match(x, "(?:^|_)([A-Z]{3})_(?:TARA_)?(?:(\\d+to\\d+|NA)_)?(20\\d{6})_(AM|PM|MID)?")
+  tibble(
+    name_site=unname(site_codes[m[, 2]]),
+    name_date=ymd(m[, 4], quiet=TRUE),
+    name_time=m[, 5]
+  )
+}
+
+link_images <- function(images) {
+  images %>%
+    bind_cols(parse_sample_name(images$parse_name)) %>%
+    left_join(sample_by_barcode, by="barcode") %>%
+    left_join(sample_by_block, by="block_name") %>%
+    left_join(
+      events %>% select(site, date, event_id),
+      by=c("name_site"="site", "name_date"="date"),
+      relationship="many-to-many"
+    ) %>%
+    ## several events on that day: decided by the time of day as for the samples
+    group_by(image_id) %>%
+    mutate(n_name_events=n_distinct(event_id, na.rm=TRUE)) %>%
+    ungroup() %>%
+    select(-event_id) %>%
+    distinct() %>%
+    left_join(
+      map_to_events(
+        distinct(., site=name_site, date=name_date, time_of_day=name_time) %>% filter(!is.na(site)),
+        events
+      ) %>% select(site, date, time_of_day, name_event_id=event_id),
+      by=c("name_site"="site", "name_date"="date", "name_time"="time_of_day")
+    ) %>%
+    mutate(
+      link=case_when(
+        !is.na(sample_layer) ~ "barcode",
+        !is.na(block_barcode) ~ "block_name",
+        !is.na(name_event_id) ~ "name_event",
+        TRUE ~ "none"
+      ),
+      sample_barcode=case_when(link == "barcode" ~ barcode, link == "block_name" ~ block_barcode),
+      sample_layer=case_when(link == "barcode" ~ sample_layer, link == "block_name" ~ "HPF"),
+      event_id=case_when(
+        link == "barcode" ~ sample_event_id,
+        link == "block_name" ~ block_event_id,
+        link == "name_event" ~ name_event_id
+      )
+    ) %>%
+    select(imaging, image_id, uri, sample_barcode, sample_layer, event_id, link, block_name, fraction, name_site, name_date, name_time)
+}
+
+barcode_in <- function(x) str_match(x, "_(\\d{9})_")[, 2]
+## one image per uri (the cryo / plastic tables have one row per channel)
+one_per_uri <- function(tab) distinct(tab, uri, .keep_all=TRUE)
+
+image_tables <- list()
+
+if ("cryo_collection_table" %in% names(collection_tables)) {
+  image_tables$cryo <- collection_tables$cryo_collection_table %>%
+    one_per_uri() %>%
+    transmute(
+      imaging=if_else(str_detect(name, "_PF_"), "cryo LM PF", "cryo LM WM"),
+      image_id=str_remove(name, "_c\\d+_[^_]+$"),
+      uri, barcode=barcode_in(name), block_name=NA_character_, parse_name=name
+    )
+}
+
+if ("plastic_collection_table" %in% names(collection_tables)) {
+  image_tables$plastic <- collection_tables$plastic_collection_table %>%
+    one_per_uri() %>%
+    transmute(
+      imaging="resin LM",
+      image_id=str_remove(name, "_c\\d+_[^_]+$"),
+      uri, barcode=barcode_in(name), block_name=NA_character_, parse_name=name
+    )
+}
+
+if ("tem_collection_table" %in% names(collection_tables)) {
+  ## source_name: <grid>_<cut>_c001_<barcode|nobarcodeassigned>_<block name>[_P2]_correctionblend...
+  image_tables$tem <- collection_tables$tem_collection_table %>%
+    mutate(
+      after_cell=str_remove(source_name, "^.*?_c\\d{3}_"),
+      block_part=str_remove(after_cell, "^(\\d{9}|nobarcodeassigned)_") %>%
+        str_remove("_correctionblend.*$") %>%
+        str_remove("\\.zarr$")
+    ) %>%
+    transmute(
+      imaging="TEM",
+      image_id=source_name,
+      uri, barcode=str_match(after_cell, "^(\\d{9})_")[, 2],
+      block_name=str_remove(block_part, "_P\\d+$"),
+      parse_name=block_part
+    )
+}
+
+if ("hitt_collection_table" %in% names(collection_tables)) {
+  image_tables$hitt <- collection_tables$hitt_collection_table %>%
+    transmute(
+      imaging="HiTT",
+      image_id=name,
+      uri, barcode=barcode_in(name),
+      block_name=str_remove(name, "_P\\d+$"),
+      parse_name=name
+    )
+}
+
+if ("sem_collection_table" %in% names(collection_tables)) {
+  ## no sample name: site, date and time of day from the columns
+  image_tables$sem <- collection_tables$sem_collection_table %>%
+    transmute(
+      imaging="SEM",
+      image_id=name,
+      uri, barcode=NA_character_, block_name=NA_character_,
+      ## Date / Time / Size fraction from the image log: complete, sem_date has typos (Porto 20230102)
+      fraction=na_if(`Size fraction`, "NA"),
+      parse_name=paste(site, Date, na_if(Time, "NA"), sep="_")
+    )
+}
+
+imaging_map <- image_tables %>%
+  bind_rows() %>%
+  link_images()
+
+## SEM: images of the chemically fixed samples, matched by site, date, time of day and size fraction
+## (several tubes of one fraction: the first one), else by site, date and time of day only
+chemfix_groups <- function(...) {
+  chemfix_events %>%
+    filter(!is.na(date), !is.na(event_id)) %>%
+    group_by(site, date, time_of_day, ...) %>%
+    summarise(cf_barcode=first(barcode), cf_event_id=first(event_id), .groups="drop")
+}
+sem_by_fraction <- imaging_map %>%
+  filter(imaging == "SEM") %>%
+  select(image_id, name_site, name_date, name_time, fraction) %>%
+  inner_join(chemfix_groups(fraction), by=c(name_site="site", name_date="date", name_time="time_of_day", fraction="fraction")) %>%
+  mutate(sem_link="sem_chemfix")
+sem_by_slot <- imaging_map %>%
+  filter(imaging == "SEM", !image_id %in% sem_by_fraction$image_id) %>%
+  select(image_id, name_site, name_date, name_time) %>%
+  inner_join(chemfix_groups(), by=c(name_site="site", name_date="date", name_time="time_of_day")) %>%
+  mutate(sem_link="sem_chemfix_other_fraction")
+
+imaging_map <- imaging_map %>%
+  left_join(
+    bind_rows(sem_by_fraction, sem_by_slot) %>% select(image_id, cf_barcode, cf_event_id, sem_link),
+    by="image_id"
+  ) %>%
+  mutate(
+    link=coalesce(sem_link, link),
+    sample_barcode=coalesce(cf_barcode, sample_barcode),
+    sample_layer=if_else(!is.na(cf_barcode), "Chem fixation", sample_layer),
+    event_id=coalesce(cf_event_id, event_id),
+    ## TEM / HiTT are always done on HPF resin blocks: blocks missing in the HPF sheet still count as HPF
+    sample_layer=if_else(imaging %in% c("TEM", "HiTT") & is.na(sample_layer) & !is.na(event_id), "HPF", sample_layer),
+    ## sample identity for counting samples: barcode, else the block name
+    sample_key=coalesce(sample_barcode, block_name)
+  ) %>%
+  select(-cf_barcode, -cf_event_id, -sem_link)
+
+imaging_map %>% count(imaging, link) %>% print(n=Inf)
+imaging_map %>%
+  filter(link == "none") %>%
+  count(imaging, name_site, name_date, name_time) %>%
+  print(n=Inf)
+
+write_tsv(imaging_map, file=file.path(ov_dir, "imaging_map.tsv"))
+
+
 ## ---- events without any sample of a layer ----
 event_coverage <- events %>%
   select(event_id, site, date, event_time, event_site_id) %>%
@@ -268,7 +511,17 @@ event_coverage <- events %>%
     n_cryo_wm=map_int(event_id, ~sum(cryo_wm_events$event_id %in% .x)),
     n_metab=map_int(event_id, ~sum(metab_events$event_id %in% .x)),
     n_chemfix=map_int(event_id, ~sum(chemfix_events$event_id %in% .x))
-  )
+  ) %>%
+  ## images per imaging modality and event
+  left_join(
+    imaging_map %>%
+      filter(!is.na(event_id)) %>%
+      count(event_id, imaging) %>%
+      mutate(imaging=paste0("n_img_", str_replace_all(str_to_lower(imaging), "[^a-z]+", "_"))) %>%
+      pivot_wider(names_from=imaging, values_from=n, values_fill=0),
+    by="event_id"
+  ) %>%
+  mutate(across(starts_with("n_img_"), ~coalesce(.x, 0L)))
 event_coverage %>%
   group_by(site) %>%
   summarise(events=n(), with_hpf=sum(n_hpf > 0), with_cryo_pf=sum(n_cryo_pf > 0), with_cryo_wm=sum(n_cryo_wm > 0), with_metab=sum(n_metab > 0), with_chemfix=sum(n_chemfix > 0))
