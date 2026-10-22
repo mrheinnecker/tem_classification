@@ -56,7 +56,8 @@ parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
   ifelse(
     is.na(parsed),
-    str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2],
+    ## plain names (listing of the mounted S3 share) are used as they are
+    coalesce(str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2], line),
     parsed
   )
 }

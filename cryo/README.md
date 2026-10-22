@@ -1,10 +1,10 @@
 # CRYO table-driven workflow
 
-This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table.
+This workflow reads listed light-microscopy Z-stack files, extracts pixel-size metadata, prepares each raw file for conversion, converts it to OME-Zarr with EuBI-Bridge, copies completed datasets into the mounted S3 share (`--publish_dir`), and writes a collection table.
 
-Before selecting datasets, the workflow lists only the top level of the configured S3 bucket with `mc ls`. Any dataset with an uploaded `<dataset_name>.ome.zarr/` or legacy `<dataset_name>.zarr/` prefix is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache. The complete input table is still written to `all_datasets.tsv` with `s3_omezarr_present` and `needs_processing` columns.
+Before selecting datasets, the workflow lists the top level of `--publish_dir` (the S3 bucket mounted on `/g`, default `/g/schwab/s3-public/imatrec/central_data_processing/cryo`). Any dataset with a complete `<dataset_name>.ome.zarr/` (root `zarr.json` or `.zattrs` present) is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache; incomplete ones are listed in `incomplete_s3_entries.txt` and processed again.
 
-For a non-dry-run `all` or `collection` run, the workflow stops if S3 cannot be listed. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when S3 is unavailable.
+For a non-dry-run `all` or `collection` run, the workflow stops if `--publish_dir` is not accessible. This avoids accidentally reprocessing every dataset or writing an incomplete collection table when S3 is unavailable.
 
 ## Input table
 
@@ -123,18 +123,22 @@ bash cryo_main.sh cluster --workflow_stage collection
 
 - `discover`: parse the table and write `images_to_process.csv` / `all_datasets.tsv`.
 - `process`: extract metadata, prepare inputs, and convert listed raw files to OME-Zarr.
-- `all`: extract metadata, prepare inputs, convert, upload to S3, and write the collection table.
-- `collection`: query S3 and rebuild the collection table from the input table plus persisted metadata.
+- `all`: extract metadata, prepare inputs, convert, copy into the S3 share, and write the collection table.
+- `collection`: list the S3 share and rebuild the collection table from the input table plus persisted metadata.
 
 Metadata JSON and pixel-size TSV files are persisted under `--persistent_metadata_dir`, defaulting to `<main_dir>/metadata` from the launcher or the profile-specific central-data path on the cluster.
 
-Uploaded datasets are written to S3 as:
+With `--workflow_stage all`, datasets are copied from the work directory into the mounted S3 share, first into a hidden `.<dataset_name>.ome.zarr.partial` directory that is renamed when the copy is complete:
 
 ```text
-<s3_bucket>/<dataset_name>.ome.zarr/
+<publish_dir>/<dataset_name>.ome.zarr/
 ```
 
-The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` uploads are still recognized when checking S3 and rebuilding the collection table.
+`--s3_bucket` only sets the public URLs (`https://schwab.buckets.embl.de/<bucket path without the mc alias>/...`). The collection table contains only datasets that are in the input table, and it is rebuilt also when no new image is processed. Grid positions are counted per site.
+
+No image data is written outside the Nextflow work directory except the final OME-Zarr in `--publish_dir`; the log directory and `--persistent_metadata_dir` only receive metadata and logs.
+
+The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` datasets are still recognized.
 
 For multi-channel CZI data, the collection table is expanded to one row per channel. The original dataset name is kept in `source_name`, while `name` becomes channel-specific, for example:
 

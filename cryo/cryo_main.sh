@@ -28,7 +28,8 @@ Options:
   --workflow_stage VALUE           discover, process, all, or collection.
   --dryrun TRUE|FALSE              Limit to --dryrun_n rows when TRUE.
   --dryrun_n N                     Number of rows to process during dryrun.
-  --s3_bucket VALUE                S3 bucket/prefix, default s3test/imatrec/central_data_processing/cryo.
+  --s3_bucket VALUE                S3 bucket/prefix for the public URLs, default s3test/imatrec/central_data_processing/cryo.
+  --publish_dir PATH               Mounted S3 share the OME-Zarrs are copied to, default /g/schwab/s3-public/imatrec/central_data_processing/cryo.
   --zarr_format VALUE              OME-Zarr format version, default 3.
   --default_x_scale VALUE          Fallback X pixel size.
   --default_y_scale VALUE          Fallback Y pixel size.
@@ -124,6 +125,7 @@ outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
 s3_bucket="${S3_BUCKET:-s3test/imatrec/central_data_processing/cryo}"
+publish_dir="${PUBLISH_DIR:-/g/schwab/s3-public/imatrec/central_data_processing/cryo}"
 zarr_format="${ZARR_FORMAT:-3}"
 default_x_scale="${DEFAULT_X_SCALE:-}"
 default_y_scale="${DEFAULT_Y_SCALE:-}"
@@ -275,6 +277,14 @@ while [[ $# -gt 0 ]]; do
       s3_bucket="${1#*=}"
       shift
       ;;
+    --publish_dir|--publish-dir)
+      publish_dir="${2:?--publish_dir requires a path}"
+      shift 2
+      ;;
+    --publish_dir=*|--publish-dir=*)
+      publish_dir="${1#*=}"
+      shift
+      ;;
     --zarr_format|--zarr-format)
       zarr_format="${2:?--zarr_format requires a value}"
       shift 2
@@ -357,6 +367,7 @@ nextflow_args=(
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"
   --s3_bucket "$s3_bucket"
+  --publish_dir "$publish_dir"
   --zarr_format "$zarr_format"
   --default_x_scale "$default_x_scale"
   --default_y_scale "$default_y_scale"

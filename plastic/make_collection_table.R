@@ -30,7 +30,8 @@ parse_mc_ls_path <- function(line) {
   parsed <- str_match(line, "^\\[.*?\\]\\s+\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2]
   ifelse(
     is.na(parsed),
-    str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2],
+    ## plain names (listing of the mounted S3 share) are used as they are
+    coalesce(str_match(line, "^\\S+\\s+(?:STANDARD\\s+)?(.+)$")[, 2], line),
     parsed
   )
 }
@@ -99,8 +100,19 @@ s3_root_markers <- read_lines(opt$all_s3) %>%
   ) %>%
   select(uri, name, s3_prefix, s3_raw)
 
+## only datasets that are (still) in the input table; others on S3 (old test runs, removed rows) are left out
+not_in_input <- setdiff(s3_root_markers$name, all_datasets$filename)
+if (length(not_in_input) > 0) {
+  message(
+    "Leaving out ", length(not_in_input), " S3 dataset(s) that are not in the input table: ",
+    paste(not_in_input, collapse=", ")
+  )
+}
+s3_root_markers <- s3_root_markers %>%
+  filter(name %in% all_datasets$filename)
+
 if (nrow(s3_root_markers) == 0) {
-  stop("No PLASTIC OME-Zarr datasets found in S3 listing.")
+  stop("No PLASTIC OME-Zarr datasets found in S3 listing that are in the input table.")
 }
 
 metadata_files <- list.files(
@@ -272,7 +284,6 @@ base_table <- s3_root_markers %>%
     site=str_extract(source_name, "^[A-Za-z]+"),
     view=coalesce(site, "plastic"),
     grid=coalesce(site, "plastic"),
-    grid_index=row_number() - 1L,
     channels=map2(channels, size_c, normalize_channels),
     exclusive=FALSE,
     blend="sum",
@@ -281,6 +292,8 @@ base_table <- s3_root_markers %>%
   ) %>%
   group_by(grid) %>%
   mutate(
+    ## position within the site's grid
+    grid_index=row_number() - 1L,
     grid_columns=near_square_columns(n()),
     grid_position=paste0("(", grid_index %% grid_columns, ",", grid_index %/% grid_columns, ")")
   ) %>%

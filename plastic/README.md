@@ -1,8 +1,8 @@
 # PLASTIC table-driven workflow
 
-This workflow reads listed Leica `.lif` light-microscopy files, extracts pixel-size metadata, converts each raw file directly to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a MoBIE collection table.
+This workflow reads listed Leica `.lif` light-microscopy files, extracts pixel-size metadata, converts each raw file directly to OME-Zarr with EuBI-Bridge, copies completed datasets into the mounted S3 share (`--publish_dir`), and writes a MoBIE collection table.
 
-Before selecting datasets, the workflow lists the top level of the configured S3 bucket with `mc ls`. Any dataset with an uploaded `<dataset_name>.ome.zarr/` or legacy `<dataset_name>.zarr/` prefix is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache.
+Before selecting datasets, the workflow lists the top level of `--publish_dir` (the S3 bucket mounted on `/g`, default `/g/schwab/s3-public/imatrec/central_data_processing/plastic`). Any dataset with a complete `<dataset_name>.ome.zarr/` (root `zarr.json` or `.zattrs` present) is excluded from `images_to_process.csv`, independently of the Nextflow `-resume` cache; incomplete ones are listed in `incomplete_s3_entries.txt` and processed again.
 
 ## Input Table
 
@@ -102,13 +102,17 @@ bash plastic_main.sh cluster --workflow_stage collection
 
 ## Outputs
 
-Uploaded datasets are written to S3 as:
+With `--workflow_stage all`, datasets are copied from the work directory into the mounted S3 share, first into a hidden `.<dataset_name>.ome.zarr.partial` directory that is renamed when the copy is complete:
 
 ```text
-<s3_bucket>/<dataset_name>.ome.zarr/
+<publish_dir>/<dataset_name>.ome.zarr/
 ```
 
-The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` uploads are still recognized.
+`--s3_bucket` only sets the public URLs (`https://schwab.buckets.embl.de/<bucket path without the mc alias>/...`). The collection table contains only datasets that are in the input table, and it is rebuilt also when no new image is processed. Grid positions are counted per site.
+
+No image data is written outside the Nextflow work directory except the final OME-Zarr in `--publish_dir`; the log directory and `--persistent_metadata_dir` only receive metadata and logs.
+
+The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` datasets are still recognized.
 
 For multi-channel data, the collection table is expanded to one row per channel. Channels from the same image share the same `grid_position`.
 

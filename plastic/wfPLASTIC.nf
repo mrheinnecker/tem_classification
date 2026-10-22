@@ -12,7 +12,10 @@ params.script_dir = params.script_dir ?: baseDir.toString()
 params.outdir = params.outdir ?: "plastic_processed"
 params.logdir = params.logdir ?: "plastic_logs"
 params.workflow_stage = params.workflow_stage ?: "discover"
+// s3_bucket only sets the public URLs in the collection table, the data is copied into publish_dir
+// (the S3 share mounted on /g, same bucket path)
 params.s3_bucket = params.s3_bucket ?: "s3test/imatrec/central_data_processing/plastic"
+params.publish_dir = params.publish_dir ?: "/g/schwab/s3-public/imatrec/central_data_processing/plastic"
 params.zarr_format = params.zarr_format ?: 3
 params.default_x_scale = params.default_x_scale ?: ""
 params.default_y_scale = params.default_y_scale ?: ""
@@ -32,7 +35,7 @@ process CHECKEXISTINGPLASTICS3FILES {
     containerOptions "--bind /g --bind /scratch --bind /home"
 
     input:
-    val s3_bucket
+    val publish_dir
     val workflow_stage
     val dryrun
 
@@ -57,39 +60,31 @@ process CHECKEXISTINGPLASTICS3FILES {
       require_s3="TRUE"
     fi
 
-    if command -v mc >/dev/null 2>&1; then
-      if ! mc ls "${s3_bucket}" > "existing_s3_entries_all.txt"; then
-        if [ "\$require_s3" = "TRUE" ]; then
-          echo "Failed to list ${s3_bucket}; refusing to continue because this run depends on S3 skip detection." >&2
-          exit 1
-        fi
-        : > "existing_s3_entries_all.txt"
-      fi
-    else
-      if [ "\$require_s3" = "TRUE" ]; then
-        echo "mc command is not available; refusing to continue because this run depends on S3 skip detection." >&2
-        exit 1
-      fi
-      : > "existing_s3_entries_all.txt"
-    fi
-
-    # a dataset only counts as present when its root metadata is on S3: zarr.json (zarr v3) or .zattrs (v2).
-    # The upload process copies the root metadata last, so a missing one means the upload did not finish
-    # -> the image is not listed in existing_s3_entries.txt and gets processed again.
+    : > "existing_s3_entries_all.txt"
     : > "existing_s3_entries.txt"
     : > "incomplete_s3_entries.txt"
-    while IFS= read -r line; do
-      name="\${line##* }"
-      case "\$name" in
-        */) name="\${name%/}" ;;
-        *) continue ;;
-      esac
-      if mc stat "${s3_bucket}/\$name/zarr.json" >/dev/null 2>&1 || mc stat "${s3_bucket}/\$name/.zattrs" >/dev/null 2>&1; then
-        echo "\$line" >> "existing_s3_entries.txt"
+
+    if [ ! -d "${publish_dir}" ]; then
+      if [ "\$require_s3" = "TRUE" ]; then
+        echo "${publish_dir} is not accessible; refusing to continue because this run depends on skip detection." >&2
+        exit 1
+      fi
+      exit 0
+    fi
+
+    # a dataset only counts as present when its root metadata exists: zarr.json (zarr v3) or .zattrs (v2).
+    # PATCHPLASTICOMEZARRMETADATA copies into a hidden .partial directory and renames it when complete,
+    # an incomplete dataset is listed in incomplete_s3_entries.txt and processed again.
+    for entry in "${publish_dir}"/*/; do
+      [ -d "\$entry" ] || continue
+      name=\$(basename "\$entry")
+      echo "\$name/" >> "existing_s3_entries_all.txt"
+      if [ -e "\$entry/zarr.json" ] || [ -e "\$entry/.zattrs" ]; then
+        echo "\$name/" >> "existing_s3_entries.txt"
       else
         echo "\$name" >> "incomplete_s3_entries.txt"
       fi
-    done < "existing_s3_entries_all.txt"
+    done
     """
 }
 
@@ -246,7 +241,7 @@ process PATCHPLASTICOMEZARRMETADATA {
     tag "${filename}"
     cpus 1
     memory "1GB"
-    time "10m"
+    time "2h"
 
     publishDir "${params.logdir}/omezarr_metadata", mode:"copy", pattern:"*_omezarr_metadata.tsv"
     containerOptions "--bind /g --bind /scratch --bind /home"
@@ -256,8 +251,8 @@ process PATCHPLASTICOMEZARRMETADATA {
     tuple val(filename), path(omezarr), path(metadata_json)
 
     output:
-    tuple val(filename), path(omezarr), emit: patched_omezarr
     path "${filename}_omezarr_metadata.tsv"
+    path "${filename}_published.txt", emit: published
 
     script:
     """
@@ -267,31 +262,8 @@ process PATCHPLASTICOMEZARRMETADATA {
       --omezarr "${omezarr}" \
       --metadata-json "${metadata_json}" \
       --log "${filename}_omezarr_metadata.tsv"
-    """
-}
 
-
-process S3UPLOADPLASTIC {
-
-    tag "${filename}"
-    cpus 1
-    memory "1GB"
-    time "30m"
-
-    publishDir "${params.logdir}/upload", mode:"copy"
-    containerOptions "--bind /g --bind /scratch --bind /home"
-    errorStrategy "ignore"
-
-    input:
-    tuple val(filename), path(omezarr)
-
-    output:
-    path "${filename}_s3_upload_done.txt"
-
-    script:
-    """
-    set -euo pipefail
-
+    # eubi writes <name>.ome.zarr/<name>.zarr -> publish the directory holding the root metadata
     image_zarr="${omezarr}"
     if [ ! -e "\${image_zarr}/zarr.json" ] && [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
       for candidate in "\${image_zarr}"/*.zarr "\${image_zarr}"/*.ome.zarr "\${image_zarr}"/*/*.zarr "\${image_zarr}"/*/*.ome.zarr "\${image_zarr}"/*/*/*.zarr "\${image_zarr}"/*/*/*.ome.zarr; do
@@ -301,31 +273,27 @@ process S3UPLOADPLASTIC {
         fi
       done
     fi
-
     if [ ! -e "\${image_zarr}/zarr.json" ] && [ ! -e "\${image_zarr}/.zattrs" ] && [ ! -e "\${image_zarr}/.zgroup" ]; then
       echo "Could not find an OME-Zarr root marker under ${omezarr}" >&2
       ls -la "${omezarr}" >&2 || true
       exit 1
     fi
 
-    # everything except the root metadata first, the root metadata (.zgroup, .zattrs, zarr.json) last:
-    # its presence on S3 marks a complete upload (checked in CHECKEXISTINGPLASTICS3FILES).
-    # A failed copy stops the script before the root metadata is uploaded.
-    target="${params.s3_bucket}/${filename}.ome.zarr"
-    for entry in "\${image_zarr}"/* "\${image_zarr}"/.[!.]*; do
-      [ -e "\$entry" ] || continue
-      case "\$(basename "\$entry")" in
-        zarr.json|.zattrs|.zgroup) continue ;;
-      esac
-      mc cp --recursive "\$entry" "\$target/"
-    done
-
-    for marker in .zgroup .zattrs zarr.json; do
-      if [ -e "\${image_zarr}/\$marker" ]; then
-        mc cp "\${image_zarr}/\$marker" "\$target/\$marker"
-      fi
-    done
-    touch "${filename}_s3_upload_done.txt"
+    # publish into the mounted S3 share (only for --workflow_stage all): copy into a hidden .partial directory
+    # and rename it at the end, so an interrupted copy never looks like a complete dataset
+    if [ "${params.workflow_stage}" = "all" ]; then
+      target="${params.publish_dir}/${filename}.ome.zarr"
+      partial="${params.publish_dir}/.${filename}.ome.zarr.partial"
+      mkdir -p "${params.publish_dir}"
+      rm -rf "\$partial"
+      mkdir "\$partial"
+      cp -rL "\${image_zarr}/." "\$partial/"
+      rm -rf "\$target"
+      mv "\$partial" "\$target"
+      echo "\$target" > "${filename}_published.txt"
+    else
+      echo "not published (workflow_stage ${params.workflow_stage})" > "${filename}_published.txt"
+    fi
     """
 }
 
@@ -347,7 +315,16 @@ process COLLECTPLASTICS3FILES {
 
     script:
     """
-    mc ls "${params.s3_bucket}" > all_s3_entries.txt
+    set -euo pipefail
+
+    # complete datasets in the mounted S3 share (root metadata present)
+    : > all_s3_entries.txt
+    for entry in "${params.publish_dir}"/*/; do
+      [ -d "\$entry" ] || continue
+      if [ -e "\$entry/zarr.json" ] || [ -e "\$entry/.zattrs" ]; then
+        echo "\$(basename "\$entry")/" >> all_s3_entries.txt
+      fi
+    done
     """
 }
 
@@ -390,7 +367,7 @@ process MAKEPLASTICCOLLECTIONTABLE {
 workflow {
 
     CHECKEXISTINGPLASTICS3FILES(
-        params.s3_bucket,
+        params.publish_dir,
         params.workflow_stage,
         params.dryrun
     )
@@ -424,10 +401,10 @@ workflow {
         PATCHPLASTICOMEZARRMETADATA(EUBIPLASTICCONVERSION.out.omezarr)
 
         if (params.workflow_stage == "all") {
-            upload_done_ch = S3UPLOADPLASTIC(PATCHPLASTICOMEZARRMETADATA.out.patched_omezarr).collect()
-            COLLECTPLASTICS3FILES(upload_done_ch)
+            // ifEmpty: with no new images the table is still rebuilt (collect() of an empty channel emits nothing)
+            COLLECTPLASTICS3FILES(PATCHPLASTICOMEZARRMETADATA.out.published.collect().ifEmpty("no_new_images"))
 
-            metadata_jsons_ch = EXTRACTPLASTICMETADATA.out.metadata_json.collect()
+            metadata_jsons_ch = EXTRACTPLASTICMETADATA.out.metadata_json.collect().ifEmpty("no_new_metadata")
             MAKEPLASTICCOLLECTIONTABLE(
                 COLLECTPLASTICS3FILES.out.all_s3,
                 SELECTPLASTICIMAGES.out.all_datasets,
