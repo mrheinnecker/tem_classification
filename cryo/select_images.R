@@ -131,10 +131,10 @@ images_raw <- if (sheet_mode == "google") {
   read_local_table(opt$input_table)
 }
 
-images <- images_raw %>%
-  mutate(across(everything(), ~na_if(.x, ""))) %>%
-  filter(str_detect(`File Name`, "_st_3D")) %>% 
-  filter(str_detect(FilePath, "CryoLM")) 
+images <- images_raw #%>%
+  # mutate(across(everything(), ~na_if(.x, ""))) %>%
+  # filter(str_detect(`File Name`, "_st_3D")) %>% 
+  # filter(str_detect(FilePath, "CryoLM")) 
 
 path_column <- first_existing_column(
   images,
