@@ -17,7 +17,7 @@ timestamp="$(date +%Y-%m-%d_%H-%M)"
 repo_dir="/g/schwab/marco/repos/tem_classification"
 cd /scratch/rheinnec/exm_screen
 
-bash "${repo_dir}/exm/exm_main.sh" cluster \
+bash "${repo_dir}/exm/exm_main.sh" interactive \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1331814489#gid=1331814489" \
   --sheet_name "exm_input_table" \
