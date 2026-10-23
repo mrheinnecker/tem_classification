@@ -11,7 +11,9 @@ spec <- matrix(c(
   "google_key", "k", 1, "character",
   "collection_table_url", "u", 1, "character",
   "collection_table_sheet", "s", 1, "character",
-  "local_collection_table", "l", 1, "character"
+  "local_collection_table", "l", 1, "character",
+  "hpf_collection_table_sheet", "H", 1, "character",
+  "local_hpf_collection_table", "L", 1, "character"
 ), ncol=4, byrow=TRUE)
 opt <- getopt(spec)
 
@@ -23,6 +25,9 @@ sheet_mode <- value_or_default(opt$sheet_mode, "google")
 collection_table_url <- value_or_default(opt$collection_table_url, "")
 collection_table_sheet <- value_or_default(opt$collection_table_sheet, "cryo_collection_table")
 local_collection_table <- value_or_default(opt$local_collection_table, "cryo_collection_table.tsv")
+## HPF carrier screens (_HPF_ in the name) go into their own collection table
+hpf_collection_table_sheet <- value_or_default(opt$hpf_collection_table_sheet, "cryo_hpf_collection_table")
+local_hpf_collection_table <- value_or_default(opt$local_hpf_collection_table, "cryo_hpf_collection_table.tsv")
 metadata_dir <- value_or_default(opt$metadata_dir, ".")
 s3_bucket <- value_or_default(opt$s3_bucket, "s3test/imatrec/central_data_processing/cryo")
 
@@ -157,6 +162,7 @@ color_for_display <- function(display, fallback) {
   case_when(
     str_detect(compact, "gfp") ~ "cyan",
     str_detect(compact, "tl") ~ "white",
+    str_detect(compact, "reflection") ~ "white",
     str_detect(compact, "chloa") | str_detect(compact, "chlorophyll") ~ "magenta",
     str_detect(compact, "pe") ~ "yellow",
     TRUE ~ fallback
@@ -180,6 +186,8 @@ canonical_channel_display <- function(channel, fallback_display) {
   emission <- rounded_wavelength(channel$emission_wavelength_nm %||% NA_real_)
 
   case_when(
+    ## reflection channel of the HPF screens (Reflection-T2)
+    str_detect(compact, "reflection") ~ "Reflection",
     str_detect(compact, "tl") & !str_detect(compact, "tpmt") ~ "TL",
     str_detect(compact, "gfp") | str_detect(compact, "egfp") |
       excitation == 488 | emission == 509 ~ "GFP",
@@ -273,6 +281,7 @@ base_table <- s3_root_markers %>%
     z_scale_nm=coalesce(as.character(z_scale_nm), sheet_z_scale),
     source_name=name,
     site=str_extract(source_name, "^[A-Za-z]+"),
+    collection=if_else(str_detect(source_name, "_HPF_"), "hpf", "pf_wm"),
     view=coalesce(site, "cryo"),
     grid=coalesce(site, "cryo"),
     channels=map2(channels, size_c, normalize_channels),
@@ -281,9 +290,9 @@ base_table <- s3_root_markers %>%
     format="OmeZarr",
     type="intensities"
   ) %>%
-  group_by(grid) %>%
+  group_by(collection, grid) %>%
   mutate(
-    ## position within the site's grid
+    ## position within the site's grid (per collection table)
     grid_index=row_number() - 1L,
     grid_columns=near_square_columns(n()),
     grid_position=paste0("(", grid_index %% grid_columns, ",", grid_index %/% grid_columns, ")")
@@ -304,6 +313,7 @@ col_table <- base_table %>%
   ) %>%
   select(-channels) %>%
   select(
+    collection,
     uri,
     name,
     view,
@@ -318,7 +328,12 @@ col_table <- base_table %>%
     exclusive
   )
 
-write_tsv(col_table, file=local_collection_table)
+pf_wm_table <- col_table %>% filter(collection == "pf_wm") %>% select(-collection)
+hpf_table <- col_table %>% filter(collection == "hpf") %>% select(-collection)
+message("Collection tables: ", n_distinct(pf_wm_table$uri), " PF/WM and ", n_distinct(hpf_table$uri), " HPF dataset(s)")
+
+write_tsv(pf_wm_table, file=local_collection_table)
+write_tsv(hpf_table, file=local_hpf_collection_table)
 
 if (sheet_mode == "google") {
   if (collection_table_url == "") {
@@ -333,7 +348,13 @@ if (sheet_mode == "google") {
   library(googledrive)
   gs4_auth(path=json_key)
   drive_auth(path=json_key)
-  write_sheet(col_table, ss=collection_table_url, sheet=collection_table_sheet)
+  ## an empty table would replace the tab with a header-only sheet, so only non-empty ones are written
+  if (nrow(pf_wm_table) > 0) {
+    write_sheet(pf_wm_table, ss=collection_table_url, sheet=collection_table_sheet)
+  }
+  if (nrow(hpf_table) > 0) {
+    write_sheet(hpf_table, ss=collection_table_url, sheet=hpf_collection_table_sheet)
+  }
 }
 
 write_tsv(tibble(done="done"), file="done.tsv")

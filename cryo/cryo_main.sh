@@ -21,6 +21,9 @@ Options:
   --google_key PATH                Google service-account JSON key.
   --collection_table_url URL       Google Sheet URL for collection table output.
   --collection_table_sheet VALUE   Output sheet name, default cryo_collection_table.
+  --hpf_collection_table_sheet VALUE
+                                   Output sheet name for the HPF screens (_HPF_ in the
+                                   file name), default cryo_hpf_collection_table.
   --main_dir PATH                  Base CRYO workflow directory.
   --outdir PATH                    Converted-output directory.
   --logdir PATH                    Workflow log directory.
@@ -121,6 +124,7 @@ sheet_name="${SHEET_NAME:-}"
 google_key="${GOOGLE_KEY:-${script_dir}/trec-tem-screen-e98a2e03f58b.json}"
 collection_table_url="${COLLECTION_TABLE_URL:-}"
 collection_table_sheet="${COLLECTION_TABLE_SHEET:-cryo_collection_table}"
+hpf_collection_table_sheet="${HPF_COLLECTION_TABLE_SHEET:-cryo_hpf_collection_table}"
 outdir="${OUTDIR:-}"
 logdir="${LOGDIR:-}"
 work_dir="${WORK_DIR:-$default_work_dir}"
@@ -245,6 +249,14 @@ while [[ $# -gt 0 ]]; do
       collection_table_sheet="${1#*=}"
       shift
       ;;
+    --hpf_collection_table_sheet|--hpf-collection-table-sheet)
+      hpf_collection_table_sheet="${2:?--hpf_collection_table_sheet requires a value}"
+      shift 2
+      ;;
+    --hpf_collection_table_sheet=*|--hpf-collection-table-sheet=*)
+      hpf_collection_table_sheet="${1#*=}"
+      shift
+      ;;
     --outdir)
       outdir="${2:?--outdir requires a path}"
       shift 2
@@ -363,6 +375,7 @@ nextflow_args=(
   --google_key "$google_key"
   --collection_table_url "$collection_table_url"
   --collection_table_sheet "$collection_table_sheet"
+  --hpf_collection_table_sheet "$hpf_collection_table_sheet"
   --workflow_stage "$workflow_stage"
   --dryrun "$dryrun"
   --dryrun_n "$dryrun_n"

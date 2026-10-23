@@ -138,6 +138,10 @@ With `--workflow_stage all`, datasets are copied from the work directory into th
 
 No image data is written outside the Nextflow work directory except the final OME-Zarr in `--publish_dir`; the log directory and `--persistent_metadata_dir` only receive metadata and logs.
 
+HPF carrier screens (`_HPF_` in the file name) are written to a separate collection table, `--hpf_collection_table_sheet` (default `cryo_hpf_collection_table`, locally `cryo_hpf_collection_table.tsv`); PF and WM stay in `--collection_table_sheet`. Both are written by the same run from the same input table. The HPF CZIs are unstitched tile scans; the tiles are placed at their stage positions when the CZI is read in `prepare_input.py` (bioio-czi), without registration or blending.
+
+The input table only needs a path column (`path`, `FilePath`, `raw_path`, ...). Pixel sizes, channels and the site come from the CZI and the file name.
+
 The collection table keeps `name` as `<dataset_name>` but points `uri` to the `.ome.zarr` prefix. Existing legacy `.zarr` datasets are still recognized.
 
 For multi-channel CZI data, the collection table is expanded to one row per channel. The original dataset name is kept in `source_name`, while `name` becomes channel-specific, for example:

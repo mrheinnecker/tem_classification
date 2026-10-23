@@ -50,6 +50,7 @@ CHANNEL_COLOR_OVERRIDES = {
     "chloa": "magenta",
     "chlorophyll": "magenta",
     "pe": "yellow",
+    "reflection": "white",
 }
 
 
@@ -267,6 +268,9 @@ def color_for_channel(label, raw_color, index):
 def canonical_channel_display(label, fluor=None, excitation_wavelength=None, emission_wavelength=None):
     text = " ".join(str(value or "") for value in (label, fluor)).lower()
     compact = re.sub(r"[^a-z0-9]+", "", text)
+    # reflection channel of the HPF screens (Reflection-T2)
+    if "reflection" in compact:
+        return "Reflection"
     if "tl" in compact and "tpmt" not in compact:
         return "TL"
     if any(term in compact for term in ("gfp", "egfp", "fitc")):
@@ -365,11 +369,21 @@ def czi_channels_from_xml(xml_text, max_channels=None):
             xml_text = xml_text.decode("utf-8", errors="replace")
         root = ET.fromstring(xml_text)
 
+    # Information/Image/Dimensions/Channels lists the channels actually in the image; the
+    # Experiment block also lists channels of unused tracks (HPF screens: 9 there, 4 acquired)
     channels_parents = [
-        element
-        for element in root.iter()
-        if local_name(element) == "Channels"
+        channels
+        for image in root.iter()
+        if local_name(image) == "Image"
+        for dimensions in find_children_by_local_name(image, "Dimensions")
+        for channels in find_children_by_local_name(dimensions, "Channels")
     ]
+    if not channels_parents:
+        channels_parents = [
+            element
+            for element in root.iter()
+            if local_name(element) == "Channels"
+        ]
     channel_elements = []
     for parent in channels_parents:
         direct_channels = find_children_by_local_name(parent, "Channel")
@@ -536,7 +550,9 @@ def extract_czi_metadata(path):
     xml_text = czi.meta
     dims_shape = None
     try:
-        dims_shape = czi.dims_shape()
+        # dims_shape() in aicspylibczi < 3, get_dims_shape() from 3 on
+        get_dims = getattr(czi, "get_dims_shape", None) or czi.dims_shape
+        dims_shape = get_dims()
         metadata["dims_shape"] = dims_shape
     except Exception:
         metadata["dims_shape"] = None

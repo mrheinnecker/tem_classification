@@ -6,6 +6,8 @@ params.google_key = params.google_key ?: "${params.script_dir}/trec-tem-screen-e
 params.collection_table_url = params.collection_table_url ?: ""
 params.collection_table_sheet = params.collection_table_sheet ?: "cryo_collection_table"
 params.local_collection_table = params.local_collection_table ?: "${params.logdir}/cryo_collection_table.tsv"
+// HPF carrier screens (_HPF_ in the file name) get their own collection table
+params.hpf_collection_table_sheet = params.hpf_collection_table_sheet ?: "cryo_hpf_collection_table"
 params.dryrun = params.dryrun ?: "TRUE"
 params.dryrun_n = params.dryrun_n ?: 2
 params.script_dir = params.script_dir ?: baseDir.toString()
@@ -398,6 +400,7 @@ process MAKECRYOCOLLECTIONTABLE {
     output:
     path "done.tsv"
     path "cryo_collection_table.tsv", optional:true
+    path "cryo_hpf_collection_table.tsv", optional:true
 
     script:
     """
@@ -410,7 +413,9 @@ process MAKECRYOCOLLECTIONTABLE {
       --google_key "${params.google_key}" \
       --collection_table_url "${params.collection_table_url}" \
       --collection_table_sheet "${params.collection_table_sheet}" \
-      --local_collection_table "cryo_collection_table.tsv"
+      --local_collection_table "cryo_collection_table.tsv" \
+      --hpf_collection_table_sheet "${params.hpf_collection_table_sheet}" \
+      --local_hpf_collection_table "cryo_hpf_collection_table.tsv"
     """
 }
 
