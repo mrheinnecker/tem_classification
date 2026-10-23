@@ -74,6 +74,25 @@ collection_tables <- list.files(collection_table_dir, pattern="\\.tsv$", full.na
   set_names(str_remove(basename(.), "\\.tsv$")) %>%
   map(~read_tsv(.x, col_types=cols(.default=col_character())))
 
+
+## ---- EXM annotation sheet: all tabs, saved as <ov_dir>/exm_annotations/<tab>.tsv ------------------
+refresh_exm_annotations <- TRUE
+
+exm_annotation_sheet <- "https://docs.google.com/spreadsheets/d/1PZzLraZx53w_zKwpISj_r7riUibX6iGg9Z2Li_Gc3rw/edit"
+exm_annotation_dir <- file.path(ov_dir, "exm_annotations")
+
+if (refresh_exm_annotations) {
+  dir.create(exm_annotation_dir, showWarnings=FALSE, recursive=TRUE)
+  exm_tabs <- googlesheets4::sheet_names(exm_annotation_sheet)
+  message("Tabs in the EXM annotation sheet: ", paste(exm_tabs, collapse=", "))
+  walk(exm_tabs, function(tab) {
+    tab_data <- googlesheets4::read_sheet(exm_annotation_sheet, sheet=tab, col_types="c")
+    file_name <- paste0(str_replace_all(tab, "[^A-Za-z0-9_-]+", "_"), ".tsv")
+    write_tsv(tab_data, file=file.path(exm_annotation_dir, file_name))
+    message(tab, ": ", nrow(tab_data), " rows")
+  })
+}
+
 sampling_events <- read_tsv(file.path(ov_dir, "sampling_events.tsv"), col_types=cols(.default=col_character()))
 hpf <- read_tsv(file.path(ov_dir, "hpf.tsv"), col_types=cols(.default=col_character()))
 cryo_pf <- read_tsv(file.path(ov_dir, "cryo_pf.tsv"), col_types=cols(.default=col_character()))
@@ -382,7 +401,7 @@ link_images <- function(images) {
         link == "name_event" ~ name_event_id
       )
     ) %>%
-    select(imaging, image_id, uri, sample_barcode, sample_layer, event_id, link, block_name, fraction, name_site, name_date, name_time)
+    select(imaging, image_id, uri, sample_barcode, sample_layer, event_id, link, block_name, fraction, any_of("exm_barcode"), name_site, name_date, name_time)
 }
 
 barcode_in <- function(x) str_match(x, "_(\\d{9})_")[, 2]
@@ -453,6 +472,39 @@ if ("sem_collection_table" %in% names(collection_tables)) {
     )
 }
 
+## EXM: the collection table names are <site code>_Img<image number>; sample (barcode of the chem fixed
+## FA2 aliquot), sampling date / time and fraction come from the ExM tab of the annotation sheet
+exm_annotation_file <- file.path(exm_annotation_dir, "ExM.tsv")
+if ("exm_collection_table" %in% names(collection_tables) && file.exists(exm_annotation_file)) {
+  ## the first row of the tab holds the column groups, the column names are in the second
+  exm_annotations <- read_tsv(exm_annotation_file, skip=1, col_types=cols(.default=col_character())) %>%
+    transmute(
+      exm_barcode=na_if(Barcode, "NA"),
+      site_code=unname(set_names(names(site_codes), site_codes)[str_remove(Supersite, ",.*$")]),
+      image_no=as.integer(str_remove_all(`Image number`, "\\D")),
+      sampling_date=ymd(`Sampling Date`, quiet=TRUE),
+      sampling_time=na_if(`Sampling Time`, "NA"),
+      fraction=str_replace(na_if(Fraction, "NA"), "-", "to"),
+      fraction_imaged=na_if(`Fraction Imaged`, "NA")
+    ) %>%
+    filter(!is.na(site_code), !is.na(image_no)) %>%
+    mutate(image_id=sprintf("%s_Img%04d", site_code, image_no)) %>%
+    distinct(image_id, .keep_all=TRUE)
+
+  image_tables$exm <- collection_tables$exm_collection_table %>%
+    one_per_uri() %>%
+    transmute(imaging="ExM", image_id=str_remove(name, "_c\\d+_[^_]+$"), uri) %>%
+    left_join(exm_annotations, by="image_id") %>%
+    transmute(
+      imaging, image_id, uri,
+      barcode=NA_character_, block_name=NA_character_,
+      exm_barcode,
+      fraction,
+      parse_name=paste(site_code, format(sampling_date, "%Y%m%d"), sampling_time, sep="_")
+    )
+  message("EXM images without annotation: ", sum(is.na(image_tables$exm$exm_barcode)))
+}
+
 imaging_map <- image_tables %>%
   bind_rows() %>%
   link_images()
@@ -486,12 +538,16 @@ imaging_map <- imaging_map %>%
     sample_barcode=coalesce(cf_barcode, sample_barcode),
     sample_layer=if_else(!is.na(cf_barcode), "Chem fixation", sample_layer),
     event_id=coalesce(cf_event_id, event_id),
+    ## EXM: chemically fixed FA2 aliquots (own barcodes, not in the chem fixation sheet), event by site / date / time
+    sample_barcode=if_else(imaging == "ExM", exm_barcode, sample_barcode),
+    sample_layer=if_else(imaging == "ExM" & !is.na(event_id), "Chem fixation", sample_layer),
+    link=if_else(imaging == "ExM" & !is.na(event_id), "exm_annotation", link),
     ## TEM / HiTT are always done on HPF resin blocks: blocks missing in the HPF sheet still count as HPF
     sample_layer=if_else(imaging %in% c("TEM", "HiTT") & is.na(sample_layer) & !is.na(event_id), "HPF", sample_layer),
     ## sample identity for counting samples: barcode, else the block name
     sample_key=coalesce(sample_barcode, block_name)
   ) %>%
-  select(-cf_barcode, -cf_event_id, -sem_link)
+  select(-cf_barcode, -cf_event_id, -sem_link, -exm_barcode)
 
 imaging_map %>% count(imaging, link) %>% print(n=Inf)
 imaging_map %>%

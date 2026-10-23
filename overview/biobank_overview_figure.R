@@ -51,7 +51,8 @@ image_rings <- c(
   `resin LM`="n_img_resin_lm",
   `cryo LM PF`="n_img_cryo_lm_pf",
   `cryo LM WM`="n_img_cryo_lm_wm",
-  SEM="n_img_sem"
+  SEM="n_img_sem",
+  ExM="n_img_exm"
 )
 
 circle_data <- coverage %>%
@@ -308,7 +309,8 @@ imaging_colors <- c(
   `resin LM`="#FD8D3C",
   `cryo LM PF`="#FDAE6B",
   `cryo LM WM`="#FDD0A2",
-  SEM="#8C6D31"
+  SEM="#8C6D31",
+  ExM="#35978F"
 )
 event_only <- "event only"
 event_only_color <- "grey75"
@@ -610,9 +612,9 @@ site_center <- function(site) {
 ## ring 2: sample types (samples)
 ## ring 3: HPF samples embedded in resin, Epon / Lowicryl from the block name (_epo / _low) (samples)
 ## ring 4: imaging of the physical sample: HiTT, resin LM, cryo LM (images)
-## ring 5: "cells": TEM and SEM (usually one cell per image)
+## ring 5: "cells": TEM, SEM and ExM (usually one cell per image)
 ## Rings 2-5 are not split by site, the site is carried by the flow colour. Paths that skip a ring
-## (cryo -> cryo LM, chem fix -> SEM, resin block -> TEM without HiTT) run through an invisible
+## (PF -> cryo LM, chem fix -> SEM, resin block -> TEM without HiTT) run through an invisible
 ## pass-through block of that ring, drawn as one continuous flow.
 ## TEM comes from HiTT when the same HPF sample (block) has HiTT images.
 ## Rings 2 / 3 share one scale (degrees per sample), rings 4 / 5 one scale (degrees per image).
@@ -634,7 +636,7 @@ is_pass <- function(x) str_starts(x, fixed(pass_prefix))
 
 chain_block_colors <- c(
   HPF="#2166AC",
-  cryo="#4393C3",
+  PF="#4393C3",
   MetaB="#5AAE61",
   `Chem fix`="#9970AB",
   Epon="#B2182B",
@@ -643,12 +645,14 @@ chain_block_colors <- c(
   `resin LM`="#FD8D3C",
   `cryo LM`="#FDAE6B",
   TEM="#7F2704",
-  SEM="#8C6D31"
+  SEM="#8C6D31",
+  ExM="#35978F"
 )
-ring2_levels <- c("HPF", "cryo", "MetaB", "Chem fix")
+ring2_levels <- c("HPF", "PF", "MetaB", "Chem fix")
 
 merge_sample_type <- function(x) {
-  recode(x, `cryo PF`="cryo", `cryo WM`="cryo", `Chem fixation`="Chem fix")
+  ## plunge frozen: cryo PF and WM together
+  recode(x, `cryo PF`="PF", `cryo WM`="PF", `Chem fixation`="Chem fix")
 }
 
 chain_samples <- samples_per_type %>%
@@ -664,6 +668,18 @@ chain_images <- imaging_map %>%
     imaging=recode(imaging, `cryo LM PF`="cryo LM", `cryo LM WM`="cryo LM"),
     sample_key=coalesce(sample_key, image_id)
   )
+
+## the ExM images come from chemically fixed FA2 aliquots, which are not in the chem fixation sheet:
+## they are added to the chem fix samples
+chain_samples <- bind_rows(
+  chain_samples,
+  chain_images %>%
+    filter(imaging == "ExM") %>%
+    distinct(site, sample_key) %>%
+    count(site, name="size") %>%
+    mutate(sample_type="Chem fix")
+) %>%
+  count(site, sample_type, wt=size, name="size")
 
 ## resin per HPF sample: block name in the HPF sheet, else the block / image name of its images
 key_resin <- bind_rows(
@@ -723,15 +739,17 @@ segments <- list(
   `1`=chain_samples %>% transmute(site, from=site, to=sample_type, w_from=size, w_to=size),
   `2`=bind_rows(
     embedded %>% count(site, resin, name="n") %>% transmute(site, from="HPF", to=resin, w_from=n, w_to=n),
-    per_site(images_of("cryo LM"), "cryo", paste(pass_prefix, "cryo"), n_keys, n_keys),
-    per_site(images_of("SEM"), "Chem fix", paste(pass_prefix, "Chem fix"), n_keys, n_keys)
+    per_site(images_of("cryo LM"), "PF", paste(pass_prefix, "PF"), n_keys, n_keys),
+    per_site(images_of("SEM"), "Chem fix", paste(pass_prefix, "Chem fix"), n_keys, n_keys),
+    per_site(images_of("ExM"), "Chem fix", paste(pass_prefix, "Chem fix ExM"), n_keys, n_keys)
   ),
   `3`=bind_rows(
     per_site(images_of("HiTT"), "{resin}", "HiTT", n_keys, n_img),
     per_site(images_of("resin LM"), "{resin}", "resin LM", n_keys, n_img),
     per_site(images_of("TEM", setdiff(tem_keys, hitt_keys)), "{resin}", pass_tem, n_keys, n_img),
-    per_site(images_of("cryo LM"), paste(pass_prefix, "cryo"), "cryo LM", n_keys, n_img),
-    per_site(images_of("SEM"), paste(pass_prefix, "Chem fix"), paste(pass_prefix, "SEM"), n_keys, n_img)
+    per_site(images_of("cryo LM"), paste(pass_prefix, "PF"), "cryo LM", n_keys, n_img),
+    per_site(images_of("SEM"), paste(pass_prefix, "Chem fix"), paste(pass_prefix, "SEM"), n_keys, n_img),
+    per_site(images_of("ExM"), paste(pass_prefix, "Chem fix ExM"), paste(pass_prefix, "ExM"), n_keys, n_img)
   ),
   `4`=bind_rows(
     images_of("HiTT", tem_keys) %>%
@@ -739,7 +757,8 @@ segments <- list(
       inner_join(images_of("TEM", hitt_keys) %>% count(site, name="n_tem"), by="site") %>%
       transmute(site, from="HiTT", to="TEM", w_from=n_hitt, w_to=n_tem),
     per_site(images_of("TEM", setdiff(tem_keys, hitt_keys)), pass_tem, "TEM", n_img, n_img),
-    per_site(images_of("SEM"), paste(pass_prefix, "SEM"), "SEM", n_img, n_img)
+    per_site(images_of("SEM"), paste(pass_prefix, "SEM"), "SEM", n_img, n_img),
+    per_site(images_of("ExM"), paste(pass_prefix, "ExM"), "ExM", n_img, n_img)
   )
 ) %>%
   imap(~mutate(.x, seg=as.integer(.y), w_from=as.numeric(w_from), w_to=as.numeric(w_to))) %>%
@@ -865,13 +884,15 @@ ring_cost <- function(blocks, src, block, w) {
 }
 
 ## fixed clockwise order of ring 4 (NULL: optimised); HiTT next to the TEM pass-through above Epon
+## fixed clockwise order of ring 5 (NULL: optimised): ExM and SEM swapped against the optimum
+ring5_order_fixed <- c("ExM", "TEM", "SEM")
 ring4_order_fixed <- c("resin LM", "cryo LM", paste(pass_prefix, "SEM"), paste(pass_prefix, "TEM Epon"), "HiTT")
 
 ## extra rotation of a ring after the optimisation, in degrees (negative = counter-clockwise);
 ## the rings outside follow, as their rotation is optimised onto the rotated ring
-ring_extra_rotation <- c(`4`=-90, `5`=70)
+ring_extra_rotation <- c(`4`=-90, `5`=-20)
 ## extra rotation of single blocks after their ring is placed, in degrees (positive = clockwise)
-block_extra_rotation <- c(`cryo LM`=90)
+block_extra_rotation <- c(`cryo LM`=105, HiTT=20, `resin LM`=-10)
 ## fixed clockwise order of the flows entering a block (by the block they come from), other flows after
 incoming_order_fixed <- list(TEM=c("HiTT", paste(pass_prefix, "TEM Epon")))
 
@@ -942,7 +963,13 @@ for (k in 2:4) {
         blocks4 <- ordered_ring(sizes, order4, deg, src3$src, src3$block, src3$w)
         cost4 <- ring_cost(blocks4, src3$src, src3$block, src3$w)
         src4 <- block_centers(blocks4)$center[match(seg4$from, blocks4$block)]
-        for (order5 in permutations(sizes5$block)) {
+        order5_candidates <- if (is.null(ring5_order_fixed)) {
+          permutations(sizes5$block)
+        } else {
+          fixed5 <- intersect(ring5_order_fixed, sizes5$block)
+          list(c(fixed5, setdiff(sizes5$block, fixed5)))
+        }
+        for (order5 in order5_candidates) {
           blocks5 <- ordered_ring(sizes5, order5, deg, src4, seg4$to, seg4$w)
           cost <- cost4 + ring_cost(blocks5, src4, seg4$to, seg4$w)
           if (cost < best_cost) {
@@ -1060,7 +1087,7 @@ chain_labels <- chain_blocks %>%
     unit=case_when(
       ring == 1 ~ " events",
       ring == 2 ~ " samples",
-      ring == 3 ~ " samples",
+      ring == 3 ~ " blocks",
       ring == 5 ~ " cells",
       TRUE ~ " images"
     ),
