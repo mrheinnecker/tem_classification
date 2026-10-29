@@ -48,6 +48,7 @@ collection_table_tabs <- c(
   "sem_collection_table",
   "hitt_collection_table",
   "cryo_collection_table",
+  "cryo_hpf_collection_table",
   "plastic_collection_table",
   "exm_collection_table"
 )
@@ -415,6 +416,17 @@ if ("cryo_collection_table" %in% names(collection_tables)) {
     one_per_uri() %>%
     transmute(
       imaging=if_else(str_detect(name, "_PF_"), "cryo LM PF", "cryo LM WM"),
+      image_id=str_remove(name, "_c\\d+_[^_]+$"),
+      uri, barcode=barcode_in(name), block_name=NA_character_, parse_name=name
+    )
+}
+
+## cryo confocal screens of HPF carriers (own collection table), linked to the HPF sample by barcode
+if ("cryo_hpf_collection_table" %in% names(collection_tables)) {
+  image_tables$cryo_hpf <- collection_tables$cryo_hpf_collection_table %>%
+    one_per_uri() %>%
+    transmute(
+      imaging="cryo LM HPF",
       image_id=str_remove(name, "_c\\d+_[^_]+$"),
       uri, barcode=barcode_in(name), block_name=NA_character_, parse_name=name
     )

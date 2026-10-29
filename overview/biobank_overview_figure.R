@@ -51,6 +51,7 @@ image_rings <- c(
   `resin LM`="n_img_resin_lm",
   `cryo LM PF`="n_img_cryo_lm_pf",
   `cryo LM WM`="n_img_cryo_lm_wm",
+  `cryo LM HPF`="n_img_cryo_lm_hpf",
   SEM="n_img_sem",
   ExM="n_img_exm"
 )
@@ -228,10 +229,10 @@ hpf_flow <- hpf_events %>%
   ) %>%
   left_join(hpf_imaging, by="barcode") %>%
   mutate(
-    ## cryo HPF: imaged with cryo LM according to the sheet, no collection table yet
+    ## cryo HPF: imaged with cryo LM according to the sheet, but not (yet) in the collection table
     imaging=case_when(
       !is.na(imaging) ~ imaging,
-      processing == "cryo" & imaged == "TRUE" ~ "cryo LM",
+      processing == "cryo" & imaged == "TRUE" ~ "cryo LM HPF",
       TRUE ~ "not imaged"
     )
   ) %>%
@@ -309,6 +310,7 @@ imaging_colors <- c(
   `resin LM`="#FD8D3C",
   `cryo LM PF`="#FDAE6B",
   `cryo LM WM`="#FDD0A2",
+  `cryo LM HPF`="#FEE6CE",
   SEM="#8C6D31",
   ExM="#35978F"
 )
@@ -625,6 +627,15 @@ color_flows_by_site <- FALSE
 
 ## colour of the flows outside the site ring when they are not coloured by site
 outer_flow_color <- "grey85"
+## TRUE: the flows outside the site ring take the colour of the block they come from (e.g. HPF -> Epon
+## in the HPF blue), mixed with white by outer_flow_lighten (0 = block colour, 1 = white);
+## FALSE: outer_flow_color
+color_flows_by_source <- TRUE
+outer_flow_lighten <- 0.4
+lighten <- function(color, amount) {
+  rgb_mix <- col2rgb(color) * (1 - amount) + 255 * amount
+  rgb(rgb_mix[1, ], rgb_mix[2, ], rgb_mix[3, ], maxColorValue=255)
+}
 
 ## blocks without _epo / _low in the name (block?, a few without suffix) count as Epon
 resin_types <- c("Epon", "Lowicryl")
@@ -665,7 +676,7 @@ chain_images <- imaging_map %>%
   filter(site %in% site_levels) %>%
   mutate(
     sample_type=merge_sample_type(sample_layer),
-    imaging=recode(imaging, `cryo LM PF`="cryo LM", `cryo LM WM`="cryo LM"),
+    imaging=recode(imaging, `cryo LM PF`="cryo LM", `cryo LM WM`="cryo LM", `cryo LM HPF`="cryo LM"),
     sample_key=coalesce(sample_key, image_id)
   )
 
@@ -687,7 +698,7 @@ key_resin <- bind_rows(
     filter(!is.na(block_name), block_name != "discarded") %>%
     transmute(sample_key=barcode, resin=resin_of(block_name)),
   chain_images %>%
-    filter(sample_type == "HPF") %>%
+    filter(sample_type == "HPF", imaging %in% c("TEM", "HiTT", "resin LM")) %>%
     transmute(sample_key, resin=resin_of(coalesce(block_name, image_id)))
 ) %>%
   distinct(sample_key, .keep_all=TRUE)
@@ -739,7 +750,9 @@ segments <- list(
   `1`=chain_samples %>% transmute(site, from=site, to=sample_type, w_from=size, w_to=size),
   `2`=bind_rows(
     embedded %>% count(site, resin, name="n") %>% transmute(site, from="HPF", to=resin, w_from=n, w_to=n),
-    per_site(images_of("cryo LM"), "PF", paste(pass_prefix, "PF"), n_keys, n_keys),
+    per_site(images_of("cryo LM") %>% filter(sample_type == "PF"), "PF", paste(pass_prefix, "PF"), n_keys, n_keys),
+    ## HPF carriers kept in cryo and screened with cryo LM
+    per_site(images_of("cryo LM") %>% filter(sample_type == "HPF"), "HPF", paste(pass_prefix, "HPF cryo"), n_keys, n_keys),
     per_site(images_of("SEM"), "Chem fix", paste(pass_prefix, "Chem fix"), n_keys, n_keys),
     per_site(images_of("ExM"), "Chem fix", paste(pass_prefix, "Chem fix ExM"), n_keys, n_keys)
   ),
@@ -747,7 +760,8 @@ segments <- list(
     per_site(images_of("HiTT"), "{resin}", "HiTT", n_keys, n_img),
     per_site(images_of("resin LM"), "{resin}", "resin LM", n_keys, n_img),
     per_site(images_of("TEM", setdiff(tem_keys, hitt_keys)), "{resin}", pass_tem, n_keys, n_img),
-    per_site(images_of("cryo LM"), paste(pass_prefix, "PF"), "cryo LM", n_keys, n_img),
+    per_site(images_of("cryo LM") %>% filter(sample_type == "PF"), paste(pass_prefix, "PF"), "cryo LM", n_keys, n_img),
+    per_site(images_of("cryo LM") %>% filter(sample_type == "HPF"), paste(pass_prefix, "HPF cryo"), "cryo LM", n_keys, n_img),
     per_site(images_of("SEM"), paste(pass_prefix, "Chem fix"), paste(pass_prefix, "SEM"), n_keys, n_img),
     per_site(images_of("ExM"), paste(pass_prefix, "Chem fix ExM"), paste(pass_prefix, "ExM"), n_keys, n_img)
   ),
@@ -792,11 +806,11 @@ allocate_side <- function(flows, blocks, node_col, other_center_col, prefix, fil
     mutate(
       rel=ang_diff((b_start + b_end) / 2, .data[[other_center_col]]),
       site_order=as.integer(factor(site, levels=site_levels)),
-      ## fixed order of incoming flows (target side only)
+      ## fixed order of incoming flows (target side), flows put at the clockwise end (source side)
       fixed_rank=if (prefix == "b") {
         map2_dbl(.data[[node_col]], from, ~coalesce(match(.y, incoming_order_fixed[[.x]] %||% character()), 0L) * 1)
       } else {
-        0
+        map2_dbl(.data[[node_col]], to, ~coalesce(match(.y, outgoing_order_last[[.x]] %||% character()), 0L) * 1)
       }
     ) %>%
     arrange(.data[[node_col]], fixed_rank, rel, site_order) %>%
@@ -805,6 +819,13 @@ allocate_side <- function(flows, blocks, node_col, other_center_col, prefix, fil
       width_col <- if (prefix == "a") "w_from" else "w_to"
       size <- if (fill) sum(f[[width_col]]) else f$b_size[1]
       pieces <- split_node(f$b_start[1], f$b_end[1], size, f[[width_col]])
+      ## outgoing_order_last: moved to the very end of the block (the pieces only fill the imaged part)
+      at_end <- prefix == "a" & f$fixed_rank > 0
+      if (any(at_end)) {
+        shift <- f$b_end[1] - max(pieces$to[at_end])
+        pieces$from[at_end] <- pieces$from[at_end] + shift
+        pieces$to[at_end] <- pieces$to[at_end] + shift
+      }
       f[[paste0(prefix, "1")]] <- pieces$from
       f[[paste0(prefix, "2")]] <- pieces$to
       f
@@ -885,16 +906,54 @@ ring_cost <- function(blocks, src, block, w) {
 
 ## fixed clockwise order of ring 4 (NULL: optimised); HiTT next to the TEM pass-through above Epon
 ## fixed clockwise order of ring 5 (NULL: optimised): ExM and SEM swapped against the optimum
-ring5_order_fixed <- c("ExM", "TEM", "SEM")
+ring5_order_fixed <- c("ExM", "SEM", "TEM")
+## ring 5 squeezed into a part of the circle (degrees clockwise from 12:00; NULL: full circle, rotated
+## onto its sources): the cell imaging in the right half, ExM at 12:00 to TEM at 6:00
+ring5_span <- c(0, 180)
 ring4_order_fixed <- c("resin LM", "cryo LM", paste(pass_prefix, "SEM"), paste(pass_prefix, "TEM Epon"), "HiTT")
 
 ## extra rotation of a ring after the optimisation, in degrees (negative = counter-clockwise);
 ## the rings outside follow, as their rotation is optimised onto the rotated ring
 ring_extra_rotation <- c(`4`=-90, `5`=-20)
+## fixed clockwise order of ring 2 (NULL: optimised); Chem fix and MetaB swapped against the optimum
+ring2_order_fixed <- c("MetaB", "HPF", "PF", "Chem fix")
+## ring 2 rotated so that this block starts at the given angle (NULL: rotated onto the sites);
+## HPF from 3:00 on, rings 3 and 4 follow
+ring2_anchor <- c(HPF=90)
+## manual positions: start angle of a block in degrees clockwise from 12:00 (3:00 = 90, 6:00 = 180,
+## 9:00 = 270); the block keeps its width, the flows follow. Applied last, so it overrides the order,
+## anchor and rotations above for that block. Invisible pass-through blocks ("pass: ...") can be set
+## too, but only reserve space (flows are drawn from their first to their last visible block).
+## The current positions are printed on every run.
+block_start_fixed <- c(
+  ## ring 2: samples
+  MetaB=45.4-90,
+  HPF=0,
+  PF=315.7-90,
+  `Chem fix`=11.4-90,
+  ## ring 3: resin blocks
+  Epon=10,
+  Lowicryl=90,
+  ## ring 4: imaging
+  `resin LM`=95,
+  `cryo LM`=200,
+  HiTT=10,
+  ## ring 5: cells
+  ExM=270,
+  SEM=23.5-90,
+  TEM=10.2
+)
 ## extra rotation of single blocks after their ring is placed, in degrees (positive = clockwise)
 block_extra_rotation <- c(`cryo LM`=105, HiTT=20, `resin LM`=-10)
 ## fixed clockwise order of the flows entering a block (by the block they come from), other flows after
 incoming_order_fixed <- list(TEM=c("HiTT", paste(pass_prefix, "TEM Epon")))
+## flows leaving a block that are put at its clockwise end (by the block they go to), e.g. the cryo HPF
+## flow at the end of HPF next to PF, close to cryo LM
+outgoing_order_last <- list(
+  HPF=c(paste(pass_prefix, "HPF cryo")),
+  ## Chem fix: ExM first, SEM at the end
+  `Chem fix`=c(paste(pass_prefix, "Chem fix"))
+)
 
 ring2_sizes <- ring_sizes(segments[[1]])
 deg_per_sample <- (360 - nrow(ring2_sizes) * block_gap) / sum(ring2_sizes$size)
@@ -907,9 +966,29 @@ ring2_costs <- map_dbl(ring2_candidates, function(order) {
   ring_cost(blocks, seg1_src$src, seg1_src$to, seg1_src$w_to)
 })
 ring2_order <- ring2_candidates[[which.min(ring2_costs)]]
+if (!is.null(ring2_order_fixed)) {
+  fixed <- intersect(ring2_order_fixed, ring2_sizes$block)
+  ring2_order <- c(fixed, setdiff(ring2_sizes$block, fixed))
+}
 message("ring 2 order: ", paste(ring2_order, collapse=", "))
 ring2_blocks <- ordered_ring(ring2_sizes, ring2_order, deg_per_sample, seg1_src$src, seg1_src$to, seg1_src$w_to)
-chain_rings[[2]] <- ring2_blocks
+if (!is.null(ring2_anchor)) {
+  anchor_start <- ring2_blocks$start[ring2_blocks$block == names(ring2_anchor)]
+  ring2_blocks <- rotate_blocks(ring2_blocks, ring2_anchor[[1]] - anchor_start)
+}
+## blocks with a manual start angle (block_start_fixed) moved there
+apply_block_start_fixed <- function(blocks) {
+  fixed <- block_start_fixed[intersect(names(block_start_fixed), blocks$block)]
+  if (length(fixed) == 0) return(blocks)
+  blocks %>%
+    mutate(
+      new_start=coalesce(unname(fixed[block]), start),
+      end=end + new_start - start,
+      start=new_start
+    ) %>%
+    select(-new_start)
+}
+chain_rings[[2]] <- apply_block_start_fixed(ring2_blocks)
 
 ## segment 1: site side filled (events vs samples)
 segments[[1]] <- segments[[1]] %>%
@@ -983,8 +1062,15 @@ for (k in 2:4) {
     }
     rot <- seg %>% transmute(block=to, w_to, src=(a1 + a2) / 2)
     chain_rings[[k + 1]] <- ordered_ring(sizes, ring_orders[[as.character(k + 1)]], deg, rot$src, rot$block, rot$w_to)
+    span_5 <- k + 1 == 5 && !is.null(ring5_span)
+    if (span_5) {
+      ## own scale: the blocks in the fixed order fill the span (half a gap at both ends)
+      sizes5 <- sizes[match(ring_orders[["5"]], sizes$block), ]
+      deg5 <- (diff(ring5_span) - nrow(sizes5) * block_gap) / sum(sizes5$size)
+      chain_rings[[k + 1]] <- rotate_blocks(layout_blocks(setNames(sizes5$size, sizes5$block), deg5), ring5_span[1])
+    }
     extra <- ring_extra_rotation[as.character(k + 1)]
-    if (!is.na(extra)) {
+    if (!is.na(extra) && !span_5) {
       chain_rings[[k + 1]] <- rotate_blocks(chain_rings[[k + 1]], extra)
     }
     chain_rings[[k + 1]] <- chain_rings[[k + 1]] %>%
@@ -995,12 +1081,21 @@ for (k in 2:4) {
       ) %>%
       select(-shift)
   }
+  chain_rings[[k + 1]] <- apply_block_start_fixed(chain_rings[[k + 1]])
 
   segments[[k]] <- seg %>%
     mutate(from_mid=(a1 + a2) / 2) %>%
     allocate_side(chain_rings[[k + 1]], "to", "from_mid", "b") %>%
     select(-from_center, -to_center_guess, -from_mid)
 }
+
+## current block positions, as start values for block_start_fixed (degrees clockwise from 12:00)
+message("block positions (start - end, degrees clockwise from 12:00):")
+iwalk(chain_rings[-1], function(blocks, i) {
+  walk(seq_len(nrow(blocks)), function(j) {
+    message(sprintf("  ring %d  %-22s %6.1f - %6.1f", i + 1, blocks$block[j], blocks$start[j] %% 360, blocks$end[j] %% 360))
+  })
+})
 
 ## flows: chains of segments through pass-through blocks, drawn as one continuous flow
 all_segments <- bind_rows(segments)
@@ -1054,7 +1149,12 @@ chain_flow_polygons <- all_segments %>%
     ) %>%
       mutate(
         id=paste("chain", flow$chain_id),
-        fill=if (flow$site %in% names(site_colors)) site_colors[[flow$site]] else outer_flow_color
+        fill=case_when(
+          flow$site %in% names(site_colors) ~ site_colors[flow$site],
+          color_flows_by_source && flow$from %in% names(chain_block_colors) ~
+            lighten(chain_block_colors[flow$from], outer_flow_lighten),
+          TRUE ~ outer_flow_color
+        )
       )
   })
 
