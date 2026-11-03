@@ -16,6 +16,83 @@ all_annotations <- read_tsv("C:/projects/tem_classification/all_annotations_2026
 
 
 
+beauty_plot <- all_annotations %>%
+  filter(!is.na(beauty)) %>%
+  mutate(
+    done_by=case_when(
+      !is.na(validated_by) ~ validated_by,
+      !is.na(annotated_by) ~ annotated_by,
+                      )
+  ) %>%
+  group_by(done_by, beauty) %>%
+  tally() %>%
+  mutate(
+    done_by=factor(done_by, levels=c(  "chandni" ,  "marco" , "Karel" ,    "viktoria", "yannick", "viktroria" ,"vitkoria"   ))
+  ) %>%
+  ggplot(aes(x=done_by, y=n, fill=beauty))+
+  geom_col(
+    position="fill"
+  )+
+  scale_fill_gradientn(colors = c("black","blue", "deeppink"))
+
+
+
+save_plot(beauty_plot, "beauty", 5, 4)
+
+
+validated <- all_annotations %>%
+  filter(!is.na(validated_by)) %>%
+  pull(source_name)
+
+
+difference <- all_annotations %>%
+  filter(source_name %in% validated, !is.na(beauty)) %>%
+  mutate(
+    done_by=case_when(
+      !is.na(validated_by) ~ validated_by,
+      !is.na(annotated_by) ~ annotated_by,
+    )
+  ) %>% select(name, done_by, 14:55) %>% select(-run, -comments, -file, -annotated_by, -validated_by) %>%
+  mutate_all(.funs = as.character) %>%
+  pivot_longer(
+    cols=names(select(., 3:38)),
+names_to="key", values_to="value"
+  ) %>%
+  pivot_wider(
+    names_from = "done_by",
+    values_from= "value"
+  ) %>%
+  mutate(
+    same=marco==viktoria
+  ) #%>%
+  
+lev <- 
+difference %>%
+  mutate(dff=!same) %>%
+  #filter(!same) %>%
+  group_by(key) %>%
+  summarise(n=sum(dff, na.rm=T)) %>%
+  #tally() %>%
+  arrange(desc(n)) %>%
+  pull(key) 
+
+
+p_acceptance <- ggplot(difference  %>% mutate(key=factor(key, levels=lev)), 
+                       aes(y=name, x=key, fill=same))+
+  geom_tile()+
+  theme(
+    axis.text.x = element_text(angle=315, hjust=0)
+  )
+  
+  
+
+
+save_plot(p_acceptance, "acceptance", 13, 4)
+
+
+
+
+
 
 ov_annotations <- all_annotations  %>%
   mutate(
@@ -39,6 +116,17 @@ first_run <- ov_annotations %>%
 annotations_first <- all_annotations %>%
   semi_join(first_run, by = c("name", "run"))
 
+
+# 
+# sheet <- googlesheets4::read_sheet("https://docs.google.com/spreadsheets/d/1EdFRvxQApkrU-JCzG7sU91scyhzK0l2VG26RkGXbC3o/edit?gid=1834412358#gid=1834412358", sheet="tem_collection_table")
+# 
+# new <- sheet %>%
+#   select(1:13) %>%
+#   left_join(annotations_first %>% select(source_name, 14:55))
+# 
+# 
+# googlesheets4::write_sheet(new, "https://docs.google.com/spreadsheets/d/1EdFRvxQApkrU-JCzG7sU91scyhzK0l2VG26RkGXbC3o/edit?gid=1834412358#gid=1834412358", sheet="tem_collection_table_new")
+# 
 
 group_lookup <- tibble(
   code  = as.character(1:8),
