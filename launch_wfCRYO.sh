@@ -20,7 +20,7 @@ cd /scratch/rheinnec/cryo_screen
 bash "${repo_dir}/cryo/cryo_main.sh" interactive \
   --sheet_mode google \
   --sheet_url "https://docs.google.com/spreadsheets/d/1ePRpa56mmMvCeRTLXmwOywOLy5_I3AFrxJepSUYGR1s/edit?gid=1442254503#gid=1442254503" \
-  --sheet_name "cryo_lm" \
+  --sheet_name "cryo_input_table" \
   --google_key "${repo_dir}/trec-tem-screen-e98a2e03f58b.json" \
   --collection_table_url "https://docs.google.com/spreadsheets/d/15WNNnse7OvlfiJwFOFYbQA4zIp-5nKc0icRZYfJS--o/edit?gid=199938698#gid=199938698" \
   --collection_table_sheet "cryo_collection_table" \
