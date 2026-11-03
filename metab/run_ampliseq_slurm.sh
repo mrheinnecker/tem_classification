@@ -11,24 +11,25 @@
 
 set -euo pipefail
 
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-readonly PARAMS_FILE="${PARAMS_FILE:-${SCRIPT_DIR}/ampliseq_params.yaml}"
-readonly CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/ampliseq_orientation.config}"
-readonly WORK_DIR="${WORK_DIR:-${SCRIPT_DIR}/work}"
-readonly APPTAINER_CACHE="${NXF_APPTAINER_CACHEDIR:-${SCRIPT_DIR}/apptainer_cache}"
+# sbatch runs a copy of this script from the Slurm spool directory, so paths
+# cannot be resolved relative to it. main.sh passes all of them via --export.
+for required_env in PARAMS_FILE CONFIG_FILE WORK_DIR NXF_APPTAINER_CACHEDIR; do
+    if [[ -z "${!required_env:-}" ]]; then
+        echo "Error: ${required_env} is not set. Submit this job through main.sh." >&2
+        exit 2
+    fi
+done
+
+readonly APPTAINER_CACHE="${NXF_APPTAINER_CACHEDIR}"
 readonly PIPELINE_VERSION="${PIPELINE_VERSION:-2.18.0}"
 readonly CONTAINER_PROFILE="${CONTAINER_PROFILE:-apptainer}"
 
-if [[ ! -r "${PARAMS_FILE}" ]]; then
-    echo "Error: parameter file not found: ${PARAMS_FILE}" >&2
-    echo "Copy ampliseq_params.example.yaml to ampliseq_params.yaml and edit it." >&2
-    exit 2
-fi
-
-if grep -q 'REPLACE_ME' "${PARAMS_FILE}"; then
-    echo "Error: ${PARAMS_FILE} still contains REPLACE_ME placeholders." >&2
-    exit 2
-fi
+for required_file in "${PARAMS_FILE}" "${CONFIG_FILE}"; do
+    if [[ ! -r "${required_file}" ]]; then
+        echo "Error: required file is not readable: ${required_file}" >&2
+        exit 2
+    fi
+done
 
 if ! command -v nextflow >/dev/null 2>&1; then
     echo "Error: Nextflow is not available. Load the appropriate cluster module." >&2

@@ -142,13 +142,17 @@ SKIP_INCOMPLETE="${SKIP_INCOMPLETE}" CHECK_GZIP="${CHECK_GZIP}" \
     printf 'FW_primer: "%s"\n' "${FW_PRIMER}"
     printf 'RV_primer: "%s"\n' "${RV_PRIMER}"
     printf 'binned_quality: "%s"\n' "${BINNED_QUALITY}"
+    # 16S pairs overlap and are merged; 18S pairs do not and are concatenated.
+    printf 'mergepairs_strategy: "consensus"\n'
     printf 'skip_taxonomy: %s\n' "${SKIP_TAXONOMY}"
     printf 'max_cpus: %s\n' "${MAX_CPUS}"
     printf 'max_memory: "%s"\n' "${MAX_MEMORY}"
     printf 'max_time: "%s"\n' "${MAX_TIME}"
     printf 'min_read_counts: 1\n'
     printf 'ignore_empty_input_files: false\n'
-    printf 'ignore_failed_trimming: false\n'
+    # Clean blanks can lose all of their few reads; drop them instead of failing.
+    printf 'ignore_failed_trimming: true\n'
+    printf 'ignore_failed_filtering: true\n'
 } > "${PARAMS_FILE}"
 
 SBATCH_OPTIONS=()
@@ -166,5 +170,5 @@ echo "Apptainer temp:  ${APPTAINER_TMP}"
 
 sbatch \
     "${SBATCH_OPTIONS[@]}" \
-    --export="ALL,PARAMS_FILE=${PARAMS_FILE},WORK_DIR=${WORK_DIR},NXF_APPTAINER_CACHEDIR=${APPTAINER_CACHE},APPTAINER_TMPDIR=${APPTAINER_TMP},PIPELINE_VERSION=${PIPELINE_VERSION},CONTAINER_PROFILE=${CONTAINER_PROFILE}" \
+    --export="ALL,PARAMS_FILE=${PARAMS_FILE},CONFIG_FILE=${SCRIPT_DIR}/ampliseq_orientation.config,WORK_DIR=${WORK_DIR},NXF_APPTAINER_CACHEDIR=${APPTAINER_CACHE},APPTAINER_TMPDIR=${APPTAINER_TMP},PIPELINE_VERSION=${PIPELINE_VERSION},CONTAINER_PROFILE=${CONTAINER_PROFILE}" \
     "${SLURM_RUNNER}"

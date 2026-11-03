@@ -4,6 +4,15 @@
 # Usage:
 #   make_ampliseq_samplesheet.sh FASTQ_DIR OUTPUT_TSV \
 #       [SAMPLEINFO_TSV [MAX_ENVIRONMENTAL [MAX_CONTROLS]]]
+#
+# With SAMPLEINFO_TSV, the samplesheet also gets a `run` column, and with
+# CONTROL_COLUMN=1 a `control` column. The run is the Illumina flowcell ID taken from the submitted filename
+# in the description (e.g. ..._HCJF5DRX7.UDI140-...), so DADA2 learns one error
+# model per sequencing run.
+#
+# The `control` column is off by default: whenever it is present, ampliseq
+# 2.18 runs DECONTAM (even with --decontam none), and that crashes when a blank
+# ends with zero ASV counts. Controls are taken from sampleinfo.tsv downstream.
 
 set -euo pipefail
 
@@ -46,12 +55,19 @@ if (( ${#FORWARD_FILES[@]} == 0 )); then
 fi
 
 readonly TEMP_OUTPUT="${OUTPUT_TSV}.tmp.$$"
-trap 'rm -f -- "${TEMP_OUTPUT}"' EXIT
+trap 'rm -f -- "${TEMP_OUTPUT}" "${TEMP_OUTPUT}.cut"' EXIT
 
 declare -A TYPE_BY_FILE=()
+declare -A RUN_BY_FILE=()
 if [[ -n "${SAMPLEINFO_TSV}" ]]; then
-    while IFS=$'\t' read -r name _url _size _md5 _description _comment _inserted _analyses _samples type; do
+    while IFS=$'\t' read -r name _url _size _md5 description _comment _inserted _analyses _samples type; do
         [[ "${name}" == "Name" ]] && continue
+        if [[ "${description}" =~ _([A-Z0-9]{9})\.UDI ]]; then
+            RUN_BY_FILE["${name}"]="${BASH_REMATCH[1]}"
+        else
+            echo "Error: no flowcell ID in the description of ${name}." >&2
+            exit 1
+        fi
         case "${type}" in
             environmental) TYPE_BY_FILE["${name}"]="sample" ;;
             control)       TYPE_BY_FILE["${name}"]="control" ;;
@@ -61,7 +77,7 @@ if [[ -n "${SAMPLEINFO_TSV}" ]]; then
                 ;;
         esac
     done < "${SAMPLEINFO_TSV}"
-    printf 'sample\tfastq_1\tfastq_2\tcontrol\n' > "${TEMP_OUTPUT}"
+    printf 'sample\tfastq_1\tfastq_2\trun\tcontrol\n' > "${TEMP_OUTPUT}"
 else
     printf 'sample\tfastq_1\tfastq_2\n' > "${TEMP_OUTPUT}"
 fi
@@ -90,7 +106,12 @@ for forward_name in "${FORWARD_FILES[@]}"; do
             echo "Error: mate types disagree for ${sample}." >&2
             exit 1
         fi
+        if [[ "${RUN_BY_FILE[${forward_name}]}" != "${RUN_BY_FILE[${reverse_name}]}" ]]; then
+            echo "Error: mate runs disagree for ${sample}." >&2
+            exit 1
+        fi
         sample_type="${TYPE_BY_FILE[${forward_name}]}"
+        sample_run="${RUN_BY_FILE[${forward_name}]}"
     fi
 
     if [[ "${sample_type}" == "control" ]]; then
@@ -124,8 +145,8 @@ for forward_name in "${FORWARD_FILES[@]}"; do
     fi
 
     if [[ -n "${SAMPLEINFO_TSV}" ]]; then
-        printf '%s\t%s\t%s\t%s\n' \
-            "${sample}" "${forward_path}" "${reverse_path}" "${sample_type}" >> "${TEMP_OUTPUT}"
+        printf '%s\t%s\t%s\t%s\t%s\n' \
+            "${sample}" "${forward_path}" "${reverse_path}" "${sample_run}" "${sample_type}" >> "${TEMP_OUTPUT}"
     else
         printf '%s\t%s\t%s\n' \
             "${sample}" "${forward_path}" "${reverse_path}" >> "${TEMP_OUTPUT}"
@@ -151,6 +172,15 @@ fi
 if [[ "${MAX_CONTROLS}" != "all" ]] && (( controls_written < MAX_CONTROLS )); then
     echo "Error: requested ${MAX_CONTROLS} controls but found ${controls_written} complete pairs." >&2
     exit 1
+fi
+
+if [[ -n "${SAMPLEINFO_TSV}" ]]; then
+    echo "Samples per run (run, control/sample):"
+    awk -F'\t' 'NR > 1 { n[$4 "\t" $5]++ } END { for (k in n) print "  " k "\t" n[k] }' "${TEMP_OUTPUT}" | sort
+    if [[ "${CONTROL_COLUMN:-0}" != "1" ]]; then
+        cut -f 1-4 -- "${TEMP_OUTPUT}" > "${TEMP_OUTPUT}.cut"
+        mv -- "${TEMP_OUTPUT}.cut" "${TEMP_OUTPUT}"
+    fi
 fi
 
 mv -- "${TEMP_OUTPUT}" "${OUTPUT_TSV}"
