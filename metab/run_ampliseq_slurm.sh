@@ -13,7 +13,7 @@ set -euo pipefail
 
 # sbatch runs a copy of this script from the Slurm spool directory, so paths
 # cannot be resolved relative to it. main.sh passes all of them via --export.
-for required_env in PARAMS_FILE CONFIG_FILE WORK_DIR NXF_APPTAINER_CACHEDIR; do
+for required_env in PARAMS_FILE CONFIG_FILE RESOURCES_CONFIG WORK_DIR NXF_APPTAINER_CACHEDIR; do
     if [[ -z "${!required_env:-}" ]]; then
         echo "Error: ${required_env} is not set. Submit this job through main.sh." >&2
         exit 2
@@ -24,7 +24,7 @@ readonly APPTAINER_CACHE="${NXF_APPTAINER_CACHEDIR}"
 readonly PIPELINE_VERSION="${PIPELINE_VERSION:-2.18.0}"
 readonly CONTAINER_PROFILE="${CONTAINER_PROFILE:-apptainer}"
 
-for required_file in "${PARAMS_FILE}" "${CONFIG_FILE}"; do
+for required_file in "${PARAMS_FILE}" "${CONFIG_FILE}" "${RESOURCES_CONFIG}"; do
     if [[ ! -r "${required_file}" ]]; then
         echo "Error: required file is not readable: ${required_file}" >&2
         exit 2
@@ -56,5 +56,6 @@ nextflow run nf-core/ampliseq \
     -profile "${CONTAINER_PROFILE}" \
     -params-file "${PARAMS_FILE}" \
     -c "${CONFIG_FILE}" \
+    -c "${RESOURCES_CONFIG}" \
     -work-dir "${WORK_DIR}" \
     -resume

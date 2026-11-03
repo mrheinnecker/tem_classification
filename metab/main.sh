@@ -100,6 +100,7 @@ done
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SAMPLESHEET="${RUN_DIR}/ampliseq_samplesheet.tsv"
 readonly PARAMS_FILE="${RUN_DIR}/ampliseq_params.yaml"
+readonly RESOURCES_CONFIG="${RUN_DIR}/ampliseq_resources.config"
 readonly SAMPLESHEET_BUILDER="${SCRIPT_DIR}/make_ampliseq_samplesheet.sh"
 readonly SLURM_RUNNER="${SCRIPT_DIR}/run_ampliseq_slurm.sh"
 
@@ -145,15 +146,20 @@ SKIP_INCOMPLETE="${SKIP_INCOMPLETE}" CHECK_GZIP="${CHECK_GZIP}" \
     # 16S pairs overlap and are merged; 18S pairs do not and are concatenated.
     printf 'mergepairs_strategy: "consensus"\n'
     printf 'skip_taxonomy: %s\n' "${SKIP_TAXONOMY}"
-    printf 'max_cpus: %s\n' "${MAX_CPUS}"
-    printf 'max_memory: "%s"\n' "${MAX_MEMORY}"
-    printf 'max_time: "%s"\n' "${MAX_TIME}"
     printf 'min_read_counts: 1\n'
     printf 'ignore_empty_input_files: false\n'
     # Clean blanks can lose all of their few reads; drop them instead of failing.
     printf 'ignore_failed_trimming: true\n'
     printf 'ignore_failed_filtering: true\n'
 } > "${PARAMS_FILE}"
+
+# ampliseq 2.18 no longer reads max_cpus/max_memory/max_time; requests above
+# these caps (up to 200 GB by default) are lowered to fit the cluster.
+{
+    printf 'process {\n'
+    printf '    resourceLimits = [cpus: %s, memory: %s, time: %s]\n' "${MAX_CPUS}" "${MAX_MEMORY}" "${MAX_TIME}"
+    printf '}\n'
+} > "${RESOURCES_CONFIG}"
 
 SBATCH_OPTIONS=()
 [[ -n "${SBATCH_ACCOUNT}" ]] && SBATCH_OPTIONS+=("--account=${SBATCH_ACCOUNT}")
@@ -170,5 +176,5 @@ echo "Apptainer temp:  ${APPTAINER_TMP}"
 
 sbatch \
     "${SBATCH_OPTIONS[@]}" \
-    --export="ALL,PARAMS_FILE=${PARAMS_FILE},CONFIG_FILE=${SCRIPT_DIR}/ampliseq_orientation.config,WORK_DIR=${WORK_DIR},NXF_APPTAINER_CACHEDIR=${APPTAINER_CACHE},APPTAINER_TMPDIR=${APPTAINER_TMP},PIPELINE_VERSION=${PIPELINE_VERSION},CONTAINER_PROFILE=${CONTAINER_PROFILE}" \
+    --export="ALL,PARAMS_FILE=${PARAMS_FILE},CONFIG_FILE=${SCRIPT_DIR}/ampliseq_orientation.config,RESOURCES_CONFIG=${RESOURCES_CONFIG},WORK_DIR=${WORK_DIR},NXF_APPTAINER_CACHEDIR=${APPTAINER_CACHE},APPTAINER_TMPDIR=${APPTAINER_TMP},PIPELINE_VERSION=${PIPELINE_VERSION},CONTAINER_PROFILE=${CONTAINER_PROFILE}" \
     "${SLURM_RUNNER}"

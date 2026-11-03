@@ -100,5 +100,10 @@ nextflow run taxonomy/wfTAXONOMY.nf -c taxonomy/nextflow.config [-profile slurm]
     [--container_dada2 /path/to/dada2_1.38.sif] [--cpus 16 --memory "32 GB"]
 ```
 
+On the cluster, adjust the paths at the top of `taxonomy/run_taxonomy_slurm.sh`
+(or pass them via `sbatch --export=ALL,AMPLISEQ_RESULTS=...`) and submit it with
+`sbatch taxonomy/run_taxonomy_slurm.sh`. It checks all inputs, then runs the
+command above with `-profile slurm` as a small controller job.
+
 On the pilot (6,573 ASVs, 8 CPUs) the 16S assignment took ~4 min and the 18S
 assignment ~22 min.
