@@ -1,294 +1,231 @@
 # TREC-Biobank / IMATREC central data processing workflows
 
-This repository contains code to process all data modalities of the TREC-Biobank / IMATREC project by the Schwab team, CBB unit EMBL Heideberg.
+This repository contains code to process all data modalities of the TREC-Biobank / IMATREC project by the Schwab team, CBB unit EMBL Heidelberg.
 
-The repo is sub-structured according to the various modalities:
+The repo is sub-structured according to the various modalities and downstream analyses:
 
+| Directory | Content |
+|---|---|
+| `tem/` | Transmission electron microscopy (TEM) |
+| `sem/` | Scanning electron microscopy (SEM) |
+| `hitt/` | High-Throughput Tomography; X-ray scans |
+| `cryo/` | Cryo confocal images of plunge-frozen (PF) and waffle-method (WM) grids, and HPF carrier screens |
+| `plastic/` | Confocal images of freeze-substituted resin blocks (Leica `.lif`) |
+| `exm/` | Expansion microscopy (Nikon `.nd2`, one file per channel) |
+| `metab/` | Metabarcoding (16S/18S amplicons): nf-core/ampliseq plus SILVA/PR2 taxonomy |
+| `overview/` | Biobank overview (samples, sampling events, imaging per modality) and collection-table overview |
+| `annotations/` | TEM annotation table setup and preliminary annotation analysis |
+| `microsam/` | micro-SAM segmentation, DINOv2 embedding and clustering of TEM images (separate pipeline, see `microsam/README.txt`) |
+| `container/` | Apptainer/Singularity definition files |
 
-- `tem/`: Transmission electron microscopy (TEM) 
-- `sem/`: Scanning electron microscopy (SEM) 
-- `hitt/`: High-Throughput Tomography; X-ray scans 
-- `cryo/`: Cryo confocal images of Plunge-frozen grids (also waffle method)
-- `plastic/`: Confocal images of freeze-substituted resin blocks
-
-Each modality follows the same strategy: Starting from raw data as it arrives from microscopes / input sources and ending in conversion to ome-zarr format, storing everything in s3 storage and creating collection tables to browse the data through MoBie.
-Each workflow is implemented in nextflow and has its dependencies handled via Apptainer/SIngularity container (see definition files in `container/`).
+The imaging workflows follow the same strategy: starting from raw data as it arrives from the microscopes / input sources and ending in conversion to OME-Zarr (zarr format 3 by default), storing everything in S3 storage and creating collection tables to browse the data through MoBIE.
+Each workflow is implemented in Nextflow and has its dependencies handled via Apptainer/Singularity containers (see definition files in `container/`).
 
 ## Usage instructions
 
-Current implementation is optimaized for EMBL slurm HPC environment. Each workflow can be run in two different modes: `cluster` or `interactive`. 
-In cluster mode, each nextflow process is submitted as a single batch job to slurm (except some light-weight guardrail or file collection scripts). In interactive mode, all processes run in the local terminal. 
-The following settings are recommened for each workflow:
+The current implementation is optimized for the EMBL Slurm HPC environment. Every imaging workflow has a launcher in the repo root (`launch_wf<MODALITY>.sh`) that holds the complete run definition: input sheet, collection table, paths, S3 target and workflow stage. Edit the launcher, then submit it:
 
-- `wfTEM`: Heavy; run always in cluster mode; submit launcher through: `sbatch /path/to/repo/launch_wfTEM.sh` with at least 12 hours of runtime
-- `wfHITT`: Extremely heavy; run always in cluster mode; Manually add this line to the launcher `launch_wfHITT.sh` with password for Hamburg cerberus server `export HITT_SSHPASS='PASSWORD'`;submit launcher through: `sbatch /path/to/repo/launch_wfHITT.sh` with at least 48 hours of runtime
-- `wfSEM`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
-- `wfCRYO`: lightweight: allocate a cluster node (`srun -p htc --time=0-04:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
-- `wfPLASTIC`: lightweight: allocate a cluster node (`srun -p htc --time=0-02:00:00 -c 10 --ntasks-per-node 16 --mem 64G --pty bash`) and run in interactive mode.
+```bash
+sbatch /g/schwab/marco/repos/tem_classification/launch_wfTEM.sh
+```
 
+The launcher runs as one Slurm job (2 CPUs, 16 GB, 24 h by default, logs in `/scratch/rheinnec/<modality>_screen/`). The first argument of the `*_main.sh` call inside it selects where the Nextflow tasks run:
+
+- `cluster`: each Nextflow process is submitted as its own Slurm job (except light-weight guardrail or file-collection steps).
+- `interactive`: all processes run inside the launcher job / current node.
+- `local`: lightweight discovery/debugging on local paths.
+
+Recommended settings:
+
+| Launcher | Mode | Notes |
+|---|---|---|
+| `launch_wfTEM.sh` | `cluster` | Heavy (IMOD blending, gradient correction, conversion) |
+| `launch_wfHITT.sh` | `cluster` | Extremely heavy. Export the Hamburg cerberus password first: `export HITT_SSHPASS='PASSWORD'`; allow at least 48 h |
+| `launch_wfSEM.sh` | `interactive` | Lightweight |
+| `launch_wfCRYO.sh` | `interactive` | Lightweight; input from the `cryo_input_table` sheet |
+| `launch_wfPLASTIC.sh` | `interactive` | Lightweight |
+| `launch_wfEXM.sh` | `interactive` | EuBI memory is sized per image from the input size |
+| `launch_collection_overview.sh` | - | Collection-table overview (see [Overview](#overview-and-annotations)) |
+| `metab/launch_ampliseq_cluster.sh` | - | Run with `bash` on the login node; it submits the ampliseq job itself (see [Metabarcoding](#metabarcoding-metab)) |
+
+Common launcher options:
+
+- `--workflow_stage`: `discover` (only find images and write logs), `process` (process and convert, no S3/collection table), `all` (full run including S3 and collection table); CRYO also has `collection` (only rebuild the collection table).
+- `--dryrun TRUE --dryrun_n N`: process only N candidates (EXM: `--dryrun_images` picks fixed images).
+- `--resume`: reuse the Nextflow cache.
+- `--logdir`: run logs, Nextflow trace/report/timeline/DAG and per-dataset metadata go to `/g/schwab/biobank_logs/<modality>/wf<MODALITY>_<timestamp>`.
+
+### S3 storage
+
+All datasets go to `imatrec/central_data_processing/<modality>` on the EMBL S3 (`schwab.buckets.embl.de`).
+
+- TEM, SEM and HITT upload with the MinIO client (`mc`). The root `zarr.json` is uploaded last, so a dataset only counts as present (and is skipped in later runs) once its upload is complete.
+- CRYO, PLASTIC and EXM copy into the mounted S3 share (`--publish_dir`, `/g/schwab/s3-public/imatrec/central_data_processing/<modality>`). The copy goes to a hidden `.<name>.ome.zarr.partial` folder that is renamed when complete; incomplete entries are listed in `incomplete_s3_entries.txt` and processed again. Non-dry `all`/`collection` runs stop if the share is not mounted.
 
 ## Repository Layout
 
 ```text
 .
-+-- container/
-|   +-- czi_to_tiff.def
-|   +-- lif_metadata.def
-|   +-- eubibridge.def
-|   +-- imod.def
-|   +-- py_mrcfile.def
-|   +-- segmentation.def
-+-- launch_wfSEM.sh
-+-- launch_wfHITT.sh
-+-- launch_wfCRYO.sh
-+-- launch_wfPLASTIC.sh
-+-- sem/
-|   +-- wfSEM.nf
-|   +-- sem_main.sh
-|   +-- nextflow.config
-|   +-- select_images.R
-|   +-- extract_metadata.py
-|   +-- make_collection_table.R
-+-- hitt/
-|   +-- wfHITT.nf
-|   +-- hitt_main.sh
-|   +-- nextflow.config
-|   +-- select_images.R
-|   +-- make_collection_table.R
-+-- cryo/
-|   +-- wfCRYO.nf
-|   +-- cryo_main.sh
-|   +-- nextflow.config
-|   +-- select_images.R
-|   +-- extract_metadata.py
-|   +-- make_collection_table.R
-+-- plastic/
-|   +-- wfPLASTIC.nf
-|   +-- plastic_main.sh
-|   +-- nextflow.config
-|   +-- select_images.R
-|   +-- extract_metadata.py
-|   +-- make_collection_table.R
-+-- tem/
-    +-- wfTEM.nf
-    +-- main.sh
-    +-- nextflow.config
-    +-- imaging_ov.R
-    +-- process_images.py
-    +-- correct_gradient.py
-    +-- extract_image_stats.py
-    +-- make_collection_table.R
-    +-- figures/
++-- launch_wf{TEM,SEM,HITT,CRYO,PLASTIC,EXM}.sh   # run definitions, submit with sbatch
++-- launch_collection_overview.sh
++-- container/        # *.def: eubibridge, imod(_procps), mc, py_mrcfile, segmentation,
+|                     #        czi_to_tiff, nd2_to_tiff, lif_metadata, sshpass, microsam
++-- tem/              # wfTEM.nf, main.sh, nextflow.config, process_images.py, correct_gradient.py,
+|                     # extract_image_stats.py, make_collection_table.R, make_split_collection_tables.R,
+|                     # imaging_ov.R, annotation_ov.R, figures/
++-- sem/              # wfSEM.nf, sem_main.sh, nextflow.config, select_images.R, extract_metadata.py,
+|                     # make_collection_table.R
++-- hitt/             # wfHITT.nf, hitt_main.sh, nextflow.config, prepare_slices.py,
+|                     # extract_stack_stats.py, make_collection_table.R
++-- cryo/             # wfCRYO.nf, cryo_main.sh, nextflow.config, extract_metadata.py, prepare_input.py,
+|                     # patch_omezarr_metadata.py, make_collection_table.R, cryo_ov_figure.R
++-- plastic/          # wfPLASTIC.nf, plastic_main.sh, nextflow.config, extract_metadata.py,
+|                     # patch_omezarr_metadata.py, make_collection_table.R
++-- exm/              # wfEXM.nf, exm_main.sh, nextflow.config, prep_input_table.R, extract_metadata.py,
+|                     # prepare_input.py, patch_omezarr_metadata.py, make_collection_table.R
++-- metab/            # ampliseq launch scripts, samplesheet builder, datahub download, AMPLISEQ_SETUP.md
+|   +-- taxonomy/     # wfTAXONOMY.nf + R scripts (SILVA/PR2 classification)
++-- overview/         # biobank_overview.R, biobank_overview_figure.R, collection_table_overview.R
++-- annotations/      # setup_main_table.R, prelim_anal.R
++-- microsam/         # segmentation / embedding / clustering pipeline
 ```
+
+Each imaging module has its own README (`tem/`, `hitt/`, `cryo/`, `plastic/`, `exm/`) with the detailed input-table format and processing steps.
 
 ## TEM Workflow
 
-The TEM workflow is defined in `tem/wfTEM.nf`, configured by `tem/nextflow.config`, and usually launched through `tem/main.sh`.
+Defined in `tem/wfTEM.nf`, configured by `tem/nextflow.config`, launched through `tem/main.sh` (via `launch_wfTEM.sh`).
 
-At a high level it:
-
-1. Scans a raw TEM directory for `.mrc` files and matching `.mdoc` files.
-2. Maintains an image log in either a local TSV file or a Google Sheet.
-3. Generates a progress/count overview plot for imaged samples.
-4. Renames/copies raw inputs into workflow output folders.
-5. Runs IMOD tools such as `justblend` and `blendmont`.
-6. Detects and optionally corrects broad low-frequency grayscale gradients.
-7. Generates overview PNGs and QC images.
-8. Extracts simple intensity statistics for contrast limits.
-9. Converts processed MRC images to OME-Zarr using EuBI-Bridge.
-10. In full mode, uploads OME-Zarr datasets to EMBL S3 and writes a collection table.
-
-Useful entry points:
+1. Scans the raw TEM directory for `.mrc` files and matching `.mdoc` files.
+2. Maintains an image log in a local TSV file or a Google Sheet.
+3. Selects images that are not yet completely uploaded to S3 (root `zarr.json` present).
+4. Runs IMOD tools (`justblend`, `blendmont`) for montages.
+5. Detects and optionally corrects broad low-frequency grayscale gradients (metrics/QC to the log dir).
+6. Generates overview PNGs and intensity statistics for contrast limits.
+7. Converts processed MRC images to OME-Zarr using EuBI-Bridge.
+8. In `all` mode, uploads to S3 and writes the `tem_collection_table`.
 
 ```bash
-cd tem
-./main.sh local
-./main.sh interactive
-./main.sh cluster
+bash tem/main.sh cluster --sheet_mode google --workflow_stage all --dryrun TRUE --dryrun_n 2 [...]
 ```
 
-The main runtime controls can be overridden with environment variables:
-
-```bash
-WORKFLOW_STAGE=discover DRYRUN=TRUE ./main.sh local
-WORKFLOW_STAGE=process DRYRUN=FALSE ./main.sh interactive
-WORKFLOW_STAGE=all DRYRUN=FALSE ./main.sh cluster
-RESUME=FALSE ./main.sh interactive
-```
-
-`WORKFLOW_STAGE` supports the following practical modes:
-
-- `discover`: only discover images and update/write logs.
-- `process`: process and convert images, but skip final S3/collection-table steps.
-- `all`: run the full workflow including S3 upload and collection-table generation.
-
-See `tem/README.md` for more detailed TEM-specific usage notes.
+Options can also be given as environment variables (`WORKFLOW_STAGE`, `DRYRUN`, `RESUME`, `SHEET_MODE`, `RAWDIR`, ...). See `tem/README.md`.
 
 ## HITT Workflow
 
-The HITT workflow is defined in `hitt/wfHITT.nf`, configured by `hitt/nextflow.config`, and launched through `hitt/hitt_main.sh`.
+Defined in `hitt/wfHITT.nf`, launched through `hitt/hitt_main.sh`.
 
-Unlike the TEM and SEM workflows, HITT does not discover files by scanning a raw image directory. It reads a Google Sheet or local table with a remote `source_path` column and processes exactly those listed image directories.
+HITT does not scan a raw directory. It reads a Google Sheet or local table with a remote `source_path` column (Hamburg cerberus server) and processes exactly those image directories:
 
-For each remote source path, the default scratch input is:
+1. Incrementally copies each remote stack into scratch (`/scratch/rheinnec/hitt_screen/...`).
+2. Stages a renamed copy of the `tomo/slice_*.tif` stack so it starts at `Z0001.tif`, converted to `uint16` by default.
+3. Calculates stack-wide gray-value display limits.
+4. Converts to OME-Zarr, uploads to `s3embl/imatrec/central_data_processing/hitt/<image_name>/` and updates the `hitt_collection_table`.
 
-```text
-/scratch/rheinnec/tmp_hitt/<dataset_name>/recon_111_1/tomo
-```
-
-and the default OME-Zarr output is:
-
-```text
-/scratch/rheinnec/tmp_hitt/<dataset_name>/<dataset_name>
-```
-
-Useful entry points:
-
-```bash
-cd hitt
-bash ./hitt_main.sh interactive --sheet_mode google --workflow_stage process
-bash ./hitt_main.sh cluster --sheet_mode google --workflow_stage all
-```
-
-Before conversion, HITT incrementally copies each listed remote stack into scratch, then stages a renamed copy of each `tomo/slice_*.tif` stack in the Nextflow work directory so it starts at `Z0001.tif`. Staged images are converted to `uint16` by default, with an option to preserve the original dtype. Stack-wide gray-value display limits are calculated from the staged TIFFs. In `all` mode, converted OME-Zarr datasets are uploaded by default to `s3embl/hitttest/<image_name>/` without an extra folder level, and the `hitt_collection_table` Google Sheet is updated.
+See `hitt/README.md`.
 
 ## SEM Workflow
 
-The SEM workflow is defined in `sem/wfSEM.nf`, configured by `sem/nextflow.config`, and usually launched through `sem/sem_main.sh`.
+Defined in `sem/wfSEM.nf`, launched through `sem/sem_main.sh`.
 
-At a high level it:
-
-1. Scans a raw SEM directory for `.tif`/`.tiff` files.
+1. Scans the raw SEM directory (`/g/schwab/Chandni/SEM/IMATREC SEM`) for `.tif`/`.tiff` files.
 2. Builds a local or Google-backed image log.
-3. Extracts TIFF/Zeiss SEM metadata, including pixel-size information.
-4. Converts SEM TIFF files to OME-Zarr using EuBI-Bridge.
-5. In full mode, uploads OME-Zarr datasets to EMBL S3.
-6. Builds a SEM collection table, optionally joined with metadata and taxonomy/annotation information.
-
-Useful entry points:
-
-```bash
-cd sem
-bash ./sem_main.sh --profile local
-bash ./sem_main.sh --profile interactive
-bash ./sem_main.sh --profile cluster
-```
-
-As with the TEM workflow, the SEM launcher separates persistent data paths from Nextflow's working directory:
-
-```bash
-bash ./sem_main.sh \
-  --profile cluster \
-  --main_dir /g/schwab/sem_screen \
-  --work_dir /scratch/rheinnec/sem_screen/work \
-  --workflow_stage all \
-  --dryrun FALSE
-```
-
-For cluster and interactive runs, `/g/schwab/sem_screen` is the default output/log base and `/scratch/rheinnec/sem_screen/work` is the default Nextflow work directory. You can still override the same values with `SEM_SCREEN_DIR`, `WORK_DIR`, `OUTDIR`, `LOGDIR`, and `RAWDIR`.
-
-To submit the full SEM driver as one Slurm job, edit the run settings in `launch_wfSEM.sh` and submit:
-
-```bash
-sbatch launch_wfSEM.sh
-```
+3. Extracts TIFF/Zeiss SEM metadata including pixel size (kept in the log dir, no intermediate data published).
+4. Converts to OME-Zarr, uploads to S3 and builds the SEM collection table.
 
 ## CRYO Workflow
 
-The CRYO workflow is defined in `cryo/wfCRYO.nf`, configured by `cryo/nextflow.config`, and launched through `cryo/cryo_main.sh`.
+Defined in `cryo/wfCRYO.nf`, launched through `cryo/cryo_main.sh`.
 
-It reads raw light-microscopy file paths from a local table or Google Sheet, extracts X/Y pixel size and Z spacing metadata, prepares inputs, converts each listed file to OME-Zarr with EuBI-Bridge, uploads completed datasets to S3, and writes a collection table. Like HITT, it first lists S3 and skips datasets whose OME-Zarr root markers already exist in the target bucket. Zeiss `.czi` inputs use the CRYO-specific `container/czi_to_tiff.def` environment and are first converted to an intermediate OME-TIFF before the existing EuBI-Bridge container creates OME-Zarr.
+The data is registered in labID; the labID table is copied into the `cryo_input_table` Google Sheet (paths only), which is the workflow input. For every listed file the workflow extracts X/Y/Z pixel size and channels, prepares the input (Zeiss `.czi` is converted to an intermediate OME-TIFF in the `czi_to_tiff` container), converts with EuBI-Bridge, patches the OME-Zarr metadata (channel names/colors) and publishes into the mounted S3 share.
 
-Useful entry points:
+- PF and WM grids go to `cryo_collection_table`.
+- HPF carrier screens (`_HPF_` in the file name) go to a separate `cryo_hpf_collection_table` (`--hpf_collection_table_sheet`). These are unstitched tile scans; the tiles are placed at their stage positions, without registration or blending.
+- Channels are read from the acquired image dimensions; the reflection channel is shown in white.
 
-```bash
-cd cryo
-bash ./cryo_main.sh local --workflow_stage discover
-bash ./cryo_main.sh interactive --sheet_mode google --workflow_stage process
-bash ./cryo_main.sh cluster --sheet_mode google --workflow_stage all
-bash ./cryo_main.sh cluster --workflow_stage collection
-```
-
-The input table should contain one of `raw_path`, `file_path`, `filepath`, `file`, `source_path`, or `path`. Optional scale columns such as `x_scale`, `y_scale`, and `z_scale` can override file metadata; otherwise the workflow reads OME/ImageJ/TIFF metadata where available.
+See `cryo/README.md`.
 
 ## PLASTIC Workflow
 
-The PLASTIC workflow is defined in `plastic/wfPLASTIC.nf`, configured by `plastic/nextflow.config`, and launched through `plastic/plastic_main.sh`.
+Defined in `plastic/wfPLASTIC.nf`, launched through `plastic/plastic_main.sh`.
 
-It follows the CRYO table/S3/collection-table pattern, but targets Leica `.lif` light-microscopy inputs. Unlike CRYO, it does not create an intermediate OME-TIFF; it sends the raw `.lif` path directly to EuBI-Bridge. Extra EuBI flags for LIF/stitched-file handling can be passed with `--eubi_extra_args`.
+Same table/S3/collection-table pattern as CRYO, for Leica `.lif` files. There is no intermediate OME-TIFF: the raw `.lif` goes directly to EuBI-Bridge (extra flags via `--eubi_extra_args`). See `plastic/README.md`.
 
-## Run Modes
+## EXM Workflow
 
-Both workflows use Nextflow profiles to separate local testing from cluster execution.
+Defined in `exm/wfEXM.nf`, launched through `exm/exm_main.sh` (started as a copy of CRYO).
 
-- `local`: intended for lightweight discovery/debugging on local paths.
-- `interactive`: intended for debugging on an allocated cluster node with local task execution.
-- `cluster`: intended for production runs with Slurm, Singularity containers, Google Sheets integration, and S3 upload.
-
-The configured paths in `nextflow.config` are specific to the current EMBL/project environment. Override paths with environment variables such as:
-
-```bash
-RAWDIR=/path/to/raw OUTDIR=/path/to/output LOGDIR=/path/to/logs ./main.sh interactive
+```text
+CHECKEXISTINGEXMS3FILES -> SELECTEXMIMAGES -> EXTRACTEXMMETADATA -> PREPAREEXMINPUT
+  -> EUBIEXMCONVERSION -> PATCHEXMOMEZARRMETADATA (patch + publish) -> COLLECTEXMS3FILES -> MAKEEXMCOLLECTIONTABLE
 ```
 
-or, for SEM:
+- Input: `exm_input_table` (one row per `.nd2` file or folder). All channel files of one image (`Img0098_Channel*.nd2`) are merged into one multi-channel OME-Zarr, ordered DAPI, FITC, TRITC, Cy5.
+- Datasets are named by `shortname` (e.g. `BAR_Img0093`); the site prefix is used as view/grid in the collection table.
+- Channel names in the collection table are the stained structures (FITC Centrin, TRITC Tubulin, Cy5 NHS), with MoBIE colors per channel.
+- EuBI memory is 4x the prepared OME-TIFF size + 8 GB (at least `req_mem`); time limit 2 h, rerun timed-out images with `--eubi_time 6h`.
+- The collection table only contains datasets from the input table and is rebuilt also when no new images were converted.
+
+See `exm/README.md`.
+
+## Metabarcoding (`metab/`)
+
+16S/18S metabarcoding of the TREC samples (primers 515F-Y / 926R, which amplify both prokaryotic/organellar 16S and eukaryotic 18S). Details, run structure and rationale are in `metab/AMPLISEQ_SETUP.md`.
+
+**Data.** Raw FASTQs come from the EMBL datahub (`metab/datahub_links.txt`, download with `sbatch metab/download_datahub_slurm.sh`). `metab/sampleinfo.tsv` maps the files to samples. There are four sequencing runs (flowcells): three from 2023 (no controls) and one from 2024 with 6 extraction/PCR blanks.
+
+**Step 1: nf-core/ampliseq 2.18.0.** Edit the paths at the top of `metab/launch_ampliseq_cluster.sh`, then on the login node:
 
 ```bash
-bash ./sem_main.sh \
-  --profile interactive \
-  --rawdir /path/to/sem/raw \
-  --outdir /path/to/output \
-  --logdir /path/to/logs \
-  --work_dir /scratch/rheinnec/other_sem_work
+bash metab/launch_ampliseq_cluster.sh
 ```
+
+It builds the samplesheet (`make_ampliseq_samplesheet.sh`: skips incomplete downloads, adds the flowcell as `run` so DADA2 learns one error model per run), writes the params file and a `resourceLimits` config, and submits `run_ampliseq_slurm.sh` as the Nextflow controller job. Pipeline settings:
+
+- `ampliseq_orientation.config` adds Cutadapt `--revcomp`, because the library contains both read orientations.
+- `mergepairs_strategy: consensus`: overlapping 16S pairs are merged, the longer non-overlapping 18S pairs are concatenated.
+- `skip_taxonomy: true`, taxonomy is done in step 2.
+- Blanks that lose all reads are dropped (`ignore_failed_trimming/filtering`) instead of failing the run.
+
+`metab/launcher.sh` runs a small local pilot without Slurm (subsampled reads).
+
+**Step 2: taxonomy (`metab/taxonomy/wfTAXONOMY.nf`).** Download the references once (`wget` commands in `AMPLISEQ_SETUP.md`: SILVA 138.2 and PR2 5.1.1 in DADA2 format, plus the DADA2 container as `.sif`), then:
+
+```bash
+sbatch metab/taxonomy/run_taxonomy_slurm.sh
+```
+
+| Process | What it does |
+|---|---|
+| `SPLITASVS` | Splits ASVs by barrnap's best hit: bacteria/archaea/mitochondria -> 16S, eukaryotes -> 18S; ASVs without a hit go to both |
+| `ASSIGNTAXONOMY` | DADA2 `assignTaxonomy` (minBoot 50): 16S against SILVA (to genus), 18S against PR2 (to species), in parallel |
+| `MERGETAXONOMY` | Combines both into `<ampliseq results>/taxonomy/`: `asv_taxonomy.tsv` (lineage, lowest rank, bootstrap, category: prokaryote / plastid / mitochondrion / eukaryote_nuclear / unassigned, all SILVA and PR2 columns), `asv_table_taxonomy.tsv` (counts per sample with taxonomy), `taxonomy_overview.tsv` |
+
+## Overview and annotations
+
+**Biobank overview (`overview/biobank_overview.R`, `overview/biobank_overview_figure.R`).** Run locally in R. Reads the sampling events, HPF, cryo PF/WM, MetaB and chemical-fixation sheets and the collection tables of all modalities, maps every sample and imaged dataset to its sampling event, and writes event maps and coverage tables (`*_event_map.tsv`, `imaging_map.tsv`, `event_coverage.tsv`). The figure script draws the overview figures: circle, radial, HPF flow and the chain figure (samples -> blocks/PF -> imaging, coloured by source). Set `refresh_from_sheets` to re-export the sheets (needs Google auth).
+
+**Collection-table overview (`launch_collection_overview.sh`).** Summarises all collection tables (rows, dataset metadata, counts per modality) in the tidyverse container.
+
+**Annotations (`annotations/`).**
+- `setup_main_table.R` builds the main annotation table from the TEM collection table and the existing annotations.
+- `prelim_anal.R` is the preliminary analysis. It keeps the first annotation of each cell across annotation runs and splits the `undescribed` column into one 0/1 column per number. It then runs pairwise association tests and per-site tests for every feature (Kruskal-Wallis, chi-squared, and a binomial GLMM with sample as random effect), and draws site heatmaps grouped by organelles and undescribed structures.
+- `annotations/launcher.sh` is temporary until all old annotations are adapted; use with care.
 
 ## External Dependencies
 
-The workflows expect several tools and services depending on the run mode:
-
-- Nextflow
-- Slurm, for cluster runs
-- Singularity/Apptainer, for containerized cluster runs
-- R with tidyverse-style packages for discovery, logging, and table generation
-- Python image-processing libraries such as `mrcfile`, `numpy`, `scipy`, `scikit-image`, `pandas`, `matplotlib`, and `tifffile`
-- IMOD for TEM blending/correction steps
-- EuBI-Bridge for OME-Zarr conversion
-- MinIO client (`mc`) for S3 upload/listing
-- Google Sheets/Drive credentials when using `sheet_mode=google`
-
-Container definition files for the main environments are stored in `container/`.
-
-## Outputs
-
-Typical TEM outputs include:
-
-- `images_to_process.csv`
-- `all_datasets.tsv`
-- local or Google image log
-- blended/corrected MRC files
-- gradient QC PNGs and metrics TSVs
-- overview PNGs
-- image intensity statistics
-- OME-Zarr datasets
-- S3 collection table
-
-Typical SEM outputs include:
-
-- `images_to_process.csv`
-- `all_datasets.tsv`
-- local or Google image log
-- metadata JSON files
-- pixel-size TSV files
-- OME-Zarr datasets
-- S3 collection table
+- Nextflow; Slurm for cluster runs; Apptainer/Singularity
+- R with tidyverse and googlesheets4 (discovery, logs, collection tables, overview, annotations)
+- Python image libraries (`mrcfile`, `numpy`, `scipy`, `scikit-image`, `tifffile`, `nd2`, `bioio`/`aicspylibczi`)
+- IMOD (TEM), EuBI-Bridge (OME-Zarr conversion), MinIO client `mc` (TEM/SEM/HITT upload)
+- nf-core/ampliseq 2.18.0 and DADA2 1.38 (metab), SILVA 138.2 and PR2 5.1.1 reference files
+- Google service-account key (`--google_key`) for `sheet_mode=google`
 
 ## Notes and Caveats
 
-- Several paths, bucket names, and Google Sheet URLs are project-specific and currently encoded in workflow configs or scripts.
-- Google-backed modes require a service-account key JSON file configured through `google_key`.
-- `DRYRUN=TRUE` limits processing candidates and is useful for discovery/debugging.
-- `RESUME=TRUE` enables Nextflow cache reuse where supported by the launcher scripts.
-- `tem/crop_omezarr_by_mask.py` appears to be experimental or stale: it contains OME-Zarr cropping helpers, but the current main function reads an MRC input and is not wired into the active TEM workflow.
+- Paths, bucket names and Google Sheet URLs are project-specific and live in the launchers and `nextflow.config` files.
+- `tem/crop_omezarr_by_mask.py` is experimental/stale and not wired into the TEM workflow.
+- `microsam/` uses its own absolute cluster paths and environment (see `microsam/README.txt`).
 
 ## Development Notes
 
